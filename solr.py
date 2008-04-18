@@ -274,7 +274,7 @@ Add 3 documents and delete 1, but send all of them as a single transaction.
 
 Enter a raw query, without processing the returned HTML contents.
     
-    >>> print c.query_raw(q='id:[* TO *]', wt='python', rows='10')
+    >>> print c.raw_query(q='id:[* TO *]', wt='python', rows='10')
 
 """
 import sys
