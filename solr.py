@@ -640,7 +640,6 @@ class SolrConnection:
 
         return data
 
-    
     def _update(self, request):
 
         # If we're in batching mode, just queue up the requests for later. 
@@ -708,7 +707,7 @@ class SolrConnection:
         attempts = 1
         while attempts: 
             try:
-                self.conn.request('POST', url, body, headers)
+                self.conn.request('POST', url, body.encode('UTF-8'), headers)
                 return check_response_status(self.conn.getresponse())
             except (socket.error,
                     httplib.ImproperConnectionState,
