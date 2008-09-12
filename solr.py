@@ -197,7 +197,11 @@ Query Responses
             
         results.start -- An integer indicating the starting # of documents
         
-        results.numMatches -- An integer indicating the total # of matches.
+        results.numFound -- An integer indicating the total # of matches.
+        
+        results.maxScore -- An integer indicating the maximum score assigned
+                            to a document. Takes into account all of documents
+                            found by the query, not only the current batch.
         
         header -- A dict containing any responseHeaders.  Usually:
         
@@ -903,8 +907,14 @@ class ResponseContentHandler(ContentHandler):
                 name = child.attrs.get('name', child.name)
                 if name == 'responseHeader': 
                     name = 'header'
-                elif child.name == 'result': 
+                elif child.name == 'result':
+                    
                     name = 'results'
+                    for attr_name in child.attrs.getNames():
+                        # We already know it is a response
+                        if attr_name != "name":
+                            setattr(response, attr_name, child.attrs.get(attr_name))
+                        
                 setattr(response, name, child.final)
 
         elif name in ('lst','doc'): 

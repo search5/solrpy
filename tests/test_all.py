@@ -883,6 +883,33 @@ class TestExceptions(unittest.TestCase):
 
     def tearDown(self):
         self.conn.close()
+        
+class TestResponse(unittest.TestCase):
+
+    def setUp(self):
+        self.conn = SolrConnection(SOLR_HTTP)
+   
+    def test_response_attributes(self):
+        """ Make sure Response objects have all the documented attributes.
+        """
+        # Same id, data and user_id
+        id = data = user_id = get_rand_string()
+        self.conn.add(id=id, user_id=user_id, data=data)
+        self.conn.commit()
+        
+        response = self.conn.query(q="id:" + id)
+        expected_attrs = ["numFound", "start", "maxScore", "header"]
+        
+        for attr in expected_attrs:
+            self.assertTrue(attr in dir(response), 
+                "Attribute %s not found in response. id:%s" % (attr, id))
+                
+            value = getattr(response, attr)
+            self.assertTrue(bool(value), 
+                "Attribute %s has no value. id:%s" % (attr,id))
+
+    def tearDown(self):
+        self.conn.close()
 
 if __name__ == "__main__":
     unittest.main()
