@@ -1016,32 +1016,23 @@ def utc_to_string(value):
     value += 'Z'
     return value
     
-if sys.version < '2.5.': 
-    def utc_from_string(value):
-        """
-        Parse a string representing an ISO 8601 date.
-        Note: this doesn't process the entire ISO 8601 standard, 
-        onle the specific format SOLR promises to generate. 
-        """
-        try:
-            if not value.endswith('Z') and value[10] == 'T': 
-                raise ValueError(value)
-            year = int(value[0:4])
-            month = int(value[5:7])
-            day = int(value[8:10])
-            hour = int(value[11:13])
-            minute = int(value[14:16])
-            microseconds = int(float(value[17:-1]) * 1000000.0)
-            second, microsecond = divmod(microseconds, 1000000)
-            return datetime.datetime(year, month, day, hour, 
-                minute, second, microsecond, utc)
-        except ValueError: 
-            raise ValueError ("'%s' is not a valid ISO 8601 SOLR date" % value)
-else: 
-    def utc_from_string(value): 
-        """
-        Parse a string representing an ISO 8601 date.
-        Note: this doesn't process the entire ISO 8601 standard, 
-        onle the specific format SOLR promises to generate. 
-        """
-        return datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+def utc_from_string(value):
+    """
+    Parse a string representing an ISO 8601 date.
+    Note: this doesn't process the entire ISO 8601 standard, 
+    onle the specific format SOLR promises to generate. 
+    """
+    try:
+        if not value.endswith('Z') and value[10] == 'T': 
+            raise ValueError(value)
+        year = int(value[0:4])
+        month = int(value[5:7])
+        day = int(value[8:10])
+        hour = int(value[11:13])
+        minute = int(value[14:16])
+        microseconds = int(float(value[17:-1]) * 1000000.0)
+        second, microsecond = divmod(microseconds, 1000000)
+        return datetime.datetime(year, month, day, hour, 
+            minute, second, microsecond, utc)
+    except ValueError: 
+        raise ValueError ("'%s' is not a valid ISO 8601 SOLR date" % value)

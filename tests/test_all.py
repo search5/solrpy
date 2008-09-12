@@ -29,8 +29,10 @@ def get_rand_string():
 
 Solr schema expected by testcases.
 
+<?xml version="1.0" encoding="UTF-8" ?>
 <schema name="solrpy_tests" version="1.1">
     <types>
+        <fieldType name="date" class="solr.DateField" sortMissingLast="true" omitNorms="true"/>
         <fieldType name="string" class="solr.StrField" sortMissingLast="true" omitNorms="true"/>
         <fieldType name="text" class="solr.TextField" sortMissingLast="true" omitNorms="true">
             <analyzer>
@@ -46,6 +48,7 @@ Solr schema expected by testcases.
         <field name="id" type="string" indexed="true" stored="true" required="true" />
         <field name="user_id" type="string" indexed="true" stored="true" required="false" />
         <field name="data" type="text" indexed="true" stored="true" required="true" />
+        <field name="creation_time" type="date" indexed="true" stored="true" required="false" />
     </fields>
     <uniqueKey>id</uniqueKey>
 </schema>
@@ -786,6 +789,46 @@ class TestQuerying(unittest.TestCase):
             self.assertEquals(datum, query_data[idx],
                 "Expected %s instead of %s on position %s in query_data:%s" % (
                     datum, query_data[idx], idx, query_data))
+        
+    def test_query_date_field_parsing_subseconds(self):
+        """ Test whether date fields with subsecond precision are being
+        handled correctly. See issue #3 for more info.
+        """
+        id = data = user_id = get_rand_string()
+        year, month, day  = "2008", "07", "23"
+        hour, minute, second, microsecond = "14", "47", "09", "123"
+        
+        timestamp = "%s-%s-%sT%s:%s:%s.%sZ" % (year, month, day, hour, minute, 
+                                                second, microsecond)
+        
+        self.conn.add(id=id, user_id=user_id, data=data, 
+                        creation_time=timestamp)
+        self.conn.commit()
+        
+        results = self.conn.query("id:" + id).results
+        
+        self.assertEquals(len(results), 1,
+            "Expexted 1 document, got:%d documents" % (len(results)))
+            
+        results = results[0]
+        
+        self.assertTrue("creation_time" in results,
+            "Query didn't return creation_time field. results:%s" % (results))
+            
+        query_timestamp = results["creation_time"]
+        
+        self.assertTrue(int(year) == query_timestamp.year)
+        self.assertTrue(int(month) == query_timestamp.month)
+        self.assertTrue(int(day) == query_timestamp.day)
+        self.assertTrue(int(hour) == query_timestamp.hour)
+        self.assertTrue(int(minute) == query_timestamp.minute)
+        self.assertTrue(int(second) == query_timestamp.second)
+        
+        # solr.utc_from_string adds "000" which doesn't seem to be actually
+        # needed but removing it would break the backward compatibility with
+        # solrpy 0.1
+        self.assertTrue(str(query_timestamp.microsecond).startswith(microsecond))
+        self.assertTrue(query_timestamp.microsecond/int(microsecond) == 1000)
         
     def tearDown(self):
         self.conn.close()
