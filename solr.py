@@ -179,6 +179,9 @@ Once created, a connection object has the following public methods:
             `hl.simple.post`).  For such parameters, replace the dots with 
             underscores when calling this method. (e.g., 
             hl_simple_post='</pre'>)
+            
+    close()
+            Close the underlying HTTP(S) connection.
 
             
 
@@ -231,7 +234,7 @@ Query Responses
 
 
     If you pass in `highlight` to the SolrConnection.query call, 
-    then the response object will also have a highlight property, 
+    then the response object will also have a "highlighting" property, 
     which will be a dictionary.
 
 
@@ -394,10 +397,13 @@ class SolrConnection:
 
         if not self.persistent: 
             self.form_headers['Connection'] = 'close'
+            
+    def close(self):
+        self.conn.close()
 
 
     def query(self, q, fields=None, highlight=None, 
-              score=True, sort=None, **params):
+              score=True, sort=None, sort_order="asc", **params):
 
         """
         q is the query string.
@@ -413,12 +419,16 @@ class SolrConnection:
         effectively ignored.  Defaults to true. 
 
         highlight indicates whether highlighting should be included.
-        highligh can either be False, indicating "No" (the default), 
-        True, incidating to highlight any fields included in "fields", 
-        or a list of fields in the same format as "fields". 
+        highlight can either be False, indicating "No" (the default),
+        a list of fields in the same format as "fields" or True, indicating 
+        to highlight any fields included in "fields". If True and no "fields" 
+        are given, raise a ValueError. 
 
         sort is a list of fields to sort by. See "fields" for
-        formatting.
+        formatting. 
+        
+        sort_order defaults to "asc" and specifies the order to sort the fields
+        in. sort_order must be "asc" or "desc", otherwise a ValueError is raised.
 
         Optional parameters can also be passed in.  Many SOLR
         parameters are in a dotted notation (e.g., hl.simple.post). 
@@ -428,11 +438,27 @@ class SolrConnection:
         Returns a Response instance.
 
         """
-
-       # Clean up optional parameters to match SOLR spec.
+        
+        # Clean up optional parameters to match SOLR spec.
         params = dict([(key.replace('_','.'), unicode(value)) 
                       for key, value in params.items()])
 
+  
+        if highlight: 
+            params['hl'] = 'true'
+            if not isinstance(highlight, (bool, int, float)): 
+                if not isinstance(highlight, basestring): 
+                    highlight = ",".join(highlight)
+                params['hl.fl'] = highlight
+            else:
+                if not fields:
+                    raise ValueError("highlight is True and no fields were given")
+                elif isinstance(fields, basestring): 
+                    params['hl.fl'] = [fields]
+                else:
+                    params['hl.fl'] = ",".join(fields)
+                    
+                      
         if q is not None: 
             params['q'] = q
         
@@ -443,22 +469,16 @@ class SolrConnection:
             fields = '*'
 
         if sort: 
+            if not sort_order or sort_order not in ("asc", "desc"):
+                raise ValueError("sort_order must be 'asc' or 'desc'")
             if not isinstance(sort, basestring): 
                 sort = ",".join(sort)
-            params['sort'] = sort
+            params['sort'] = "%s %s" % (sort, sort_order) 
 
         if score and not 'score' in fields.replace(',',' ').split(): 
             fields += ',score'
 
         params['fl'] = fields
-
-        if highlight: 
-            params['hi'] = 'on'
-            if not isinstance(highlight, (bool, int, float)): 
-                if not isinstance(highlight, basestring): 
-                    highlight = ",".join(highlight)
-                params['hi.fl'] = highlight
-
         params['version'] = self.response_version
         params['wt'] = 'standard'
 
@@ -475,7 +495,7 @@ class SolrConnection:
             
         finally:
             if not self.persistent: 
-                self.conn.close()
+                self.close()
 
         return data
 
@@ -540,9 +560,7 @@ class SolrConnection:
         """
         Delete documents using a list of IDs. 
         """
-        self.begin_batch()
         [self.delete(id) for id in ids]
-        self.end_batch()
 
 
     def delete_query(self, query):
@@ -564,10 +582,12 @@ class SolrConnection:
         lst = [u'<add>']
         self.__add(lst, fields)
         lst.append(u'</add>')
-        if _commit: 
-            lst.append(u'<commit/>')
         xstr = ''.join(lst)
-        return self._update(xstr)
+        if not _commit:
+            return self._update(xstr)
+        else:
+            self._update(xstr)
+            return self.commit()
 
 
     def add_many(self, docs, _commit=False):
@@ -581,10 +601,12 @@ class SolrConnection:
         for doc in docs:
             self.__add(lst, doc)
         lst.append(u'</add>')
-        if _commit: 
-            lst.append(u'<commit/>')
         xstr = ''.join(lst)
-        return self._update(xstr)
+        if not _commit:
+            return self._update(xstr)
+        else:
+            self._update(xstr)
+            return self.commit()
 
 
     def commit(self, wait_flush=True, wait_searcher=True, _optimize=False):
@@ -636,7 +658,7 @@ class SolrConnection:
             data = rsp.read()
         finally:
             if not self.persistent: 
-                self.conn.close()
+                self.close()
 
         return data
 
@@ -653,7 +675,7 @@ class SolrConnection:
             data = rsp.read()
         finally:
             if not self.persistent: 
-                self.conn.close()
+                self.close()
                 
         #detect old-style error response (HTTP response code of
         #200 with a non-zero status.
@@ -699,7 +721,7 @@ class SolrConnection:
 
     def _reconnect(self):
         self.reconnects += 1
-        self.conn.close()
+        self.close()
         self.conn.connect()
 
 
