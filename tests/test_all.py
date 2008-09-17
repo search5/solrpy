@@ -25,36 +25,6 @@ SOLR_HTTPS = "https://" + SOLR_HOST + ":" + SOLR_PORT_HTTPS + SOLR_PATH
 def get_rand_string():
     return "".join(choice(digits)  for x in range(12))
 
-"""
-
-Solr schema expected by testcases.
-
-<?xml version="1.0" encoding="UTF-8" ?>
-<schema name="solrpy_tests" version="1.1">
-    <types>
-        <fieldType name="date" class="solr.DateField" sortMissingLast="true" omitNorms="true"/>
-        <fieldType name="string" class="solr.StrField" sortMissingLast="true" omitNorms="true"/>
-        <fieldType name="text" class="solr.TextField" sortMissingLast="true" omitNorms="true">
-            <analyzer>
-                <tokenizer class="solr.StandardTokenizerFactory"/>
-                <filter class="solr.StandardFilterFactory"/>
-                <filter class="solr.LowerCaseFilterFactory"/>
-                <filter class="solr.StopFilterFactory"/>
-                <filter class="solr.PorterStemFilterFactory"/>
-            </analyzer>
-        </fieldType>
-    </types>
-    <fields>
-        <field name="id" type="string" indexed="true" stored="true" required="true" />
-        <field name="user_id" type="string" indexed="true" stored="true" required="false" />
-        <field name="data" type="text" indexed="true" stored="true" required="true" />
-        <field name="creation_time" type="date" indexed="true" stored="true" required="false" />
-    </fields>
-    <uniqueKey>id</uniqueKey>
-</schema>
-"""
-
-
 class TestHTTPConnection(unittest.TestCase):
     
     def test_connect(self):
