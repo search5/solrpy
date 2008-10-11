@@ -841,10 +841,8 @@ class ResponseContentHandler(ContentHandler):
         # Keep track of children
         self.stack[-2].children.append(element)
 
-
     def characters (self, ch):
         self.stack[-1].chars.append(ch)
-
 
     def endElement(self, name):
         node = self.stack.pop()
@@ -880,7 +878,6 @@ class ResponseContentHandler(ContentHandler):
                 if name == 'responseHeader':
                     name = 'header'
                 elif child.name == 'result':
-
                     name = 'results'
                     for attr_name in child.attrs.getNames():
                         # We already know it is a response
@@ -905,7 +902,6 @@ class ResponseContentHandler(ContentHandler):
         elif name in ('responseHeader',):
             node.final = dict([(cnode.name, cnode.final)
                         for cnode in node.children])
-
         else:
             raise SolrException("Unknown tag: %s" % name)
 
