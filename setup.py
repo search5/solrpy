@@ -4,7 +4,7 @@ ez_setup.use_setuptools()
 
 from setuptools import setup
 
-setup( 
+setup(
     name = 'solrpy',
     version = '0.1',
     url = 'http://cheeseshop.python.org/pypi/solrpy',
