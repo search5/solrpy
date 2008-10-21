@@ -6,7 +6,7 @@ from setuptools import setup
 
 setup(
     name = 'solrpy',
-    version = '0.1',
+    version = '0.2',
     url = 'http://cheeseshop.python.org/pypi/solrpy',
     license = 'http://opensource.org/licenses/apache2.0.php',
     py_modules = ['solr'],
