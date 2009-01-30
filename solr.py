@@ -671,12 +671,6 @@ class SolrConnection:
     def __add(self, lst, fields):
         lst.append(u'<doc>')
         for field, value in fields.items():
-            # Do some basic data conversion
-            if isinstance(value, datetime.datetime):
-                value = utc_to_string(value)
-
-            elif isinstance(value, bool):
-                value = value and 'true' or 'false'
 
             # Handle multi-valued fields if values
             # is passed in as a list/tuple
@@ -686,6 +680,14 @@ class SolrConnection:
                 values = value
 
             for value in values:
+                # Do some basic data conversion
+                if isinstance(value, datetime.date):
+                    value = datetime.datetime.combine(value, datetime.time(tzinfo=UTC()))
+                if isinstance(value, datetime.datetime):
+                    value = utc_to_string(value)
+                elif isinstance(value, bool):
+                    value = value and 'true' or 'false'
+
                 lst.append('<field name=%s>%s</field>' % (
                     (quoteattr(field),
                     escape(unicode(value)))))

@@ -9,6 +9,7 @@ Meant to be run against Solr 1.2+.
 # stdlib
 import time
 import socket
+import datetime
 import unittest
 from string import digits
 from random import choice
@@ -766,6 +767,32 @@ class TestQuerying(unittest.TestCase):
                 "Expected %s instead of %s on position %s in query_data:%s" % (
                     datum, query_data[idx], idx, query_data))
 
+    def test_date(self):
+        id = data = user_id = get_rand_string()
+        date = datetime.date(1969, 5, 28)
+        self.conn.add(id=id, user_id=user_id, data=data, creation_time=date)
+        self.conn.commit()
+        results = self.conn.query("id:%s" % id).results
+        self.assertEqual(len(results), 1)
+        self.assertTrue(isinstance(results[0]['creation_time'],
+                                   datetime.datetime))
+        self.assertEqual(str(results[0]['creation_time']), 
+                         '1969-05-28 00:00:00+00:00')
+
+    def test_multi_date(self):
+        id = data = user_id = get_rand_string()
+        dates = [datetime.date(1969, 5, 28), datetime.date(2009, 1, 30)]
+        self.conn.add(id=id, user_id=user_id, data=data, multi_time=dates)
+        self.conn.commit()
+        results = self.conn.query("id:%s" % id).results
+        self.assertEqual(len(results), 1)
+        times = results[0]['multi_time']
+        self.assertEqual(len(times), 2)
+        self.assertTrue(isinstance(times[0], datetime.datetime))
+        self.assertEqual(str(times[0]), '1969-05-28 00:00:00+00:00')
+        self.assertTrue(isinstance(times[1], datetime.datetime))
+        self.assertEqual(str(times[1]), '2009-01-30 00:00:00+00:00')
+
     def test_query_date_field_parsing_subseconds(self):
         """ Test whether date fields with subsecond precision are being
         handled correctly. See issue #3 for more info.
@@ -784,7 +811,7 @@ class TestQuerying(unittest.TestCase):
         results = self.conn.query("id:" + id).results
 
         self.assertEquals(len(results), 1,
-            "Expexted 1 document, got:%d documents" % (len(results)))
+            "Expected 1 document, got:%d documents" % (len(results)))
 
         results = results[0]
 
