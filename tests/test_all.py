@@ -307,6 +307,21 @@ class TestAddingDocuments(unittest.TestCase):
         """
         self.fail("To be implemented if batch updates stay in solrpy.")
 
+    def test_add_none_field(self):
+        """ Try to add a document with a field of None
+        """
+        user_id = get_rand_string()
+        data = get_rand_string()
+        id = get_rand_string()
+
+        doc = {}
+        doc["user_id"] = user_id
+        doc["data"] = data
+        doc["id"] = id
+        doc["num"] = None
+
+        self.conn.add(**doc)
+
     def tearDown(self):
         self.conn.close()
 

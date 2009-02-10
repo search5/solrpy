@@ -12,11 +12,13 @@
                 <filter class="solr.PorterStemFilterFactory"/>
             </analyzer>
         </fieldType>
+        <fieldType name="sint" class="solr.SortableIntField" sortMissingLast="true" omitNorms="true" />
     </types>
     <fields>
         <field name="id" type="string" indexed="true" stored="true" required="true" />
         <field name="user_id" type="string" indexed="true" stored="true" required="false" />
         <field name="data" type="text" indexed="true" stored="true" required="true" />
+        <field name="num" type="sint" indexed="true" stored="true" required="false" />
         <field name="creation_time" type="date" indexed="true" stored="true"
             required="false" />
         <field name="multi_time" type="date" indexed="true" stored="true"

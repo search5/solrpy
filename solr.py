@@ -292,7 +292,7 @@ from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
 
-__version__ = "0.4"
+__version__ = "0.5"
 
 __all__ = ['SolrException', 'SolrConnection', 'Response']
 
@@ -671,7 +671,6 @@ class SolrConnection:
     def __add(self, lst, fields):
         lst.append(u'<doc>')
         for field, value in fields.items():
-
             # Handle multi-valued fields if values
             # is passed in as a list/tuple
             if not isinstance(value, (list, tuple)):
@@ -680,6 +679,9 @@ class SolrConnection:
                 values = value
 
             for value in values:
+                # ignore values that are not defined
+                if value == None:
+                    continue
                 # Do some basic data conversion
                 if isinstance(value, datetime.date):
                     value = datetime.datetime.combine(value, datetime.time(tzinfo=UTC()))
