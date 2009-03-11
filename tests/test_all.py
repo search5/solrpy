@@ -16,8 +16,7 @@ from random import choice
 from xml.dom.minidom import parseString
 
 # solrpy
-from solr import SolrConnection
-from solr.paginator import SolrPaginator, SolrPage
+from solr import SolrConnection, SolrPaginator
 
 SOLR_PATH = "/solr"
 SOLR_HOST = "localhost"

@@ -2,7 +2,7 @@ import math
 
 class SolrPaginator:
     """
-    Create a Django like Paginator for a solr response object. Can be handy
+    Create a Django-like Paginator for a solr response object. Can be handy
     when you want to hand off a Paginator and/or Page to a template to 
     display results, and provide links to next page, etc.
 
