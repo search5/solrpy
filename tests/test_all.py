@@ -17,6 +17,7 @@ from xml.dom.minidom import parseString
 
 # solrpy
 from solr import SolrConnection
+from solr.paginator import SolrPaginator, SolrPage
 
 SOLR_PATH = "/solr"
 SOLR_HOST = "localhost"
@@ -974,6 +975,46 @@ class TestResponse(unittest.TestCase):
     def tearDown(self):
         self.conn.close()
 
+
+class TestPaginator(unittest.TestCase):
+
+    def setUp(self):
+        self.conn = SolrConnection(SOLR_HTTP)
+        self.conn.delete_query('*:*')
+        for i in range(0,20):
+            self.conn.add(id=i, data='data_%02i' % i)
+        self.conn.commit()
+
+    def test_pagination(self):
+        result = self.conn.query('*:*', sort='data', sort_order='desc')
+        paginator = SolrPaginator(result)
+        self.assertEqual(paginator.num_pages, 2)
+        self.assertEqual(paginator.count, 20)
+        self.assertEqual(paginator.page_range, [1,2])
+
+        page = paginator.page(1)
+        self.assertEqual(page.has_other_pages(), True)
+        self.assertEqual(page.has_next(), True)
+        self.assertEqual(page.has_previous(), False)
+        self.assertEqual(page.next_page_number(), 2)
+        self.assertEqual(page.start_index(), 0)
+        self.assertEqual(page.end_index(), 9)
+        self.assertEqual(len(page.object_list), 10)
+        self.assertEqual(page.object_list[0]['data'], 'data_19')
+
+        page = paginator.page(2)
+        self.assertEqual(page.has_other_pages(), True)
+        self.assertEqual(page.has_next(), False)
+        self.assertEqual(page.has_previous(), True)
+        self.assertEqual(page.previous_page_number(), 1)
+        self.assertEqual(page.start_index(), 10)
+        self.assertEqual(page.end_index(), 19)
+        self.assertEqual(len(page.object_list), 10)
+        self.assertEqual(len(page.object_list), 10)
+        self.assertEqual(page.object_list[0]['data'], 'data_09')
+
+    def tearDown(self):
+        self.conn.close()
 
 if __name__ == "__main__":
     unittest.main()
