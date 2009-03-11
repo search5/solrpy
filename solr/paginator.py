@@ -7,8 +7,7 @@ class SolrPaginator:
     display results, and provide links to next page, etc.
 
     For example:
-    >>> from solr import SolrConnection
-    >>> from solr.paginator import SolrPaginator
+    >>> from solr import SolrConnection, SolrPaginator
     >>>
     >>> conn = SolrConnection('http://localhost:8083/solr')
     >>> response = conn.query('title:huckleberry')
@@ -16,7 +15,8 @@ class SolrPaginator:
     >>> print paginator.num_pages
     >>> page = paginator.get_page(5)
 
-    For more details see Django Paginator documentation and solrpy unittests.
+    For more details see the Django Paginator documentation and solrpy 
+    unittests.
 
       http://docs.djangoproject.com/en/dev/topics/pagination/
 
