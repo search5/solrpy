@@ -444,7 +444,7 @@ class TestDocumentsDeletion(unittest.TestCase):
 class TestQuerying(unittest.TestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        self.conn = SolrConnection(SOLR_HTTP,timeout=1)
 
     def test_query_string(self):
         """ Get documents (all default fields) by a simple query.
@@ -1012,6 +1012,19 @@ class TestPaginator(unittest.TestCase):
         self.assertEqual(len(page.object_list), 10)
         self.assertEqual(page.object_list[0]['data'], 'data_09')
 
+    def tearDown(self):
+        self.conn.close()
+
+class TestTimeout(unittest.TestCase):
+    def setUp(self):
+        self.conn = SolrConnection(SOLR_HTTP,timeout=0.00000001)
+    
+    def test_timout_exception(self):
+        """ A socket.timeout exception should be raised 
+        """
+        
+        self.assertRaises(socket.timeout,self.conn.query,"user_id:12345")
+    
     def tearDown(self):
         self.conn.close()
 
