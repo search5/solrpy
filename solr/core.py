@@ -348,7 +348,6 @@ class SolrConnection:
 
             timeout -- Timeout, in seconds, for the server to response.
                 By default, use the python default timeout (of none?)
-                NOTE: This changes the python-wide timeout.
 
             ssl_key, ssl_cert -- If using client-side key files for
                 SSL authentication,  these should be, respectively,
