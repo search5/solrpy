@@ -444,7 +444,7 @@ class TestDocumentsDeletion(unittest.TestCase):
 class TestQuerying(unittest.TestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        self.conn = SolrConnection(SOLR_HTTP,timeout=1)
 
     def test_query_string(self):
         """ Get documents (all default fields) by a simple query.
@@ -847,7 +847,31 @@ class TestQuerying(unittest.TestCase):
         # solrpy 0.1
         self.assertTrue(str(query_timestamp.microsecond).startswith(microsecond))
         self.assertTrue(query_timestamp.microsecond/int(microsecond) == 1000)
-
+        
+    def test_facet_field(self):
+        """ Test basic facet fields and make sure they are included in the 
+        response properly """
+        
+        self.conn.delete_query('id:[* TO *]')
+        self.conn.optimize()
+        
+        for i in range(0,12):
+            self.conn.add(id=i,user_id=i%3,data=get_rand_string(),num=10)
+        
+        self.conn.optimize()
+        
+        results = self.conn.query('id:[* TO *]',facet='true',
+                                  facet_field=['user_id','num'])
+        
+        self.assertTrue(hasattr(results,'facet_counts'))
+        self.assertTrue(u'facet_fields' in results.facet_counts)
+        self.assertTrue(u'num' in results.facet_counts[u'facet_fields'])
+        self.assertTrue(u'user_id' in results.facet_counts[u'facet_fields'])
+        self.assertEqual(len(results.facet_counts[u'facet_fields'][u'num']),1)
+        self.assertEqual(len(results.facet_counts[u'facet_fields'][u'user_id']),3)
+        self.assertEqual(results.facet_counts[u'facet_fields'][u'num'],{u'10':12})
+        self.assertEqual(results.facet_counts[u'facet_fields'][u'user_id'],{u'0':4,u'1':4,u'2':4})
+        
     def tearDown(self):
         self.conn.close()
 
@@ -1012,6 +1036,19 @@ class TestPaginator(unittest.TestCase):
         self.assertEqual(len(page.object_list), 10)
         self.assertEqual(page.object_list[0]['data'], 'data_09')
 
+    def tearDown(self):
+        self.conn.close()
+
+class TestTimeout(unittest.TestCase):
+    def setUp(self):
+        self.conn = SolrConnection(SOLR_HTTP,timeout=0.00000001)
+    
+    def test_timout_exception(self):
+        """ A socket.timeout exception should be raised 
+        """
+        
+        self.assertRaises(socket.timeout,self.conn.query,"user_id:12345")
+    
     def tearDown(self):
         self.conn.close()
 

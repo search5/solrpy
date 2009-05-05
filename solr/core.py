@@ -296,6 +296,7 @@ __version__ = "0.5"
 
 __all__ = ['SolrException', 'SolrConnection', 'Response']
 
+_python_version = sys.version_info[0]+(sys.version_info[1]/10.0)
 
 # ===================================================================
 # Exceptions
@@ -347,7 +348,6 @@ class SolrConnection:
 
             timeout -- Timeout, in seconds, for the server to response.
                 By default, use the python default timeout (of none?)
-                NOTE: This changes the python-wide timeout.
 
             ssl_key, ssl_cert -- If using client-side key files for
                 SSL authentication,  these should be, respectively,
@@ -365,12 +365,17 @@ class SolrConnection:
         self.timeout = timeout
         self.ssl_key = ssl_key
         self.ssl_cert = ssl_cert
-
+        
+        kwargs = {}
+        
+        if self.timeout and _python_version >= 2.6 and _python_version < 3:
+            kwargs['timeout'] = self.timeout
+        
         if self.scheme == 'https':
             self.conn = httplib.HTTPSConnection(self.host,
-                   key_file=ssl_key, cert_file=ssl_cert)
+                   key_file=ssl_key, cert_file=ssl_cert, **kwargs)
         else:
-            self.conn = httplib.HTTPConnection(self.host)
+            self.conn = httplib.HTTPConnection(self.host, **kwargs)
 
         self.batch_cnt = 0  #  this is int, not bool!
         self.response_version = 2.2
@@ -378,10 +383,14 @@ class SolrConnection:
 
         # Responses from Solr will always be in UTF-8
         self.decoder = codecs.getdecoder('utf-8')
-
+        
         # Set timeout, if applicable.
-        if timeout:
-            socket.setdefaulttimeout(timeout)
+        if self.timeout and _python_version < 2.6:
+            self.conn.connect()
+            if self.scheme == 'http':
+                self.conn.sock.settimeout(self.timeout)
+            elif self.scheme == 'https':
+                self.conn.sock.sock.settimeout(self.timeout)
 
         self.xmlheaders = {'Content-Type': 'text/xml; charset=utf-8'}
         self.xmlheaders.update(post_headers)
@@ -434,7 +443,7 @@ class SolrConnection:
         """
 
         # Clean up optional parameters to match SOLR spec.
-        params = dict([(key.replace('_','.'), unicode(value))
+        params = dict([(key.replace('_','.'), value)
                       for key, value in params.items()])
 
         if highlight:
@@ -705,6 +714,11 @@ class SolrConnection:
         self.reconnects += 1
         self.close()
         self.conn.connect()
+        if self.timeout and _python_version < 2.6:
+            if self.scheme == 'http':
+                self.conn.sock.settimeout(self.timeout)
+            elif self.scheme == 'https':
+                self.conn.sock.sock.settimeout(self.timeout)
 
     def _post(self, url, body, headers):
         attempts = 1
