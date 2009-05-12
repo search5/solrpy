@@ -1000,21 +1000,38 @@ class TestResponse(unittest.TestCase):
 
 
 class TestPaginator(unittest.TestCase):
-
+    
     def setUp(self):
         self.conn = SolrConnection(SOLR_HTTP)
         self.conn.delete_query('*:*')
-        for i in range(0,20):
+        for i in range(0,15):
             self.conn.add(id=i, data='data_%02i' % i)
         self.conn.commit()
-
-    def test_pagination(self):
-        result = self.conn.query('*:*', sort='data', sort_order='desc')
-        paginator = SolrPaginator(result)
+        self.result = self.conn.query('*:*', sort='data', sort_order='desc')
+    
+    def test_num_pages(self):
+        """ Check the number of pages reported by the paginator """
+        paginator = SolrPaginator(self.result)
         self.assertEqual(paginator.num_pages, 2)
-        self.assertEqual(paginator.count, 20)
+    
+    def test_count(self):
+        """ Check the result count reported by the paginator """
+        paginator = SolrPaginator(self.result)
+        self.assertEqual(paginator.count, 15)
+    
+    def test_page_range(self):
+        """ Check the page range returned by the paginator """
+        paginator = SolrPaginator(self.result)
         self.assertEqual(paginator.page_range, [1,2])
-
+    
+    def test_default_page_size(self):
+        """ Test invalid/impproper default page sizes for paginator """
+        self.assertRaises(ValueError,SolrPaginator,self.result,'asdf')
+        self.assertRaises(ValueError,SolrPaginator,self.result,5)
+    
+    def test_page_one(self):
+        """ Test the first page from a paginator """
+        paginator = SolrPaginator(self.result)
         page = paginator.page(1)
         self.assertEqual(page.has_other_pages(), True)
         self.assertEqual(page.has_next(), True)
@@ -1023,21 +1040,24 @@ class TestPaginator(unittest.TestCase):
         self.assertEqual(page.start_index(), 0)
         self.assertEqual(page.end_index(), 9)
         self.assertEqual(len(page.object_list), 10)
-        self.assertEqual(page.object_list[0]['data'], 'data_19')
-
+        self.assertEqual(page.object_list[0]['data'], 'data_14')
+    
+    def test_page_two(self):
+        """ Test the second/last page from a paginator """
+        paginator = SolrPaginator(self.result,default_page_size=10)
         page = paginator.page(2)
         self.assertEqual(page.has_other_pages(), True)
         self.assertEqual(page.has_next(), False)
         self.assertEqual(page.has_previous(), True)
         self.assertEqual(page.previous_page_number(), 1)
         self.assertEqual(page.start_index(), 10)
-        self.assertEqual(page.end_index(), 19)
-        self.assertEqual(len(page.object_list), 10)
-        self.assertEqual(len(page.object_list), 10)
-        self.assertEqual(page.object_list[0]['data'], 'data_09')
+        self.assertEqual(page.end_index(), 14)
+        self.assertEqual(len(page.object_list), 5)
+        self.assertEqual(page.object_list[0]['data'], 'data_04')
 
     def tearDown(self):
         self.conn.close()
+
 
 class TestTimeout(unittest.TestCase):
     def setUp(self):

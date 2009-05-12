@@ -22,11 +22,26 @@ class SolrPaginator:
 
     """
     
-    def __init__(self, result):
+    def __init__(self, result, default_page_size=None):
         self.params = result.header['params']
         self.result = result
         self.conn = result._connection
         
+        if 'rows' in self.params:
+            self.page_size = int(self.params['rows'])
+        elif default_page_size:
+            try:
+                self.page_size = int(default_page_size)
+            except ValueError:
+                raise ValueError('default_page_size must be an integer')
+            
+            if self.page_size < len(self.result.results):
+                raise ValueError('Invalid default_page_size specified, lower '
+                                 'than number of results')
+            
+        else:
+            self.page_size = len(self.result.results)
+    
     @property
     def count(self):
         return int(self.result.numFound)
@@ -35,8 +50,7 @@ class SolrPaginator:
     def num_pages(self):
         if self.count == 0:
             return 0
-        real_num = (self.count * 1.0) / len(self.result.results)
-        return int(math.ceil(real_num))
+        return int(math.ceil(float(self.count) / float(self.page_size)))
             
     @property
     def page_range(self):
@@ -73,7 +87,7 @@ class SolrPaginator:
             raise 'EmptyPage', 'That page does not exist.'
 
         # Page 1 starts at 0; take one off before calculating
-        start = (page_num - 1) * len(self.result.results)
+        start = (page_num - 1) * self.page_size
         new_result = self._fetch_page(start=start)
         return SolrPage(new_result.results, page_num, self)
     
@@ -108,7 +122,7 @@ class SolrPage:
     def start_index(self):
         # off by one because self.number is 1-based w/django,
         # but start is 0-based in solr 
-        return (self.number - 1) * len(self.result)
+        return (self.number - 1) * self.paginator.page_size
         
     def end_index(self):
         # off by one because we want the last one in this set, 
