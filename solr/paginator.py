@@ -67,7 +67,7 @@ class SolrPaginator:
         for k, v in self.params.items():
             new_params[str(k)] = v
 
-        if new_params['sort']:
+        if new_params.get('sort',None):
             field, order = new_params['sort'].split(' ')
             new_params['sort'] = field
             new_params['sort_order'] = order
