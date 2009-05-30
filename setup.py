@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'solrpy',
-    version = '0.6',
+    version = '0.7',
     url = 'http://code.google.com/p/solrpy',
     license = 'http://opensource.org/licenses/apache2.0.php',
     packages=find_packages(exclude=['ez_setup']),
