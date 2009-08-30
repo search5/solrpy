@@ -302,11 +302,6 @@ class TestAddingDocuments(unittest.TestCase):
         self.assertEqual(ids_symdiff, set([]),
             "IDs sets differ (difference:%s)" % (ids_symdiff))
 
-    def test_batching(self):
-        """ To be done.
-        """
-        self.fail("To be implemented if batch updates stay in solrpy.")
-
     def test_add_none_field(self):
         """ Try to add a document with a field of None
         """
