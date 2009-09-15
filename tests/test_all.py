@@ -1049,7 +1049,20 @@ class TestPaginator(unittest.TestCase):
         self.assertEqual(page.end_index(), 14)
         self.assertEqual(len(page.object_list), 5)
         self.assertEqual(page.object_list[0]['data'], 'data_04')
-
+    
+    def test_unicode_query(self):
+        """ Test for unicode support in subsequent paginator queries """
+        from solr import SolrException
+        chinese_data = '\xe6\xb3\xb0\xe5\x9b\xbd'.decode('utf-8')
+        self.conn.add(id=100, data=chinese_data)
+        self.conn.commit()
+        result = self.conn.query(chinese_data.encode('utf-8'))
+        paginator = SolrPaginator(result, default_page_size=10)
+        try:
+            page = paginator.page(1)
+        except SolrException:
+            self.fail('Unicode not encoded correctly in paginator')
+    
     def tearDown(self):
         self.conn.close()
 

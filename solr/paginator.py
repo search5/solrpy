@@ -65,7 +65,7 @@ class SolrPaginator:
         # need to convert the keys to strings to pass them as parameters
         new_params = {} 
         for k, v in self.params.items():
-            new_params[str(k)] = v
+            new_params[str(k)] = v.encode('utf-8')
 
         if new_params.get('sort',None):
             field, order = new_params['sort'].split(' ')
