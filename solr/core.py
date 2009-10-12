@@ -332,7 +332,8 @@ class SolrConnection:
                  timeout=None,
                  ssl_key=None,
                  ssl_cert=None,
-                 post_headers={}):
+                 post_headers={},
+                 max_retries=3):
 
         """
             url -- URI pointing to the SOLR instance. Examples:
@@ -365,6 +366,9 @@ class SolrConnection:
         self.timeout = timeout
         self.ssl_key = ssl_key
         self.ssl_cert = ssl_cert
+        self.max_retries = int(max_retries)
+        
+        assert self.max_retries >= 0
         
         kwargs = {}
         
@@ -721,8 +725,8 @@ class SolrConnection:
                 self.conn.sock.sock.settimeout(self.timeout)
 
     def _post(self, url, body, headers):
-        attempts = 1
-        while attempts:
+        attempts = self.max_retries + 1
+        while attempts > 0:
             try:
                 self.conn.request('POST', url, body.encode('UTF-8'), headers)
                 return check_response_status(self.conn.getresponse())
@@ -734,7 +738,7 @@ class SolrConnection:
                     # SOLR connection (though not often)
                 self._reconnect()
                 attempts -= 1
-                if not attempts:
+                if attempts <= 0:
                     raise
 
 

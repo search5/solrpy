@@ -11,6 +11,7 @@ import time
 import socket
 import datetime
 import unittest
+import httplib
 from string import digits
 from random import choice
 from xml.dom.minidom import parseString
@@ -961,7 +962,17 @@ class TestExceptions(unittest.TestCase):
         """
         self.assertRaises(ValueError, self.conn.query, "id:" + "abc",
                             **{"sort":"id", "sort_order":"invalid_sort_order"})
-
+    
+    
+    def test_invalid_max_retries(self):
+        """ Passing something that can't be cast as an integer for max_retries
+        should raise a ValueError and a value less than 0 should raise an
+        AssertionError """
+        self.assertRaises(ValueError, SolrConnection, SOLR_HTTP,
+                          max_retries='asdf')
+        self.assertRaises(AssertionError, SolrConnection, SOLR_HTTP,
+                          max_retries=-5)
+    
     def tearDown(self):
         self.conn.close()
 
@@ -1075,10 +1086,57 @@ class TestTimeout(unittest.TestCase):
         """ A socket.timeout exception should be raised 
         """
         
-        self.assertRaises(socket.timeout,self.conn.query,"user_id:12345")
+        self.assertRaises(socket.timeout,self.conn.query,"user_id:[* TO *]")
     
     def tearDown(self):
         self.conn.close()
+
+class ThrowBadStatusLineExceptions(object):
+    def __init__(self, max=None, wrap=None):
+        self.calls = 0
+        self.max = max
+        self.wrap = wrap
+    
+    def __call__(self, *args, **kwargs):
+        self.calls += 1
+        if self.max is None or self.calls <= self.max:
+            raise httplib.BadStatusLine('Dummy status line exception')
+        
+        if self.wrap is not None:
+            f = self.wrap
+            return f(*args, **kwargs)
+        
+        return True
+
+class TestRetries(unittest.TestCase):
+    def setUp(self):
+        self.conn = SolrConnection(SOLR_HTTP)
+    
+    def test_badstatusline(self):
+        """ Replace the low level connection request with a dummy function that
+        raises an exception. Verify that the request method is called 4 times 
+        and still raises the exception """
+        t = ThrowBadStatusLineExceptions(max=None, wrap=self.conn.conn.request)
+        
+        self.conn.conn.request = t
+        
+        self.assertRaises(httplib.BadStatusLine, self.conn.query,
+                          "user_id:12345")
+        
+        self.assertEqual(t.calls, 4)
+    
+    def test_success_after_failure(self):
+        """ Wrap the calls the the lower level request and throw only 1 
+        exception and then proceed normally. It should result in two calls to
+        self.conn.conn.request. """
+        t = ThrowBadStatusLineExceptions(max=1, wrap=self.conn.conn.request)
+        
+        self.conn.conn.request = t
+        
+        r = self.conn.query("user_id:12345")
+        
+        self.assertEqual(t.calls, 2)
+        
 
 if __name__ == "__main__":
     unittest.main()
