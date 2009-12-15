@@ -6,10 +6,10 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'solrpy',
-    version = '0.8',
+    version = '0.81',
     url = 'http://code.google.com/p/solrpy',
     license = 'http://opensource.org/licenses/apache2.0.php',
-    packages=find_packages(exclude=['ez_setup']),
+    packages=find_packages(),
     install_requires = [],
     description = 'client for the solr search service',
     tests_require = ["nose>=0.10.1"],
