@@ -778,6 +778,51 @@ class TestQuerying(unittest.TestCase):
                 "Expected %s instead of %s on position %s in query_data:%s" % (
                     datum, query_data[idx], idx, query_data))
 
+    def test_query_sort_complex_sort_order(self):
+        """ Test whether sorting works (using non-default, descending, sort order).
+        """
+        doc_count = 10
+        prefix = get_rand_string()
+
+        data = [prefix + "-" + str(x) for x in range(5)]
+
+        # Two user ids
+        user_ids = [get_rand_string(), get_rand_string()]
+        # We sort 'em
+        user_ids.sort()
+
+        for user_id in user_ids:
+            for datum in data:
+                self.conn.add(id=get_rand_string(), user_id=user_id, data=datum)
+        self.conn.commit()
+
+        results = self.conn.query(
+            q="user_id:%s OR user_id:%s" % (user_ids[0], user_ids[1]),
+            sort=["user_id asc", "data desc"]).results
+
+        self.assertEquals(len(results), doc_count,
+            "There should be %d documents returned, got:%d, results:%s" % (
+                doc_count, len(results), results))
+
+        data.reverse()
+        # I'm not entirely sure wheter Python 2.3 supports this
+        # expected = [(a,b) for a in user_ids for b in data]
+        # If it does substitute to below
+        expected = []
+        for user_id in user_ids:
+            for d in data:
+                expected.append((user_id, d))
+
+        for idx, result in enumerate(results):
+            params =  (result['user_id'], result['data']) + expected[idx] + \
+                (idx, results, expected)
+            self.assertEquals(
+                (result['user_id'], result['data']),
+                expected[idx],
+                ("Expected %s, %s instead of %s, %s at position %s"
+                " in %s (expected %s)") % params
+            )
+
     def test_date(self):
         id = data = user_id = get_rand_string()
         date = datetime.date(1969, 5, 28)

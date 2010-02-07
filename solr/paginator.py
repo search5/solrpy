@@ -67,11 +67,6 @@ class SolrPaginator:
         for k, v in self.params.items():
             new_params[str(k)] = v.encode('utf-8')
 
-        if new_params.get('sort',None):
-            field, order = new_params['sort'].split(' ')
-            new_params['sort'] = field
-            new_params['sort_order'] = order
-
         # get the new start index
         new_params['start'] = start
         return self.conn.query(**new_params) 

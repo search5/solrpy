@@ -433,10 +433,11 @@ class SolrConnection:
         are given, raise a ValueError.
 
         sort is a list of fields to sort by. See "fields" for
-        formatting.
+        formatting. Each sort element can have be in the form
+        "fieldname asc|desc" as specified by SOLR specs.
 
-        sort_order defaults to "asc" and specifies the order to sort the fields
-        in. sort_order must be "asc" or "desc", otherwise a ValueError is raised.
+        sort_order is the backward compatible way to add the same ordering
+        to all the sort field when it is not specified.
 
         Optional parameters can also be passed in.  Many SOLR
         parameters are in a dotted notation (e.g., hl.simple.post).
@@ -476,9 +477,16 @@ class SolrConnection:
         if sort:
             if not sort_order or sort_order not in ("asc", "desc"):
                 raise ValueError("sort_order must be 'asc' or 'desc'")
-            if not isinstance(sort, basestring):
-                sort = ",".join(sort)
-            params['sort'] = "%s %s" % (sort, sort_order)
+            if isinstance(sort, basestring):
+                sort = [ f.strip() for f in sort.split(",") ]
+            sorting = []
+            for e in sort:
+                if not (e.endswith("asc") or e.endswith("desc")):
+                    sorting.append("%s %s" % (e, sort_order))
+                else:
+                    sorting.append(e)
+            sort = ",".join(sorting)
+            params['sort'] = sort
 
         if score and not 'score' in fields.replace(',',' ').split():
             fields += ',score'
