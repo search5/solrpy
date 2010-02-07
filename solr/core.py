@@ -286,6 +286,7 @@ import urlparse
 import codecs
 import urllib
 import datetime
+import logging
 from StringIO import StringIO
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
@@ -333,7 +334,8 @@ class SolrConnection:
                  ssl_key=None,
                  ssl_cert=None,
                  post_headers={},
-                 max_retries=3):
+                 max_retries=3,
+                 debug=False):
 
         """
             url -- URI pointing to the SOLR instance. Examples:
@@ -407,6 +409,8 @@ class SolrConnection:
 
         if not self.persistent:
             self.form_headers['Connection'] = 'close'
+
+        self.debug = debug
 
     def close(self):
         self.conn.close()
@@ -497,6 +501,9 @@ class SolrConnection:
 
         request = urllib.urlencode(params, doseq=True)
 
+        if self.debug:
+            logging.info("solrpy request: %s" % request)
+
         try:
             rsp = self._post(self.path + '/select',
                               request, self.form_headers)
@@ -504,6 +511,9 @@ class SolrConnection:
             # and creating a StringIO, then Persistence breaks with
             # an internal python error.
             xml = StringIO(rsp.read())
+            if self.debug:
+                logging.info("solrpy got response: %s" % xml.getvalue())
+                
             data = parse_query_response(xml,  params=params, connection=self)
 
         finally:
