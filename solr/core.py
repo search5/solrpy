@@ -648,7 +648,7 @@ class SolrConnection:
         """
 
         # Clean up optional parameters to match SOLR spec.
-        params = dict([(key.replace('_','.'), unicode(value))
+        params = dict([(key.replace('_','.'), value)
                        for key, value in params.items()])
 
         request = urllib.urlencode(params, doseq=True)
