@@ -714,9 +714,11 @@ class SolrConnection:
                 if value == None:
                     continue
                 # Do some basic data conversion
-                if isinstance(value, datetime.date):
-                    value = datetime.datetime.combine(value, datetime.time(tzinfo=UTC()))
                 if isinstance(value, datetime.datetime):
+                    value = utc_to_string(value)
+                elif isinstance(value, datetime.date):
+                    value = datetime.datetime.combine(
+                        value, datetime.time(tzinfo=UTC()))
                     value = utc_to_string(value)
                 elif isinstance(value, bool):
                     value = value and 'true' or 'false'

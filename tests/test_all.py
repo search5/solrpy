@@ -18,6 +18,7 @@ from xml.dom.minidom import parseString
 
 # solrpy
 from solr import SolrConnection, SolrPaginator
+import solr.core
 
 SOLR_PATH = "/solr"
 SOLR_HOST = "localhost"
@@ -866,6 +867,19 @@ class TestQuerying(unittest.TestCase):
                                    datetime.datetime))
         self.assertEqual(str(results[0]['creation_time']), 
                          '1969-05-28 00:00:00+00:00')
+
+    def test_datetime_utc(self):
+        id = data = user_id = get_rand_string()
+        dt = datetime.datetime(
+            1969, 5, 28, 12, 24, 42, tzinfo=solr.core.UTC())
+        self.conn.add(id=id, user_id=user_id, data=data, creation_time=dt)
+        self.conn.commit()
+        results = self.conn.query("id:%s" % id).results
+        self.assertEqual(len(results), 1)
+        self.assertTrue(isinstance(results[0]['creation_time'],
+                                   datetime.datetime))
+        self.assertEqual(str(results[0]['creation_time']), 
+                         '1969-05-28 12:24:42+00:00')
 
     def test_multi_date(self):
         id = data = user_id = get_rand_string()
