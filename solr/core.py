@@ -704,7 +704,7 @@ class SolrConnection:
         for field, value in fields.items():
             # Handle multi-valued fields if values
             # is passed in as a list/tuple
-            if not isinstance(value, (list, tuple)):
+            if not isinstance(value, (list, tuple, set)):
                 values = [value]
             else:
                 values = value

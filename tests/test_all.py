@@ -91,6 +91,38 @@ class TestAddingDocuments(unittest.TestCase):
         self.assertEquals(doc["user_id"], user_id)
         self.assertEquals(doc["data"], data)
 
+    def test_add_one_document_multiplefields(self):
+        """ Adds several documents with multiple fields, namely
+        a list, a tuple, and a set
+        """
+        user_id = get_rand_string()
+        data = get_rand_string()
+        letterset = [ u'a', u'b', u'c' ]
+        letters = [
+            letterset,
+            tuple(letterset),
+            set(letterset)
+        ]
+
+        for lset in letters:
+            doc = {}
+            doc["user_id"] = user_id
+            doc["data"] = data
+            doc["id"] = get_rand_string()
+            doc["letters"] = lset
+            self.conn.add(**doc)
+            self.conn.commit()
+            
+        results = self.conn.query("user_id:" + user_id).results
+
+        self.assertEquals(len(results), 3,
+            "Could not find expected data (user_id:%s)" % user_id)
+
+        for i, doc in enumerate(results):
+            self.assertEquals(doc["user_id"], user_id)
+            self.assertEquals(doc["data"], data)
+            self.assertEquals(doc["letters"], list(letters[i]))
+
     def test_add_one_document_implicit_commit(self):
         """ Try to add one document and commit changes in one operation.
         """
