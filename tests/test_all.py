@@ -1028,7 +1028,8 @@ class TestResponse(unittest.TestCase):
         self.conn = SolrConnection(SOLR_HTTP)
 
     def test_response_attributes(self):
-        """ Make sure Response objects have all the documented attributes.
+        """ Make sure Response objects have all the documented attributes,
+        and also checks that they are of the correct type
         """
         # Same id, data and user_id
         id = data = user_id = get_rand_string()
@@ -1036,15 +1037,22 @@ class TestResponse(unittest.TestCase):
         self.conn.commit()
 
         response = self.conn.query(q="id:" + id)
-        expected_attrs = ["numFound", "start", "maxScore", "header"]
+        # here we also check the type of the attribute
+        expected_attrs = {
+            "numFound": long,
+            "start": long,
+            "maxScore": float,
+            "header": dict
+        }
 
-        for attr in expected_attrs:
-            self.assertTrue(attr in dir(response),
+        for attr, attr_type in expected_attrs.items():
+            self.assertTrue(hasattr(response, attr),
                 "Attribute %s not found in response. id:%s" % (attr, id))
 
             value = getattr(response, attr)
-            self.assertTrue(bool(value),
-                "Attribute %s has no value. id:%s" % (attr,id))
+            # check type
+            self.assertTrue(isinstance(value, attr_type),
+                "Attribute %s has wrong type. id:%s" % (attr,id))
 
     def tearDown(self):
         self.conn.close()

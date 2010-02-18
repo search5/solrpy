@@ -784,6 +784,39 @@ class Response(object):
         self._connection = connection
         self._params = {}
 
+    def _set_numFound(self, value):
+        self._numFound = long(value)
+
+    def _get_numFound(self):
+        return self._numFound
+
+    def _del_numFound(self):
+        del self._numFound
+
+    numFound = property(_get_numFound, _set_numFound, _del_numFound)
+
+    def _set_start(self, value):
+        self._start = long(value)
+
+    def _get_start(self):
+        return self._start
+
+    def _del_start(self):
+        del self._start
+
+    start = property(_get_start, _set_start, _del_start)
+
+    def _set_maxScore(self, value):
+        self._maxScore = float(value)
+
+    def _get_maxScore(self):
+        return self._maxScore
+
+    def _del_maxScore(self):
+        del self._maxScore
+
+    maxScore = property(_get_maxScore, _set_maxScore, _del_maxScore)
+
     def __len__(self):
         """
         Return the number of matching documents contained in this set.
