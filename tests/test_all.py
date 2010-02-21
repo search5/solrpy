@@ -355,6 +355,90 @@ class TestAddingDocuments(unittest.TestCase):
         self.conn.close()
 
 
+class TestUpdatingDocuments(unittest.TestCase):
+
+    def setUp(self):
+        self.conn = SolrConnection(SOLR_HTTP)
+
+    def test_update_single(self):
+        """ Try to add one document, and then update it (readd it)
+        """
+        user_id = get_rand_string()
+        data = get_rand_string()
+        updated_data = get_rand_string()
+        id = get_rand_string()
+
+        doc = {}
+        doc["user_id"] = user_id
+        doc["data"] = data
+        doc["id"] = id
+
+        self.conn.add(**doc)
+        self.conn.commit()
+        
+        # we assume this works, being tested elsewhere
+        doc["data"] = updated_data
+        self.conn.add(**doc)
+        self.conn.commit()
+        
+        results = self.conn.query("id:" + id).results
+        doc = results[0]
+        self.assertEquals(doc["data"], updated_data)
+
+    def test_update_many(self):
+        """ Try to add more than one document in a single operation, and then
+        again to update them all in a single run.
+        """
+        doc_count = 10
+        user_ids = [get_rand_string() for x in range(doc_count)]
+        data =  [get_rand_string() for x in range(doc_count)]
+        updated_data = [get_rand_string() for x in range(doc_count)]
+        ids =  [get_rand_string() for x in range(doc_count)]
+        documents = [dict(user_id=user_ids[x], data=data[x], id=ids[x])
+                        for x in range(doc_count)]
+
+        self.conn.add_many(documents)
+        self.conn.commit()
+
+        # we assume the previous operation went through correctly, since
+        # it has a test all for itself.
+        for i, doc in enumerate(documents):
+            doc["data"] = updated_data[i]
+
+        self.conn.add_many(documents)
+        self.conn.commit()
+
+        results = []
+        for id in ids:
+            res = self.conn.query("id:" + id).results
+            if not res:
+                self.fail("Could not find document (id:%s)" % id)
+            results.append(res[0])
+
+        self.assertEquals(len(results), doc_count,
+            "Query didn't return all documents. Expected: %d, got: %d" % (
+                doc_count, len(results)))
+
+        query_user_ids = [doc["user_id"] for doc in results]
+        query_data = [doc["data"] for doc in results]
+        query_ids = [doc["id"] for doc in results]
+
+        # Symmetric difference will give us those documents which are neither
+        # in original list nor in a fetched one. It's a handy way to check
+        # whether all, and only those expected, documents have been returned.
+
+        user_ids_symdiff = set(user_ids) ^ set(query_user_ids)
+        data_symdiff = set(updated_data) ^ set(query_data)
+        ids_symdiff = set(ids) ^ set(query_ids)
+
+        self.assertEqual(user_ids_symdiff, set([]),
+            "User IDs sets differ (difference:%s)" % (user_ids_symdiff))
+        self.assertEqual(data_symdiff, set([]),
+            "Data sets differ (difference:%s)" % (data_symdiff))
+        self.assertEqual(ids_symdiff, set([]),
+            "IDs sets differ (difference:%s)" % (ids_symdiff))
+
+
 class TestDocumentsDeletion(unittest.TestCase):
 
     def setUp(self):
