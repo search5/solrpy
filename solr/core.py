@@ -25,8 +25,7 @@ Features
  * Supports http/https and SSL client-side certificates
  * Uses persistent HTTP connections by default
  * Properly converts to/from SOLR data types, including datetime objects
- * Supports both querying and update commands (add, delete).
- * Supports batching of commands
+ * Supports both querying and update commands (add, delete)
  * Requires Python 2.3+
 
 
@@ -96,7 +95,6 @@ Once created, a connection object has the following public methods:
                 add(id='foo', notes='bar')
 
             You must "commit" for the addition to be saved.
-            This command honors begin_batch/end_batch.
 
     add_many(lst)
 
@@ -108,65 +106,33 @@ Once created, a connection object has the following public methods:
                             {'id': 'foo2', 'notes': 'w00t'} ] )
 
             You must "commit" for the addition to be saved.
-            This command honors begin_batch/end_batch.
 
     delete(id)
 
             Delete a document by id.
 
             You must "commit" for the deletion to be saved.
-            This command honors begin_batch/end_batch.
 
     delete_many(lst)
 
             Delete a series of documents.  Pass in a list of ids.
 
             You must "commit" for the deletion to be saved.
-            This command honors begin_batch/end_batch.
 
     delete_query(query)
 
             Delete any documents returned by issuing a query.
 
             You must "commit" for the deletion to be saved.
-            This command honors begin_batch/end_batch.
 
 
     commit(wait_flush=True, wait_searcher=True)
 
             Issue a commit command.
 
-            This command honors begin_batch/end_batch.
-
     optimize(wait_flush=True, wait_searcher=True)
 
             Issue an optimize command.
-
-            This command honors begin_batch/end_batch.
-
-    begin_batch()
-
-            Begin "batch" mode, in which all commands to be sent
-            to the SOLR server are queued up and sent all at once.
-
-            No update commands will be sent to the backend server
-            until end_batch() is called. Not that "query" commands
-            are not batched.
-
-            begin_batch/end_batch transactions can be nested.
-            The transaction will not be sent to the backend server
-            until as many end_batch() calls have been made as
-            begin_batch()s.
-
-            Batching is completely optional. Any update commands
-            issued outside of a begin_batch()/end_batch() pair will
-            be immediately processed.
-
-    end_batch(commit=False)
-
-            End a batching pair.  Any pending commands are sent
-            to the backend server.  If "True" is passed in to
-            end_batch, a <commit> is also sent.
 
     raw_query(**params)
 
@@ -264,15 +230,6 @@ Examples showing the search wrapper
     >>> response = response.next_batch()
     >>> print response.results.start
      20
-
-Add 3 documents and delete 1, but send all of them as a single transaction.
-
-    >>> c.begin_batch()
-    >>> c.add(id="1")
-    >>> c.add(id="2")
-    >>> c.add(id="3")
-    >>> c.delete(id="0")
-    >>> c.end_batch(True)
 
 Enter a raw query, without processing the returned HTML contents.
 
@@ -383,7 +340,6 @@ class SolrConnection:
         else:
             self.conn = httplib.HTTPConnection(self.host, **kwargs)
 
-        self.batch_cnt = 0  #  this is int, not bool!
         self.response_version = 2.2
         self.encoder = codecs.getencoder('utf-8')
 
@@ -522,51 +478,6 @@ class SolrConnection:
 
         return data
 
-    def begin_batch(self):
-        """
-        Denote the beginning of a batch update.
-
-        No update commands will be sent to the backend server
-        until end_batch() is called.
-
-        Any update commands issued outside of a begin_batch()/
-        end_batch() series will be immediately processed.
-
-        begin_batch/end_batch transactions can be nested.
-        The transaction will not be sent to the backend server
-        until as many end_batch() calls have been made as
-        begin_batch()s.
-        """
-        if not self.batch_cnt:
-            self.__batch_queue = []
-
-        self.batch_cnt += 1
-
-        return self.batch_cnt
-
-    def end_batch(self, commit=False):
-        """
-        Denote the end of a batch update.
-
-        Sends any queued commands to the backend server.
-
-        If `commit` is True, then a <commit/> command is included
-        at the end of the list of commands sent.
-        """
-        batch_cnt = self.batch_cnt - 1
-        if batch_cnt < 0:
-            raise SolrException(
-                "end_batch called without a corresponding begin_batch")
-
-        self.batch_cnt = batch_cnt
-        if batch_cnt:
-            return False
-
-        if commit:
-            self.__batch_queue.append('<commit/>')
-
-        return self._update("".join(self.__batch_queue))
-
     def delete(self, id):
         """
         Delete a specific document by id.
@@ -674,11 +585,6 @@ class SolrConnection:
         return data
 
     def _update(self, request):
-
-        # If we're in batching mode, just queue up the requests for later.
-        if self.batch_cnt:
-            self.__batch_queue.append(request)
-            return
 
         try:
             rsp = self._post(self.path + '/update',
