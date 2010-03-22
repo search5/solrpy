@@ -12,7 +12,7 @@ To run the tests, you need to have a running solr instance:
   unzip apache-solr-1.3.0.zip
   cp tests/schema.xml apache-solr-1.3.0/example/solr/conf
   cd apache-solr-1.3.0/example
-  java -Djetty.port=8983 -jar start.jar &
+  java -jar start.jar &
   python setup.py test
 
 
