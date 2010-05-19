@@ -489,7 +489,12 @@ class SolrConnection:
         """
         Delete documents using a list of IDs.
         """
-        [self.delete(id) for id in ids]
+        if ids:
+            lst = [u'<delete>\n']
+            for id in ids:
+                lst.append(u'<id>%s</id>\n' % id)
+            lst.append(u'</delete>')
+            return self._update(''.join(lst))
 
     def delete_query(self, query):
         """
