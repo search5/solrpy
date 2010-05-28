@@ -112,7 +112,7 @@ class TestAddingDocuments(unittest.TestCase):
             doc["letters"] = lset
             self.conn.add(**doc)
             self.conn.commit()
-            
+
         results = self.conn.query("user_id:" + user_id).results
 
         self.assertEquals(len(results), 3,
@@ -374,12 +374,12 @@ class TestUpdatingDocuments(unittest.TestCase):
 
         self.conn.add(**doc)
         self.conn.commit()
-        
+
         # we assume this works, being tested elsewhere
         doc["data"] = updated_data
         self.conn.add(**doc)
         self.conn.commit()
-        
+
         results = self.conn.query("id:" + id).results
         doc = results[0]
         self.assertEquals(doc["data"], updated_data)
@@ -946,7 +946,7 @@ class TestQuerying(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertTrue(isinstance(results[0]['creation_time'],
                                    datetime.datetime))
-        self.assertEqual(str(results[0]['creation_time']), 
+        self.assertEqual(str(results[0]['creation_time']),
                          '1969-05-28 00:00:00+00:00')
 
     def test_datetime_utc(self):
@@ -959,7 +959,7 @@ class TestQuerying(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertTrue(isinstance(results[0]['creation_time'],
                                    datetime.datetime))
-        self.assertEqual(str(results[0]['creation_time']), 
+        self.assertEqual(str(results[0]['creation_time']),
                          '1969-05-28 12:24:42+00:00')
 
     def test_multi_date(self):
@@ -1015,22 +1015,22 @@ class TestQuerying(unittest.TestCase):
         # solrpy 0.1
         self.assertTrue(str(query_timestamp.microsecond).startswith(microsecond))
         self.assertTrue(query_timestamp.microsecond/int(microsecond) == 1000)
-        
+
     def test_facet_field(self):
-        """ Test basic facet fields and make sure they are included in the 
+        """ Test basic facet fields and make sure they are included in the
         response properly """
-        
+
         self.conn.delete_query('id:[* TO *]')
         self.conn.optimize()
-        
+
         for i in range(0,12):
             self.conn.add(id=i,user_id=i%3,data=get_rand_string(),num=10)
-        
+
         self.conn.optimize()
-        
+
         results = self.conn.query('id:[* TO *]',facet='true',
                                   facet_field=['user_id','num'])
-        
+
         self.assertTrue(hasattr(results,'facet_counts'))
         self.assertTrue(u'facet_fields' in results.facet_counts)
         self.assertTrue(u'num' in results.facet_counts[u'facet_fields'])
@@ -1039,7 +1039,7 @@ class TestQuerying(unittest.TestCase):
         self.assertEqual(len(results.facet_counts[u'facet_fields'][u'user_id']),3)
         self.assertEqual(results.facet_counts[u'facet_fields'][u'num'],{u'10':12})
         self.assertEqual(results.facet_counts[u'facet_fields'][u'user_id'],{u'0':4,u'1':4,u'2':4})
-        
+
     def tearDown(self):
         self.conn.close()
 
@@ -1134,8 +1134,8 @@ class TestExceptions(unittest.TestCase):
         """
         self.assertRaises(ValueError, self.conn.query, "id:" + "abc",
                             **{"sort":"id", "sort_order":"invalid_sort_order"})
-    
-    
+
+
     def test_invalid_max_retries(self):
         """ Passing something that can't be cast as an integer for max_retries
         should raise a ValueError and a value less than 0 should raise an
@@ -1144,7 +1144,7 @@ class TestExceptions(unittest.TestCase):
                           max_retries='asdf')
         self.assertRaises(AssertionError, SolrConnection, SOLR_HTTP,
                           max_retries=-5)
-    
+
     def tearDown(self):
         self.conn.close()
 
@@ -1186,7 +1186,7 @@ class TestResponse(unittest.TestCase):
 
 
 class TestPaginator(unittest.TestCase):
-    
+
     def setUp(self):
         self.conn = SolrConnection(SOLR_HTTP)
         self.conn.delete_query('*:*')
@@ -1194,27 +1194,27 @@ class TestPaginator(unittest.TestCase):
             self.conn.add(id=i, data='data_%02i' % i)
         self.conn.commit()
         self.result = self.conn.query('*:*', sort='data', sort_order='desc')
-    
+
     def test_num_pages(self):
         """ Check the number of pages reported by the paginator """
         paginator = SolrPaginator(self.result)
         self.assertEqual(paginator.num_pages, 2)
-    
+
     def test_count(self):
         """ Check the result count reported by the paginator """
         paginator = SolrPaginator(self.result)
         self.assertEqual(paginator.count, 15)
-    
+
     def test_page_range(self):
         """ Check the page range returned by the paginator """
         paginator = SolrPaginator(self.result)
         self.assertEqual(paginator.page_range, [1,2])
-    
+
     def test_default_page_size(self):
         """ Test invalid/impproper default page sizes for paginator """
         self.assertRaises(ValueError,SolrPaginator,self.result,'asdf')
         self.assertRaises(ValueError,SolrPaginator,self.result,5)
-    
+
     def test_page_one(self):
         """ Test the first page from a paginator """
         paginator = SolrPaginator(self.result)
@@ -1227,7 +1227,7 @@ class TestPaginator(unittest.TestCase):
         self.assertEqual(page.end_index(), 9)
         self.assertEqual(len(page.object_list), 10)
         self.assertEqual(page.object_list[0]['data'], 'data_14')
-    
+
     def test_page_two(self):
         """ Test the second/last page from a paginator """
         paginator = SolrPaginator(self.result,default_page_size=10)
@@ -1240,7 +1240,7 @@ class TestPaginator(unittest.TestCase):
         self.assertEqual(page.end_index(), 14)
         self.assertEqual(len(page.object_list), 5)
         self.assertEqual(page.object_list[0]['data'], 'data_04')
-    
+
     def test_unicode_query(self):
         """ Test for unicode support in subsequent paginator queries """
         from solr import SolrException
@@ -1253,7 +1253,7 @@ class TestPaginator(unittest.TestCase):
             paginator.page(1)
         except SolrException:
             self.fail('Unicode not encoded correctly in paginator')
-    
+
     def tearDown(self):
         self.conn.close()
 
@@ -1273,13 +1273,13 @@ class TestTimeout(unittest.TestCase):
 
     def setUp(self):
         self.conn = SolrConnection(SOLR_HTTP,timeout=0.00000001)
-    
+
     def test_timout_exception(self):
-        """ A socket.timeout exception should be raised 
+        """ A socket.timeout exception should be raised
         """
-        
+
         self.assertRaises(socket.timeout,self.conn.query,"user_id:[* TO *]")
-    
+
     def tearDown(self):
         self.conn.close()
 
@@ -1288,47 +1288,47 @@ class ThrowBadStatusLineExceptions(object):
         self.calls = 0
         self.max = max
         self.wrap = wrap
-    
+
     def __call__(self, *args, **kwargs):
         self.calls += 1
         if self.max is None or self.calls <= self.max:
             raise httplib.BadStatusLine('Dummy status line exception')
-        
+
         if self.wrap is not None:
             f = self.wrap
             return f(*args, **kwargs)
-        
+
         return True
 
 class TestRetries(unittest.TestCase):
     def setUp(self):
         self.conn = SolrConnection(SOLR_HTTP)
-    
+
     def test_badstatusline(self):
         """ Replace the low level connection request with a dummy function that
-        raises an exception. Verify that the request method is called 4 times 
+        raises an exception. Verify that the request method is called 4 times
         and still raises the exception """
         t = ThrowBadStatusLineExceptions(max=None, wrap=self.conn.conn.request)
-        
+
         self.conn.conn.request = t
-        
+
         self.assertRaises(httplib.BadStatusLine, self.conn.query,
                           "user_id:12345")
-        
+
         self.assertEqual(t.calls, 4)
-    
+
     def test_success_after_failure(self):
-        """ Wrap the calls the the lower level request and throw only 1 
+        """ Wrap the calls the the lower level request and throw only 1
         exception and then proceed normally. It should result in two calls to
         self.conn.conn.request. """
         t = ThrowBadStatusLineExceptions(max=1, wrap=self.conn.conn.request)
-        
+
         self.conn.conn.request = t
-        
+
         self.conn.query("user_id:12345")
-        
+
         self.assertEqual(t.calls, 2)
-        
+
 
 if __name__ == "__main__":
     unittest.main()

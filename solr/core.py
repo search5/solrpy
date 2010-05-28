@@ -326,14 +326,14 @@ class SolrConnection:
         self.ssl_key = ssl_key
         self.ssl_cert = ssl_cert
         self.max_retries = int(max_retries)
-        
+
         assert self.max_retries >= 0
-        
+
         kwargs = {}
-        
+
         if self.timeout and _python_version >= 2.6 and _python_version < 3:
             kwargs['timeout'] = self.timeout
-        
+
         if self.scheme == 'https':
             self.conn = httplib.HTTPSConnection(self.host,
                    key_file=ssl_key, cert_file=ssl_cert, **kwargs)
@@ -345,7 +345,7 @@ class SolrConnection:
 
         # Responses from Solr will always be in UTF-8
         self.decoder = codecs.getdecoder('utf-8')
-        
+
         # Set timeout, if applicable.
         if self.timeout and _python_version < 2.6:
             self.conn.connect()
@@ -468,7 +468,7 @@ class SolrConnection:
             xml = StringIO(rsp.read())
             if self.debug:
                 logging.info("solrpy got response: %s" % xml.getvalue())
-                
+
             data = parse_query_response(xml,  params=params, connection=self)
 
         finally:
