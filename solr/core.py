@@ -360,8 +360,7 @@ class SolrConnection:
             self.xmlheaders['Connection'] = 'close'
 
         self.form_headers = {
-                'Content-Type':
-                'application/x-www-form-urlencoded; charset=utf-8'}
+            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
 
         if not self.persistent:
             self.form_headers['Connection'] = 'close'
@@ -558,7 +557,7 @@ class SolrConnection:
 
         return self._update(xstr)
 
-    def optimize(self, wait_flush=True, wait_searcher=True, ):
+    def optimize(self, wait_flush=True, wait_searcher=True):
         """
         Issue an optimize command to the SOLR server.
         """
@@ -600,8 +599,9 @@ class SolrConnection:
                 self.close()
 
         # Detect old-style error response (HTTP response code
-        # of 200 with a non-zero status.
-        if data.startswith('<result status="') and not data.startswith('<result status="0"'):
+        # of 200 with a non-zero status).
+        starts = data.startswith
+        if starts('<result status="') and not starts('<result status="0"'):
             data = self.decoder(data)[0]
             parsed = parseString(data)
             status = parsed.documentElement.getAttribute('status')
