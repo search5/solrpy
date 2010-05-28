@@ -7,7 +7,6 @@ Meant to be run against Solr 1.2+.
 """
 
 # stdlib
-import time
 import socket
 import datetime
 import unittest
@@ -40,7 +39,7 @@ class TestHTTPConnection(unittest.TestCase):
 
         try:
             self.conn.conn.request("GET", SOLR_PATH)
-        except socket.error, e:
+        except socket.error:
             self.fail("Connection to %s failed" % (SOLR_HTTP))
 
         status = self.conn.conn.getresponse().status
@@ -840,7 +839,6 @@ class TestQuerying(unittest.TestCase):
         """ Test whether sorting works (using default, ascending, sort order).
         """
         doc_count = 10
-        field_to_be_sorted_by = "data"
         prefix = get_rand_string()
 
         data = [prefix + "-" + str(x) for x in range(10)]
@@ -869,7 +867,6 @@ class TestQuerying(unittest.TestCase):
         """ Test whether sorting works (using non-default, descending, sort order).
         """
         doc_count = 10
-        field_to_be_sorted_by = "data"
         prefix = get_rand_string()
 
         data = [prefix + "-" + str(x) for x in range(10)]
@@ -1253,7 +1250,7 @@ class TestPaginator(unittest.TestCase):
         result = self.conn.query(chinese_data.encode('utf-8'))
         paginator = SolrPaginator(result, default_page_size=10)
         try:
-            page = paginator.page(1)
+            paginator.page(1)
         except SolrException:
             self.fail('Unicode not encoded correctly in paginator')
     
@@ -1328,7 +1325,7 @@ class TestRetries(unittest.TestCase):
         
         self.conn.conn.request = t
         
-        r = self.conn.query("user_id:12345")
+        self.conn.query("user_id:12345")
         
         self.assertEqual(t.calls, 2)
         
