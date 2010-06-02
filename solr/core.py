@@ -302,6 +302,10 @@ def committing(function=None):
     return wrapper
 
 
+# ===================================================================
+# Connection Objects
+# ===================================================================
+
 class Solr:
 
     def __init__(self, url,
@@ -704,9 +708,6 @@ class Solr:
                     raise
 
 
-# ===================================================================
-# Connection Object
-# ===================================================================
 class SolrConnection(Solr):
     """
     Represents a Solr connection.
