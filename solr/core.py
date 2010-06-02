@@ -275,6 +275,41 @@ class SolrException(Exception):
 
 
 # ===================================================================
+# Decorator
+# ===================================================================
+
+def update(function=None, under_commit=None):
+
+    if function is None:
+        return lambda f: update(f, under_commit=under_commit)
+
+    def wrapper(self, *args, **kw):
+        default_commit = False
+        if under_commit is not None:
+            if "_commit" in kw:
+                default_commit = kw["_commit"]
+            elif len(args) > under_commit:
+                # passed as a positional arg
+                default_commit = args[under_commit]
+                args = args[:under_commit] + args[under_commit + 1:]
+        commit = kw.pop("commit", default_commit)
+        optimize = kw.pop("optimize", False)
+        query = {}
+        if commit or optimize:
+            if optimize:
+                query["optimize"] = "true"
+            elif commit:
+                query["commit"] = "true"
+        content = function(self, *args, **kw)
+        if content:
+            return self._update(content, query)
+
+    wrapper.__doc__ = function.__doc__
+    wrapper.__name__ = function.__name__
+    return wrapper
+
+
+# ===================================================================
 # Connection Object
 # ===================================================================
 class SolrConnection:
@@ -477,13 +512,14 @@ class SolrConnection:
 
         return data
 
+    @update
     def delete(self, id):
         """
         Delete a specific document by id.
         """
-        xstr = u'<delete><id>%s</id></delete>' % escape(unicode(id))
-        return self._update(xstr)
+        return u'<delete><id>%s</id></delete>' % escape(unicode(id))
 
+    @update
     def delete_many(self, ids):
         """
         Delete documents using a list of IDs.
@@ -493,15 +529,16 @@ class SolrConnection:
             for id in ids:
                 lst.append(u'<id>%s</id>\n' % id)
             lst.append(u'</delete>')
-            return self._update(''.join(lst))
+            return ''.join(lst)
 
+    @update
     def delete_query(self, query):
         """
         Delete all documents returned by a query.
         """
-        xstr = u'<delete><query>%s</query></delete>' % escape(query)
-        return self._update(xstr)
+        return u'<delete><query>%s</query></delete>' % escape(query)
 
+    @update(under_commit=0)
     def add(self, _commit=False, **fields):
         """
         Add a document to the SOLR server.  Document fields
@@ -513,13 +550,10 @@ class SolrConnection:
         lst = [u'<add>']
         self.__add(lst, fields)
         lst.append(u'</add>')
-        xstr = ''.join(lst)
-        query = None
-        if _commit:
-            query = {'commit': 'true'}
-        return self._update(xstr, query)
+        return ''.join(lst)
 
-    def add_many(self, docs, _commit=False):
+    @update(under_commit=1)
+    def add_many(self, docs):
         """
         Add several documents to the SOLR server.
 
@@ -530,11 +564,7 @@ class SolrConnection:
         for doc in docs:
             self.__add(lst, doc)
         lst.append(u'</add>')
-        xstr = ''.join(lst)
-        query = None
-        if _commit:
-            query = {'commit': 'true'}
-        return self._update(xstr, query)
+        return ''.join(lst)
 
     def commit(self, wait_flush=True, wait_searcher=True, _optimize=False):
         """
