@@ -278,10 +278,10 @@ class SolrException(Exception):
 # Decorator
 # ===================================================================
 
-def update(function=None, under_commit=None):
+def committing(function=None, under_commit=None):
 
     if function is None:
-        return lambda f: update(f, under_commit=under_commit)
+        return lambda f: committing(f, under_commit=under_commit)
 
     def wrapper(self, *args, **kw):
         default_commit = False
@@ -512,14 +512,14 @@ class SolrConnection:
 
         return data
 
-    @update
+    @committing
     def delete(self, id):
         """
         Delete a specific document by id.
         """
         return u'<delete><id>%s</id></delete>' % escape(unicode(id))
 
-    @update
+    @committing
     def delete_many(self, ids):
         """
         Delete documents using a list of IDs.
@@ -531,14 +531,14 @@ class SolrConnection:
             lst.append(u'</delete>')
             return ''.join(lst)
 
-    @update
+    @committing
     def delete_query(self, query):
         """
         Delete all documents returned by a query.
         """
         return u'<delete><query>%s</query></delete>' % escape(query)
 
-    @update(under_commit=0)
+    @committing(under_commit=0)
     def add(self, _commit=False, **fields):
         """
         Add a document to the SOLR server.  Document fields
@@ -552,7 +552,7 @@ class SolrConnection:
         lst.append(u'</add>')
         return ''.join(lst)
 
-    @update(under_commit=1)
+    @committing(under_commit=1)
     def add_many(self, docs):
         """
         Add several documents to the SOLR server.
