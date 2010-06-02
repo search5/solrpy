@@ -252,7 +252,7 @@ from xml.dom.minidom import parseString
 
 __version__ = "0.9.1"
 
-__all__ = ['SolrException', 'SolrConnection', 'Response']
+__all__ = ['SolrException', 'Solr', 'SolrConnection', 'Response']
 
 _python_version = sys.version_info[0]+(sys.version_info[1]/10.0)
 
@@ -274,25 +274,12 @@ class SolrException(Exception):
         return 'HTTP code=%s, reason=%s' % (self.httpcode, self.reason)
 
 
-# ===================================================================
-# Decorator
-# ===================================================================
+# Decorator (used below)
 
-def committing(function=None, under_commit=None):
-
-    if function is None:
-        return lambda f: committing(f, under_commit=under_commit)
+def committing(function=None):
 
     def wrapper(self, *args, **kw):
-        default_commit = False
-        if under_commit is not None:
-            if "_commit" in kw:
-                default_commit = kw["_commit"]
-            elif len(args) > under_commit:
-                # passed as a positional arg
-                default_commit = args[under_commit]
-                args = args[:under_commit] + args[under_commit + 1:]
-        commit = kw.pop("commit", default_commit)
+        commit = kw.pop("commit", False)
         optimize = kw.pop("optimize", False)
         query = {}
         if commit or optimize:
@@ -300,6 +287,12 @@ def committing(function=None, under_commit=None):
                 query["optimize"] = "true"
             elif commit:
                 query["commit"] = "true"
+            wait_searcher = kw.pop("wait_searcher", True)
+            wait_flush = kw.pop("wait_flush", True)
+            if not wait_searcher:
+                query["waitSearcher"] = "false"
+                if not wait_flush:
+                    query["waitFlush"] = "false"
         content = function(self, *args, **kw)
         if content:
             return self._update(content, query)
@@ -309,16 +302,7 @@ def committing(function=None, under_commit=None):
     return wrapper
 
 
-# ===================================================================
-# Connection Object
-# ===================================================================
-class SolrConnection:
-    """
-    Represents a Solr connection.
-
-    Designed to work with the 2.2 response format (SOLR 1.2+).
-    (though 2.1 will likely work.)
-    """
+class Solr:
 
     def __init__(self, url,
                  persistent=True,
@@ -404,6 +388,9 @@ class SolrConnection:
 
     def close(self):
         self.conn.close()
+
+
+    # Query interface.
 
     def query(self, q, fields=None, highlight=None,
               score=True, sort=None, sort_order="asc", **params):
@@ -512,12 +499,50 @@ class SolrConnection:
 
         return data
 
+    def raw_query(self, **params):
+        """
+        Issue a query against a SOLR server.
+
+        Return the raw result.  No pre-processing or
+        post-processing happends to either
+        input parameters or responses
+        """
+
+        # Clean up optional parameters to match SOLR spec.
+        params = dict([(key.replace('_','.'), value)
+                       for key, value in params.items()])
+
+        request = urllib.urlencode(params, doseq=True)
+
+        try:
+            rsp = self._post(self.path+'/select',
+                              request, self.form_headers)
+            data = rsp.read()
+        finally:
+            if not self.persistent:
+                self.close()
+
+        return data
+
+
+    # Update interface.
+
     @committing
-    def delete(self, id):
+    def delete(self, id=None, ids=None, queries=None):
         """
         Delete a specific document by id.
         """
-        return u'<delete><id>%s</id></delete>' % escape(unicode(id))
+        if not ids:
+            ids = []
+        if id:
+            ids.insert(0, id)
+        lst = [u'<delete>\n']
+        for id in ids:
+            lst.append(u'<id>%s</id>\n' % escape(unicode(id)))
+        for query in (queries or ()):
+            lst.append(u'<query>%s</query>\n' % escape(unicode(query)))
+        lst.append(u'</delete>')
+        return ''.join(lst)
 
     @committing
     def delete_many(self, ids):
@@ -538,8 +563,8 @@ class SolrConnection:
         """
         return u'<delete><query>%s</query></delete>' % escape(query)
 
-    @committing(under_commit=0)
-    def add(self, _commit=False, **fields):
+    @committing
+    def add(self, doc):
         """
         Add a document to the SOLR server.  Document fields
         should be specified as arguments to this function
@@ -548,11 +573,11 @@ class SolrConnection:
             connection.add(id="mydoc", author="Me")
         """
         lst = [u'<add>']
-        self.__add(lst, fields)
+        self.__add(lst, doc)
         lst.append(u'</add>')
         return ''.join(lst)
 
-    @committing(under_commit=1)
+    @committing
     def add_many(self, docs):
         """
         Add several documents to the SOLR server.
@@ -591,30 +616,8 @@ class SolrConnection:
         """
         self.commit(wait_flush, wait_searcher, _optimize=True)
 
-    def raw_query(self, **params):
-        """
-        Issue a query against a SOLR server.
 
-        Return the raw result.  No pre-processing or
-        post-processing happends to either
-        input parameters or responses
-        """
-
-        # Clean up optional parameters to match SOLR spec.
-        params = dict([(key.replace('_','.'), value)
-                       for key, value in params.items()])
-
-        request = urllib.urlencode(params, doseq=True)
-
-        try:
-            rsp = self._post(self.path+'/select',
-                              request, self.form_headers)
-            data = rsp.read()
-        finally:
-            if not self.persistent:
-                self.close()
-
-        return data
+    # Helper methods.
 
     def _update(self, request, query=None):
         selector = '%s/update%s' % (self.path, qs_from_items(query))
@@ -667,10 +670,11 @@ class SolrConnection:
         lst.append('</doc>')
 
     def __repr__(self):
-        return ('<SolrConnection (url=%s, '
-                'persistent=%s, post_headers=%s, reconnects=%s)>') % (
-            self.url, self.persistent,
-            self.xmlheaders, self.reconnects)
+        return (
+            '<%s (url=%s, persistent=%s, post_headers=%s, reconnects=%s)>'
+            % (self.__class__.__name__,
+               self.url, self.persistent,
+               self.xmlheaders, self.reconnects))
 
     def _reconnect(self):
         self.reconnects += 1
@@ -698,6 +702,26 @@ class SolrConnection:
                 attempts -= 1
                 if attempts <= 0:
                     raise
+
+
+# ===================================================================
+# Connection Object
+# ===================================================================
+class SolrConnection(Solr):
+    """
+    Represents a Solr connection.
+
+    Designed to work with the 2.2 response format (SOLR 1.2+).
+    (though 2.1 will likely work.)
+    """
+
+    # Backward compatible update interfaces.
+
+    def add(self, _commit=False, **fields):
+        return Solr.add_many(self, [fields], commit=_commit)
+
+    def add_many(self, docs, _commit=False):
+        return Solr.add_many(self, docs, commit=_commit)
 
 
 # ===================================================================
