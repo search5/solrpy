@@ -16,7 +16,7 @@ from random import choice
 from xml.dom.minidom import parseString
 
 # solrpy
-from solr import SolrConnection, SolrPaginator
+import solr
 import solr.core
 
 SOLR_PATH = "/solr"
@@ -30,43 +30,56 @@ def get_rand_string():
     return "".join(choice(digits)  for x in range(12))
 
 
-class TestHTTPConnection(unittest.TestCase):
+
+class SolrTestCase(unittest.TestCase):
+
+    connection_factory = solr.SolrConnection
+
+    def setUp(self):
+        self._connections = []
+
+    def new_connection(self, **kw):
+        conn = self.connection_factory(SOLR_HTTP, **kw)
+        self._connections.append(conn)
+        return conn
+
+    def tearDown(self):
+        for conn in self._connections:
+            conn.close()
+
+
+class TestHTTPConnection(SolrTestCase):
 
     def test_connect(self):
         """ Check if we're really get connected to Solr through HTTP.
         """
-        self.conn = SolrConnection(SOLR_HTTP)
+        conn = self.new_connection()
 
         try:
-            self.conn.conn.request("GET", SOLR_PATH)
+            conn.conn.request("GET", SOLR_PATH)
         except socket.error:
             self.fail("Connection to %s failed" % (SOLR_HTTP))
 
-        status = self.conn.conn.getresponse().status
+        status = conn.conn.getresponse().status
         self.assertEquals(status, 302, "Expected FOUND (302), got: %d" % status)
 
     def test_close_connection(self):
         """ Make sure connections to Solr are being closed properly.
         """
-        self.conn2 = SolrConnection(SOLR_HTTP)
-        self.conn2.conn.request("GET", SOLR_PATH)
-        self.conn2.close()
+        conn = self.new_connection()
+        conn.conn.request("GET", SOLR_PATH)
+        conn.close()
 
         # Closing the Solr connection should close the underlying
         # HTTPConnection's socket.
-        self.assertEquals(self.conn2.conn.sock, None, "Connection not closed")
-
-    def tearDown(self):
-        # Connections may as well not exist.
-        for conn in ["conn", "conn2"]:
-            if hasattr(self, conn):
-                getattr(self, conn).close()
+        self.assertEquals(conn.conn.sock, None, "Connection not closed")
 
 
-class TestAddingDocuments(unittest.TestCase):
+class TestAddingDocuments(SolrTestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        super(TestAddingDocuments, self).setUp()
+        self.conn = self.new_connection()
 
     def test_add_one_document(self):
         """ Try to add one document.
@@ -350,14 +363,12 @@ class TestAddingDocuments(unittest.TestCase):
 
         self.conn.add(**doc)
 
-    def tearDown(self):
-        self.conn.close()
 
-
-class TestUpdatingDocuments(unittest.TestCase):
+class TestUpdatingDocuments(SolrTestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        super(TestUpdatingDocuments, self).setUp()
+        self.conn = self.new_connection()
 
     def test_update_single(self):
         """ Try to add one document, and then update it (readd it)
@@ -438,10 +449,11 @@ class TestUpdatingDocuments(unittest.TestCase):
             "IDs sets differ (difference:%s)" % (ids_symdiff))
 
 
-class TestDocumentsDeletion(unittest.TestCase):
+class TestDocumentsDeletion(SolrTestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        super(TestDocumentsDeletion, self).setUp()
+        self.conn = self.new_connection()
 
     def test_delete_one_document_by_query(self):
         """ Try to delete a single document matching a given query.
@@ -471,7 +483,8 @@ class TestDocumentsDeletion(unittest.TestCase):
         """ Try to delete many documents matching a given query.
         """
         doc_count = 10
-        user_id = get_rand_string() # Same user ID will be used for all documents.
+        # Same user ID will be used for all documents.
+        user_id = get_rand_string()
 
         for x in range(doc_count):
             self.conn.add(id=get_rand_string(), data=get_rand_string(), user_id=user_id)
@@ -549,14 +562,12 @@ class TestDocumentsDeletion(unittest.TestCase):
         self.assertEquals(len(results), 0,
             "Document (id:%s) should've been deleted"% (id))
 
-    def tearDown(self):
-        self.conn.close()
 
-
-class TestQuerying(unittest.TestCase):
+class TestQuerying(SolrTestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP,timeout=1)
+        super(TestQuerying, self).setUp()
+        self.conn = self.new_connection(timeout=1)
 
     def test_query_string(self):
         """ Get documents (all default fields) by a simple query.
@@ -1040,14 +1051,12 @@ class TestQuerying(unittest.TestCase):
         self.assertEqual(results.facet_counts[u'facet_fields'][u'num'],{u'10':12})
         self.assertEqual(results.facet_counts[u'facet_fields'][u'user_id'],{u'0':4,u'1':4,u'2':4})
 
-    def tearDown(self):
-        self.conn.close()
 
-
-class TestCommitingOptimizing(unittest.TestCase):
+class TestCommitingOptimizing(SolrTestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        super(TestCommitingOptimizing, self).setUp()
+        self.conn = self.new_connection()
 
     def test_commit(self):
         """ Check whether commiting works.
@@ -1112,14 +1121,12 @@ class TestCommitingOptimizing(unittest.TestCase):
         self.assertEquals(len(results), 1,
             "No documents returned, results:%s" % (repr(results)))
 
-    def tearDown(self):
-        self.conn.close()
 
-
-class TestExceptions(unittest.TestCase):
+class TestExceptions(SolrTestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        super(TestExceptions, self).setUp()
+        self.conn = self.new_connection()
 
     def test_exception_highlight_true_no_fields(self):
         """ A ValueError should be raised when querying and highlight is True
@@ -1140,19 +1147,17 @@ class TestExceptions(unittest.TestCase):
         """ Passing something that can't be cast as an integer for max_retries
         should raise a ValueError and a value less than 0 should raise an
         AssertionError """
-        self.assertRaises(ValueError, SolrConnection, SOLR_HTTP,
+        self.assertRaises(ValueError, self.new_connection,
                           max_retries='asdf')
-        self.assertRaises(AssertionError, SolrConnection, SOLR_HTTP,
+        self.assertRaises(AssertionError, self.new_connection,
                           max_retries=-5)
 
-    def tearDown(self):
-        self.conn.close()
 
-
-class TestResponse(unittest.TestCase):
+class TestResponse(SolrTestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        super(TestResponse, self).setUp()
+        self.conn = self.new_connection()
 
     def test_response_attributes(self):
         """ Make sure Response objects have all the documented attributes,
@@ -1181,14 +1186,12 @@ class TestResponse(unittest.TestCase):
             self.assertTrue(isinstance(value, attr_type),
                 "Attribute %s has wrong type. id:%s" % (attr,id))
 
-    def tearDown(self):
-        self.conn.close()
 
-
-class TestPaginator(unittest.TestCase):
+class TestPaginator(SolrTestCase):
 
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        super(TestPaginator, self).setUp()
+        self.conn = self.new_connection()
         self.conn.delete_query('*:*')
         for i in range(0,15):
             self.conn.add(id=i, data='data_%02i' % i)
@@ -1197,27 +1200,27 @@ class TestPaginator(unittest.TestCase):
 
     def test_num_pages(self):
         """ Check the number of pages reported by the paginator """
-        paginator = SolrPaginator(self.result)
+        paginator = solr.SolrPaginator(self.result)
         self.assertEqual(paginator.num_pages, 2)
 
     def test_count(self):
         """ Check the result count reported by the paginator """
-        paginator = SolrPaginator(self.result)
+        paginator = solr.SolrPaginator(self.result)
         self.assertEqual(paginator.count, 15)
 
     def test_page_range(self):
         """ Check the page range returned by the paginator """
-        paginator = SolrPaginator(self.result)
+        paginator = solr.SolrPaginator(self.result)
         self.assertEqual(paginator.page_range, [1,2])
 
     def test_default_page_size(self):
         """ Test invalid/impproper default page sizes for paginator """
-        self.assertRaises(ValueError,SolrPaginator,self.result,'asdf')
-        self.assertRaises(ValueError,SolrPaginator,self.result,5)
+        self.assertRaises(ValueError,solr.SolrPaginator,self.result,'asdf')
+        self.assertRaises(ValueError,solr.SolrPaginator,self.result,5)
 
     def test_page_one(self):
         """ Test the first page from a paginator """
-        paginator = SolrPaginator(self.result)
+        paginator = solr.SolrPaginator(self.result)
         page = paginator.page(1)
         self.assertEqual(page.has_other_pages(), True)
         self.assertEqual(page.has_next(), True)
@@ -1230,7 +1233,7 @@ class TestPaginator(unittest.TestCase):
 
     def test_page_two(self):
         """ Test the second/last page from a paginator """
-        paginator = SolrPaginator(self.result,default_page_size=10)
+        paginator = solr.SolrPaginator(self.result,default_page_size=10)
         page = paginator.page(2)
         self.assertEqual(page.has_other_pages(), True)
         self.assertEqual(page.has_next(), False)
@@ -1248,17 +1251,14 @@ class TestPaginator(unittest.TestCase):
         self.conn.add(id=100, data=chinese_data)
         self.conn.commit()
         result = self.conn.query(chinese_data.encode('utf-8'))
-        paginator = SolrPaginator(result, default_page_size=10)
+        paginator = solr.SolrPaginator(result, default_page_size=10)
         try:
             paginator.page(1)
         except SolrException:
             self.fail('Unicode not encoded correctly in paginator')
 
-    def tearDown(self):
-        self.conn.close()
 
-
-class TestTimeout(unittest.TestCase):
+class TestTimeout(SolrTestCase):
 
     # This test assumes that the Solr instance is slow enough that it
     # can't respond in the allowed time; that's not always the case.
@@ -1271,17 +1271,11 @@ class TestTimeout(unittest.TestCase):
     # is provided correctly, rather than assuming that these tests are
     # running on a slow machine.
 
-    def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP,timeout=0.00000001)
-
     def test_timout_exception(self):
         """ A socket.timeout exception should be raised
         """
-
-        self.assertRaises(socket.timeout,self.conn.query,"user_id:[* TO *]")
-
-    def tearDown(self):
-        self.conn.close()
+        conn = self.new_connection(timeout=0.00000001)
+        self.assertRaises(socket.timeout,conn.query,"user_id:[* TO *]")
 
 class ThrowBadStatusLineExceptions(object):
     def __init__(self, max=None, wrap=None):
@@ -1300,9 +1294,11 @@ class ThrowBadStatusLineExceptions(object):
 
         return True
 
-class TestRetries(unittest.TestCase):
+class TestRetries(SolrTestCase):
+
     def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP)
+        super(TestRetries, self).setUp()
+        self.conn = self.new_connection()
 
     def test_badstatusline(self):
         """ Replace the low level connection request with a dummy function that
