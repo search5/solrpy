@@ -26,9 +26,17 @@ SOLR_PORT_HTTPS = "8943"
 SOLR_HTTP = "http://" + SOLR_HOST + ":" + SOLR_PORT_HTTP  + SOLR_PATH
 SOLR_HTTPS = "https://" + SOLR_HOST + ":" + SOLR_PORT_HTTPS + SOLR_PATH
 
+
 def get_rand_string():
     return "".join(choice(digits)  for x in range(12))
 
+
+def get_rand_userdoc():
+    return {
+        "user_id": get_rand_string(),
+        "data": get_rand_string(),
+        "id": get_rand_string(),
+        }
 
 
 class SolrTestCase(unittest.TestCase):
@@ -114,25 +122,17 @@ class TestAddingDocuments(SolrTestCase):
     def test_add_one_document(self):
         """ Try to add one document.
         """
-        user_id = get_rand_string()
-        data = get_rand_string()
-        id = get_rand_string()
-
-        doc = {}
-        doc["user_id"] = user_id
-        doc["data"] = data
-        doc["id"] = id
+        doc = get_rand_userdoc()
 
         self.conn.add(**doc)
         self.conn.commit()
-        results = self.conn.query("id:" + id).results
+        results = self.conn.query("id:" + doc["id"]).results
 
         self.assertEquals(len(results), 1,
             "Could not find expected data (id:%s)" % id)
 
-        doc = results[0]
-        self.assertEquals(doc["user_id"], user_id)
-        self.assertEquals(doc["data"], data)
+        self.assertEquals(results[0]["user_id"], doc["user_id"])
+        self.assertEquals(results[0]["data"], doc["data"])
 
     def test_add_one_document_multiplefields(self):
         """ Adds several documents with multiple fields, namely
@@ -172,42 +172,26 @@ class TestAddingDocuments(SolrTestCase):
 
         # That one fails in r5 (<commit/> must be made on its own)
 
-        user_id = get_rand_string()
-        data = get_rand_string()
-        id = get_rand_string()
-
-        doc = {}
-        doc["user_id"] = user_id
-        doc["data"] = data
-        doc["id"] = id
+        doc = get_rand_userdoc()
 
         # Commit the changes
         self.conn.add(True, **doc)
-        results = self.conn.query("id:" + id).results
+        results = self.conn.query("id:" + doc["id"]).results
 
         self.assertEquals(len(results), 1,
             "Could not find expected data (id:%s)" % id)
 
-        doc = results[0]
-        self.assertEquals(doc["user_id"], user_id)
-        self.assertEquals(doc["data"], data)
+        self.assertEquals(results[0]["user_id"], doc["user_id"])
+        self.assertEquals(results[0]["data"], doc["data"])
 
     def test_add_no_commit(self):
         """ Add one document without commiting the operation.
         """
-        user_id = get_rand_string()
-        data = get_rand_string()
-        id = get_rand_string()
-
-        doc = {}
-        doc["user_id"] = user_id
-        doc["data"] = data
-        doc["id"] = id
-
+        doc = get_rand_userdoc()
         self.conn.add(**doc)
-        results = self.conn.query("user_id:" + user_id).results
+        results = self.conn.query("user_id:" + doc["user_id"]).results
         self.assertEquals(len(results), 0,
-            "Document (id:%s) shouldn't have been fetched" % (id))
+            "Document (id:%s) shouldn't have been fetched" % (doc["id"]))
 
     def test_add_many(self):
         """ Try to add more than one document in a single operation.
@@ -299,18 +283,13 @@ class TestAddingDocuments(SolrTestCase):
         """
         # "bile" in Polish (UTF-8).
         data = "\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87".decode("utf-8")
-        user_id = get_rand_string()
-        id = get_rand_string()
-
-        doc = {}
-        doc["user_id"] = user_id
+        doc = get_rand_userdoc()
         doc["data"] = data
-        doc["id"] = id
 
         self.conn.add(**doc)
         self.conn.commit()
 
-        results = self.conn.query("id:" + id).results
+        results = self.conn.query("id:" + doc["id"]).results
         if not results:
             self.fail("Could not find document (id:%s)" % id)
 
@@ -318,13 +297,17 @@ class TestAddingDocuments(SolrTestCase):
         query_data = results[0]["data"]
         query_id = results[0]["id"]
 
-        self.assertEquals(user_id, query_user_id,
-            "Invalid user_id, expected: %s, got: %s" % (user_id, query_user_id))
-        self.assertEquals(data, query_data,
-            "Invalid data, expected: %s, got: %s" % (repr(data),
-                                                        repr(query_data)))
-        self.assertEquals(id, query_id,
-            "Invalid id, expected: %s, got: %s" % (id, query_id))
+        self.assertEquals(
+            doc["user_id"], query_user_id,
+            ("Invalid user_id, expected: %s, got: %s"
+             % (doc["user_id"], query_user_id)))
+        self.assertEquals(
+            data, query_data,
+            ("Invalid data, expected: %s, got: %s"
+             % (repr(data), repr(query_data))))
+        self.assertEquals(
+            doc["id"], query_id,
+            "Invalid id, expected: %s, got: %s" % (doc["id"], query_id))
 
     def test_add_many_unicode(self):
         """ Check correctness of handling Unicode data when adding many
@@ -336,10 +319,8 @@ class TestAddingDocuments(SolrTestCase):
 
         documents = []
         for char in chars:
-            doc = {}
+            doc = get_rand_userdoc()
             doc["data"] = char
-            doc["user_id"] = get_rand_string()
-            doc["id"] = get_rand_string()
             documents.append(doc)
 
         user_ids = [doc["user_id"] for doc in documents]
@@ -381,14 +362,7 @@ class TestAddingDocuments(SolrTestCase):
     def test_add_none_field(self):
         """ Try to add a document with a field of None
         """
-        user_id = get_rand_string()
-        data = get_rand_string()
-        id = get_rand_string()
-
-        doc = {}
-        doc["user_id"] = user_id
-        doc["data"] = data
-        doc["id"] = id
+        doc = get_rand_userdoc()
         doc["num"] = None
 
         self.conn.add(**doc)
