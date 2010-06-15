@@ -1232,6 +1232,9 @@ class TestResponse(SolrTestCase):
 
 
 class TestPaginator(SolrTestCase):
+    # This only needs to use one of the connection classes since the
+    # paginator relies only on the results, not the connection that
+    # produced them.
 
     def setUp(self):
         super(TestPaginator, self).setUp()
