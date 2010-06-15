@@ -74,6 +74,32 @@ class TestHTTPConnection(SolrTestCase):
         # HTTPConnection's socket.
         self.assertEquals(conn.conn.sock, None, "Connection not closed")
 
+    def test_invalid_max_retries(self):
+        """ Passing something that can't be cast as an integer for max_retries
+        should raise a ValueError and a value less than 0 should raise an
+        AssertionError """
+        self.assertRaises(ValueError, self.new_connection,
+                          max_retries='asdf')
+        self.assertRaises(AssertionError, self.new_connection,
+                          max_retries=-5)
+
+    # This test assumes that the Solr instance is slow enough that it
+    # can't respond in the allowed time; that's not always the case.
+    #
+    # Reducing the allowed time can help, but a better test needs to be
+    # devised.
+    #
+    # This is really testing that the timeout is provided to the socket
+    # library; perhaps that should be mocked to check that the timeout
+    # is provided correctly, rather than assuming that these tests are
+    # running on a slow machine.
+
+    def test_timout_exception(self):
+        """ A socket.timeout exception should be raised
+        """
+        conn = self.new_connection(timeout=0.00000001)
+        self.assertRaises(socket.timeout,conn.query,"user_id:[* TO *]")
+
 
 class TestAddingDocuments(SolrTestCase):
 
@@ -1122,10 +1148,10 @@ class TestCommitingOptimizing(SolrTestCase):
             "No documents returned, results:%s" % (repr(results)))
 
 
-class TestExceptions(SolrTestCase):
+class TestQueryExceptions(SolrTestCase):
 
     def setUp(self):
-        super(TestExceptions, self).setUp()
+        super(TestQueryExceptions, self).setUp()
         self.conn = self.new_connection()
 
     def test_exception_highlight_true_no_fields(self):
@@ -1141,16 +1167,6 @@ class TestExceptions(SolrTestCase):
         """
         self.assertRaises(ValueError, self.conn.query, "id:" + "abc",
                             **{"sort":"id", "sort_order":"invalid_sort_order"})
-
-
-    def test_invalid_max_retries(self):
-        """ Passing something that can't be cast as an integer for max_retries
-        should raise a ValueError and a value less than 0 should raise an
-        AssertionError """
-        self.assertRaises(ValueError, self.new_connection,
-                          max_retries='asdf')
-        self.assertRaises(AssertionError, self.new_connection,
-                          max_retries=-5)
 
 
 class TestResponse(SolrTestCase):
@@ -1174,8 +1190,8 @@ class TestResponse(SolrTestCase):
             "numFound": long,
             "start": long,
             "maxScore": float,
-            "header": dict
-        }
+            "header": dict,
+            }
 
         for attr, attr_type in expected_attrs.items():
             self.assertTrue(hasattr(response, attr),
@@ -1258,30 +1274,13 @@ class TestPaginator(SolrTestCase):
             self.fail('Unicode not encoded correctly in paginator')
 
 
-class TestTimeout(SolrTestCase):
-
-    # This test assumes that the Solr instance is slow enough that it
-    # can't respond in the allowed time; that's not always the case.
-    #
-    # Reducing the allowed time can help, but a better test needs to be
-    # devised.
-    #
-    # This is really testing that the timeout is provided to the socket
-    # library; perhaps that should be mocked to check that the timeout
-    # is provided correctly, rather than assuming that these tests are
-    # running on a slow machine.
-
-    def test_timout_exception(self):
-        """ A socket.timeout exception should be raised
-        """
-        conn = self.new_connection(timeout=0.00000001)
-        self.assertRaises(socket.timeout,conn.query,"user_id:[* TO *]")
-
 class ThrowBadStatusLineExceptions(object):
-    def __init__(self, max=None, wrap=None):
+
+    def __init__(self, conn, max=None):
         self.calls = 0
         self.max = max
-        self.wrap = wrap
+        self.wrap = conn.conn.request
+        conn.conn.request = self
 
     def __call__(self, *args, **kwargs):
         self.calls += 1
@@ -1294,6 +1293,7 @@ class ThrowBadStatusLineExceptions(object):
 
         return True
 
+
 class TestRetries(SolrTestCase):
 
     def setUp(self):
@@ -1304,9 +1304,7 @@ class TestRetries(SolrTestCase):
         """ Replace the low level connection request with a dummy function that
         raises an exception. Verify that the request method is called 4 times
         and still raises the exception """
-        t = ThrowBadStatusLineExceptions(max=None, wrap=self.conn.conn.request)
-
-        self.conn.conn.request = t
+        t = ThrowBadStatusLineExceptions(self.conn)
 
         self.assertRaises(httplib.BadStatusLine, self.conn.query,
                           "user_id:12345")
@@ -1317,9 +1315,7 @@ class TestRetries(SolrTestCase):
         """ Wrap the calls the the lower level request and throw only 1
         exception and then proceed normally. It should result in two calls to
         self.conn.conn.request. """
-        t = ThrowBadStatusLineExceptions(max=1, wrap=self.conn.conn.request)
-
-        self.conn.conn.request = t
+        t = ThrowBadStatusLineExceptions(self.conn, max=1)
 
         self.conn.query("user_id:12345")
 
