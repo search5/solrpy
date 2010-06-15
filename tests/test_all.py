@@ -394,7 +394,24 @@ class TestAddingDocuments(SolrTestCase):
         self.conn.add(**doc)
 
 
-class TestUpdatingDocuments(SolrTestCase):
+class SolrConnectionBased(SolrTestCase):
+
+    def add(self, **doc):
+        # This is used to abstract away the differences in the ``add``
+        # method for the two connection APIs; this is overridden for use
+        # with the ``solr.Solr`` connection class.
+        self._connections[-1].add(**doc)
+
+
+class SolrBased(SolrConnectionBased):
+
+    connection_factory = solr.Solr
+
+    def add(self, **doc):
+        self._connections[-1].add(doc)
+
+
+class TestUpdatingDocuments(SolrConnectionBased):
 
     def setUp(self):
         super(TestUpdatingDocuments, self).setUp()
@@ -413,12 +430,12 @@ class TestUpdatingDocuments(SolrTestCase):
         doc["data"] = data
         doc["id"] = id
 
-        self.conn.add(**doc)
+        self.add(**doc)
         self.conn.commit()
 
         # we assume this works, being tested elsewhere
         doc["data"] = updated_data
-        self.conn.add(**doc)
+        self.add(**doc)
         self.conn.commit()
 
         results = self.conn.query("id:" + id).results
@@ -479,21 +496,8 @@ class TestUpdatingDocuments(SolrTestCase):
             "IDs sets differ (difference:%s)" % (ids_symdiff))
 
 
-class SolrConnectionBased(SolrTestCase):
-
-    def add(self, **doc):
-        # This is used to abstract away the differences in the ``add``
-        # method for the two connection APIs; this is overridden for use
-        # with the ``solr.Solr`` connection class.
-        self._connections[-1].add(**doc)
-
-
-class SolrBased(SolrConnectionBased):
-
-    connection_factory = solr.Solr
-
-    def add(self, **doc):
-        self._connections[-1].add(doc)
+class TestSolrUpdatingDocuments(SolrBased, TestUpdatingDocuments):
+    pass
 
 
 class TestDocumentsDeletion(SolrConnectionBased):
