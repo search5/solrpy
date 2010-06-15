@@ -368,6 +368,9 @@ class TestAddingDocuments(SolrTestCase):
         self.conn.add(**doc)
 
 
+# The names of the following two classes relate specifically to the
+# class names in solr.core.
+
 class SolrConnectionBased(SolrTestCase):
 
     def add(self, **doc):
