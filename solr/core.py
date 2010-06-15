@@ -291,8 +291,9 @@ def committing(function=None):
             wait_flush = kw.pop("wait_flush", True)
             if not wait_searcher:
                 query["waitSearcher"] = "false"
-                if not wait_flush:
-                    query["waitFlush"] = "false"
+            if not wait_flush:
+                query["waitFlush"] = "false"
+                query["waitSearcher"] = "false"
         content = function(self, *args, **kw)
         if content:
             return self._update(content, query)

@@ -477,18 +477,11 @@ class TestDocumentsDeletion(SolrConnectionTestCase):
     def test_delete_one_document_by_query(self):
         """ Try to delete a single document matching a given query.
         """
-        user_id = get_rand_string()
-        data = get_rand_string()
-        id = get_rand_string()
-
-        doc = {}
-        doc["user_id"] = user_id
-        doc["data"] = data
-        doc["id"] = data
-
+        doc = get_rand_userdoc()
         self.add(**doc)
         self.conn.commit()
 
+        id = doc["id"]
         results = self.conn.query("id:" + id).results
 
         self.conn.delete_query("id:" + id)
@@ -506,7 +499,9 @@ class TestDocumentsDeletion(SolrConnectionTestCase):
         user_id = get_rand_string()
 
         for x in range(doc_count):
-            self.add(id=get_rand_string(), data=get_rand_string(), user_id=user_id)
+            doc = get_rand_userdoc()
+            doc["user_id"] = user_id
+            self.add(**doc)
 
         self.conn.commit()
         results = self.conn.query("user_id:" + user_id).results
@@ -1277,12 +1272,7 @@ class ThrowBadStatusLineExceptions(object):
         self.calls += 1
         if self.max is None or self.calls <= self.max:
             raise httplib.BadStatusLine('Dummy status line exception')
-
-        if self.wrap is not None:
-            f = self.wrap
-            return f(*args, **kwargs)
-
-        return True
+        return self.wrap(*args, **kwargs)
 
 
 class TestRetries(SolrConnectionTestCase):
@@ -1318,7 +1308,36 @@ class TestRetries(SolrConnectionTestCase):
 class TestSolrHTTPConnection(SolrBased, TestHTTPConnection):
     pass
 
+class RequestTracker(object):
+
+    def __init__(self, conn, test):
+        self.wrap = conn.conn.request
+        self.test = test
+        conn.conn.request = self
+
+    def __call__(self, *args, **kwargs):
+        self.test._update = args, kwargs
+        return self.wrap(*args, **kwargs)
+
 class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
+
+    def new_connection(self, **args):
+        # Hook the _update method of the connection to pick up the
+        # querystring passed in; we want to see what options are being
+        # passed along.
+        conn = super(TestSolrAddingDocuments, self).new_connection()
+        RequestTracker(conn, self)
+        return conn
+
+    def selector(self):
+        s = self._update[0][1]
+        if s.startswith(SOLR_PATH):
+            return s[len(SOLR_PATH):]
+        self.fail("URL path doesn't start with expected prefix: ")
+
+    def _check_one_result(self, doc):
+        super(TestSolrAddingDocuments, self)._check_one_result(doc)
+        self.assertEqual(self._update[0][0], "POST")
 
     # Override tests that are affected by API differences:
 
@@ -1328,6 +1347,7 @@ class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
         doc = get_rand_userdoc()
         # Add with commit:
         self.conn.add(doc, commit=True)
+        self.assertEqual(self.selector(), "/update?commit=true")
         self._check_one_result(doc)
 
     def test_add_many_implicit_commit(self):
@@ -1339,6 +1359,7 @@ class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
 
         # Pass in the commit flag.
         self.conn.add_many(documents, commit=True)
+        self.assertEqual(self.selector(), "/update?commit=true")
 
         for doc in documents:
             self._check_one_result(doc)
@@ -1346,11 +1367,45 @@ class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
     # Additional tests related to the solr.Solr API:
 
     def test_add_one_document_inline_optimize(self):
-        """ Try to add one document and commit changes in one operation.
+        """ Try to add one document and commit changes, with optimization,
+        in one operation.
         """
         doc = get_rand_userdoc()
         # Add with optimize:
         self.conn.add(doc, optimize=True)
+        self.assertEqual(self.selector(), "/update?optimize=true")
+        self._check_one_result(doc)
+
+    def test_add_many_inline_optimize(self):
+        """ Try to add more than one document and commit changes,
+        with optimization, all in one operation.
+        """
+        doc_count = 10
+        documents = [get_rand_userdoc() for x in range(doc_count)]
+
+        # Pass in the commit flag.
+        self.conn.add_many(documents, optimize=True)
+        self.assertEqual(self.selector(), "/update?optimize=true")
+
+        for doc in documents:
+            self._check_one_result(doc)
+
+    def test_add_one_noflush(self):
+        doc = get_rand_userdoc()
+        # Add with optimize:
+        self.conn.add(doc, commit=True, wait_flush=False)
+        self.assertEqual(
+            self.selector(),
+            "/update?commit=true&waitFlush=false&waitSearcher=false")
+        self._check_one_result(doc)
+
+    def test_add_one_nosearcher(self):
+        doc = get_rand_userdoc()
+        # Add with optimize:
+        self.conn.add(doc, commit=True, wait_searcher=False)
+        self.assertEqual(
+            self.selector(),
+            "/update?commit=true&waitSearcher=false")
         self._check_one_result(doc)
 
 class TestSolrUpdatingDocuments(SolrBased, TestUpdatingDocuments):
