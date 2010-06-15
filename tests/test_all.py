@@ -39,24 +39,41 @@ def get_rand_userdoc():
         }
 
 
-class SolrTestCase(unittest.TestCase):
+# The names of the following two classes relate specifically to the
+# class names in solr.core.
+
+class SolrConnectionTestCase(unittest.TestCase):
 
     connection_factory = solr.SolrConnection
 
     def setUp(self):
         self._connections = []
 
+    def tearDown(self):
+        for conn in self._connections:
+            conn.close()
+
     def new_connection(self, **kw):
         conn = self.connection_factory(SOLR_HTTP, **kw)
         self._connections.append(conn)
         return conn
 
-    def tearDown(self):
-        for conn in self._connections:
-            conn.close()
+    def add(self, **doc):
+        # This is used to abstract away the differences in the ``add``
+        # method for the two connection APIs; this is overridden for use
+        # with the ``solr.Solr`` connection class.
+        self._connections[-1].add(**doc)
 
 
-class TestHTTPConnection(SolrTestCase):
+class SolrBased(SolrConnectionTestCase):
+
+    connection_factory = solr.Solr
+
+    def add(self, **doc):
+        self._connections[-1].add(doc)
+
+
+class TestHTTPConnection(SolrConnectionTestCase):
 
     def test_connect(self):
         """ Check if we're really get connected to Solr through HTTP.
@@ -109,11 +126,7 @@ class TestHTTPConnection(SolrTestCase):
         self.assertRaises(socket.timeout,conn.query,"user_id:[* TO *]")
 
 
-class TestSolrHTTPConnection(TestHTTPConnection):
-    connection_factory = solr.Solr
-
-
-class TestAddingDocuments(SolrTestCase):
+class TestAddingDocuments(SolrConnectionTestCase):
 
     def setUp(self):
         super(TestAddingDocuments, self).setUp()
@@ -124,7 +137,7 @@ class TestAddingDocuments(SolrTestCase):
         """
         doc = get_rand_userdoc()
 
-        self.conn.add(**doc)
+        self.add(**doc)
         self.conn.commit()
         results = self.conn.query("id:" + doc["id"]).results
 
@@ -153,7 +166,7 @@ class TestAddingDocuments(SolrTestCase):
             doc["data"] = data
             doc["id"] = get_rand_string()
             doc["letters"] = lset
-            self.conn.add(**doc)
+            self.add(**doc)
             self.conn.commit()
 
         results = self.conn.query("user_id:" + user_id).results
@@ -166,6 +179,14 @@ class TestAddingDocuments(SolrTestCase):
             self.assertEquals(doc["data"], data)
             self.assertEquals(doc["letters"], list(letters[i]))
 
+    def _check_one_result(self, doc):
+        # Search for a single document and verify the fields.
+        results = self.conn.query("id:" + doc["id"]).results
+        self.assertEquals(len(results), 1,
+            "Could not find expected data (id:%s)" % doc["id"])
+        self.assertEquals(results[0]["user_id"], doc["user_id"])
+        self.assertEquals(results[0]["data"], doc["data"])
+
     def test_add_one_document_implicit_commit(self):
         """ Try to add one document and commit changes in one operation.
         """
@@ -176,19 +197,13 @@ class TestAddingDocuments(SolrTestCase):
 
         # Commit the changes
         self.conn.add(True, **doc)
-        results = self.conn.query("id:" + doc["id"]).results
-
-        self.assertEquals(len(results), 1,
-            "Could not find expected data (id:%s)" % id)
-
-        self.assertEquals(results[0]["user_id"], doc["user_id"])
-        self.assertEquals(results[0]["data"], doc["data"])
+        self._check_one_result(doc)
 
     def test_add_no_commit(self):
         """ Add one document without commiting the operation.
         """
         doc = get_rand_userdoc()
-        self.conn.add(**doc)
+        self.add(**doc)
         results = self.conn.query("user_id:" + doc["user_id"]).results
         self.assertEquals(len(results), 0,
             "Document (id:%s) shouldn't have been fetched" % (doc["id"]))
@@ -286,7 +301,7 @@ class TestAddingDocuments(SolrTestCase):
         doc = get_rand_userdoc()
         doc["data"] = data
 
-        self.conn.add(**doc)
+        self.add(**doc)
         self.conn.commit()
 
         results = self.conn.query("id:" + doc["id"]).results
@@ -365,30 +380,10 @@ class TestAddingDocuments(SolrTestCase):
         doc = get_rand_userdoc()
         doc["num"] = None
 
-        self.conn.add(**doc)
+        self.add(**doc)
 
 
-# The names of the following two classes relate specifically to the
-# class names in solr.core.
-
-class SolrConnectionBased(SolrTestCase):
-
-    def add(self, **doc):
-        # This is used to abstract away the differences in the ``add``
-        # method for the two connection APIs; this is overridden for use
-        # with the ``solr.Solr`` connection class.
-        self._connections[-1].add(**doc)
-
-
-class SolrBased(SolrConnectionBased):
-
-    connection_factory = solr.Solr
-
-    def add(self, **doc):
-        self._connections[-1].add(doc)
-
-
-class TestUpdatingDocuments(SolrConnectionBased):
+class TestUpdatingDocuments(SolrConnectionTestCase):
 
     def setUp(self):
         super(TestUpdatingDocuments, self).setUp()
@@ -473,11 +468,7 @@ class TestUpdatingDocuments(SolrConnectionBased):
             "IDs sets differ (difference:%s)" % (ids_symdiff))
 
 
-class TestSolrUpdatingDocuments(SolrBased, TestUpdatingDocuments):
-    pass
-
-
-class TestDocumentsDeletion(SolrConnectionBased):
+class TestDocumentsDeletion(SolrConnectionTestCase):
 
     def setUp(self):
         super(TestDocumentsDeletion, self).setUp()
@@ -591,11 +582,7 @@ class TestDocumentsDeletion(SolrConnectionBased):
             "Document (id:%s) should've been deleted"% (id))
 
 
-class TestSolrDocumentDeletion(SolrBased, TestDocumentsDeletion):
-    pass
-
-
-class TestQuerying(SolrConnectionBased):
+class TestQuerying(SolrConnectionTestCase):
 
     def setUp(self):
         super(TestQuerying, self).setUp()
@@ -1100,11 +1087,7 @@ class TestQuerying(SolrConnectionBased):
                             **{"sort":"id", "sort_order":"invalid_sort_order"})
 
 
-class TestSolrQuerying(SolrBased, TestQuerying):
-    pass
-
-
-class TestCommitingOptimizing(SolrConnectionBased):
+class TestCommitingOptimizing(SolrConnectionTestCase):
 
     def setUp(self):
         super(TestCommitingOptimizing, self).setUp()
@@ -1174,11 +1157,7 @@ class TestCommitingOptimizing(SolrConnectionBased):
             "No documents returned, results:%s" % (repr(results)))
 
 
-class TestSolrCommitingOptimizing(SolrBased, TestCommitingOptimizing):
-    pass
-
-
-class TestResponse(SolrTestCase):
+class TestResponse(SolrConnectionTestCase):
 
     def setUp(self):
         super(TestResponse, self).setUp()
@@ -1212,7 +1191,7 @@ class TestResponse(SolrTestCase):
                 "Attribute %s has wrong type. id:%s" % (attr,id))
 
 
-class TestPaginator(SolrTestCase):
+class TestPaginator(SolrConnectionTestCase):
     # This only needs to use one of the connection classes since the
     # paginator relies only on the results, not the connection that
     # produced them.
@@ -1306,7 +1285,7 @@ class ThrowBadStatusLineExceptions(object):
         return True
 
 
-class TestRetries(SolrTestCase):
+class TestRetries(SolrConnectionTestCase):
 
     def setUp(self):
         super(TestRetries, self).setUp()
@@ -1334,9 +1313,60 @@ class TestRetries(SolrTestCase):
         self.assertEqual(t.calls, 2)
 
 
-class TestSolrRetries(TestRetries):
+# Now let's do the same thing again, but with the solr.Solr connection:
 
-    connection_factory = solr.Solr
+class TestSolrHTTPConnection(SolrBased, TestHTTPConnection):
+    pass
+
+class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
+
+    # Override tests that are affected by API differences:
+
+    def test_add_one_document_implicit_commit(self):
+        """ Try to add one document and commit changes in one operation.
+        """
+        doc = get_rand_userdoc()
+        # Add with commit:
+        self.conn.add(doc, commit=True)
+        self._check_one_result(doc)
+
+    def test_add_many_implicit_commit(self):
+        """ Try to add more than one document and commit changes,
+        all in one operation.
+        """
+        doc_count = 10
+        documents = [get_rand_userdoc() for x in range(doc_count)]
+
+        # Pass in the commit flag.
+        self.conn.add_many(documents, commit=True)
+
+        for doc in documents:
+            self._check_one_result(doc)
+
+    # Additional tests related to the solr.Solr API:
+
+    def test_add_one_document_inline_optimize(self):
+        """ Try to add one document and commit changes in one operation.
+        """
+        doc = get_rand_userdoc()
+        # Add with optimize:
+        self.conn.add(doc, optimize=True)
+        self._check_one_result(doc)
+
+class TestSolrUpdatingDocuments(SolrBased, TestUpdatingDocuments):
+    pass
+
+class TestSolrDocumentDeletion(SolrBased, TestDocumentsDeletion):
+    pass
+
+class TestSolrQuerying(SolrBased, TestQuerying):
+    pass
+
+class TestSolrCommitingOptimizing(SolrBased, TestCommitingOptimizing):
+    pass
+
+class TestSolrRetries(SolrBased, TestRetries):
+    pass
 
 
 if __name__ == "__main__":
