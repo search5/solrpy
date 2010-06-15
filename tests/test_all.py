@@ -101,6 +101,10 @@ class TestHTTPConnection(SolrTestCase):
         self.assertRaises(socket.timeout,conn.query,"user_id:[* TO *]")
 
 
+class TestSolrHTTPConnection(TestHTTPConnection):
+    connection_factory = solr.Solr
+
+
 class TestAddingDocuments(SolrTestCase):
 
     def setUp(self):
@@ -140,8 +144,8 @@ class TestAddingDocuments(SolrTestCase):
         letters = [
             letterset,
             tuple(letterset),
-            set(letterset)
-        ]
+            set(letterset),
+            ]
 
         for lset in letters:
             doc = {}
@@ -475,7 +479,24 @@ class TestUpdatingDocuments(SolrTestCase):
             "IDs sets differ (difference:%s)" % (ids_symdiff))
 
 
-class TestDocumentsDeletion(SolrTestCase):
+class SolrConnectionBased(SolrTestCase):
+
+    def add(self, **doc):
+        # This is used to abstract away the differences in the ``add``
+        # method for the two connection APIs; this is overridden for use
+        # with the ``solr.Solr`` connection class.
+        self._connections[-1].add(**doc)
+
+
+class SolrBased(SolrConnectionBased):
+
+    connection_factory = solr.Solr
+
+    def add(self, **doc):
+        self._connections[-1].add(doc)
+
+
+class TestDocumentsDeletion(SolrConnectionBased):
 
     def setUp(self):
         super(TestDocumentsDeletion, self).setUp()
@@ -493,7 +514,7 @@ class TestDocumentsDeletion(SolrTestCase):
         doc["data"] = data
         doc["id"] = data
 
-        self.conn.add(**doc)
+        self.add(**doc)
         self.conn.commit()
 
         results = self.conn.query("id:" + id).results
@@ -513,7 +534,7 @@ class TestDocumentsDeletion(SolrTestCase):
         user_id = get_rand_string()
 
         for x in range(doc_count):
-            self.conn.add(id=get_rand_string(), data=get_rand_string(), user_id=user_id)
+            self.add(id=get_rand_string(), data=get_rand_string(), user_id=user_id)
 
         self.conn.commit()
         results = self.conn.query("user_id:" + user_id).results
@@ -544,7 +565,7 @@ class TestDocumentsDeletion(SolrTestCase):
         data = user_id = get_rand_string()
 
         for id in ids:
-            self.conn.add(id=id, data=data, user_id=user_id)
+            self.add(id=id, data=data, user_id=user_id)
         self.conn.commit()
 
         # Make sure they've been added
@@ -571,7 +592,7 @@ class TestDocumentsDeletion(SolrTestCase):
         # Same data and user_id
         user_id = data = get_rand_string()
 
-        self.conn.add(id=id, user_id=user_id, data=data)
+        self.add(id=id, user_id=user_id, data=data)
         self.conn.commit()
 
         # Make sure it's been added
@@ -589,7 +610,11 @@ class TestDocumentsDeletion(SolrTestCase):
             "Document (id:%s) should've been deleted"% (id))
 
 
-class TestQuerying(SolrTestCase):
+class TestSolrDocumentDeletion(SolrBased, TestDocumentsDeletion):
+    pass
+
+
+class TestQuerying(SolrConnectionBased):
 
     def setUp(self):
         super(TestQuerying, self).setUp()
@@ -606,7 +631,7 @@ class TestQuerying(SolrTestCase):
         data = get_rand_string()
 
         for id in ids:
-            self.conn.add(id=id, user_id=user_id, data=data)
+            self.add(id=id, user_id=user_id, data=data)
         self.conn.commit()
 
         results = self.conn.query("user_id:" + user_id).results
@@ -661,7 +686,7 @@ class TestQuerying(SolrTestCase):
         data = get_rand_string()
 
         for idx, id in enumerate(ids):
-            self.conn.add(id=ids[idx], user_id=user_ids[idx], data=data)
+            self.add(id=ids[idx], user_id=user_ids[idx], data=data)
         self.conn.commit()
 
         # We want to return only the "id" field
@@ -704,7 +729,7 @@ class TestQuerying(SolrTestCase):
         # Same data and user_id
         user_id = data = get_rand_string()
 
-        self.conn.add(id=id, user_id=user_id, data=data)
+        self.add(id=id, user_id=user_id, data=data)
         self.conn.commit()
 
         results = self.conn.query("id:" + id).results
@@ -726,7 +751,7 @@ class TestQuerying(SolrTestCase):
         # Same data and user_id
         user_id = data = get_rand_string()
 
-        self.conn.add(id=id, user_id=user_id, data=data)
+        self.add(id=id, user_id=user_id, data=data)
         self.conn.commit()
 
         results = self.conn.query("id:" + id, score=False).results
@@ -748,7 +773,7 @@ class TestQuerying(SolrTestCase):
         # Same data and user_id
         user_id = data = get_rand_string()
 
-        self.conn.add(id=id, user_id=user_id, data=data)
+        self.add(id=id, user_id=user_id, data=data)
         self.conn.commit()
 
         # Specify the fields to highlight as a string
@@ -809,7 +834,7 @@ class TestQuerying(SolrTestCase):
         # Same data and user_id
         user_id = data = get_rand_string()
 
-        self.conn.add(id=id, user_id=user_id, data=data)
+        self.add(id=id, user_id=user_id, data=data)
         self.conn.commit()
 
         # Specify the fields to highlight as a list of fields
@@ -850,7 +875,7 @@ class TestQuerying(SolrTestCase):
         # Same data and user_id
         user_id = data = prefix + "-" + get_rand_string()
 
-        self.conn.add(id=id, user_id=user_id, data=data)
+        self.add(id=id, user_id=user_id, data=data)
         self.conn.commit()
 
         # Issue a prefix query, return data only (which should be equal
@@ -884,7 +909,7 @@ class TestQuerying(SolrTestCase):
         user_id = get_rand_string()
 
         for datum in data:
-            self.conn.add(id=get_rand_string(), user_id=user_id, data=datum)
+            self.add(id=get_rand_string(), user_id=user_id, data=datum)
         self.conn.commit()
 
         results = self.conn.query(q="user_id:" + user_id, sort="data").results
@@ -912,7 +937,7 @@ class TestQuerying(SolrTestCase):
         user_id = get_rand_string()
 
         for datum in data:
-            self.conn.add(id=get_rand_string(), user_id=user_id, data=datum)
+            self.add(id=get_rand_string(), user_id=user_id, data=datum)
         self.conn.commit()
 
         results = self.conn.query(q="user_id:" + user_id, sort="data",
@@ -944,7 +969,7 @@ class TestQuerying(SolrTestCase):
 
         for user_id in user_ids:
             for datum in data:
-                self.conn.add(id=get_rand_string(), user_id=user_id, data=datum)
+                self.add(id=get_rand_string(), user_id=user_id, data=datum)
         self.conn.commit()
 
         results = self.conn.query(
@@ -977,7 +1002,7 @@ class TestQuerying(SolrTestCase):
     def test_date(self):
         id = data = user_id = get_rand_string()
         date = datetime.date(1969, 5, 28)
-        self.conn.add(id=id, user_id=user_id, data=data, creation_time=date)
+        self.add(id=id, user_id=user_id, data=data, creation_time=date)
         self.conn.commit()
         results = self.conn.query("id:%s" % id).results
         self.assertEqual(len(results), 1)
@@ -990,7 +1015,7 @@ class TestQuerying(SolrTestCase):
         id = data = user_id = get_rand_string()
         dt = datetime.datetime(
             1969, 5, 28, 12, 24, 42, tzinfo=solr.core.UTC())
-        self.conn.add(id=id, user_id=user_id, data=data, creation_time=dt)
+        self.add(id=id, user_id=user_id, data=data, creation_time=dt)
         self.conn.commit()
         results = self.conn.query("id:%s" % id).results
         self.assertEqual(len(results), 1)
@@ -1002,7 +1027,7 @@ class TestQuerying(SolrTestCase):
     def test_multi_date(self):
         id = data = user_id = get_rand_string()
         dates = [datetime.date(1969, 5, 28), datetime.date(2009, 1, 30)]
-        self.conn.add(id=id, user_id=user_id, data=data, multi_time=dates)
+        self.add(id=id, user_id=user_id, data=data, multi_time=dates)
         self.conn.commit()
         results = self.conn.query("id:%s" % id).results
         self.assertEqual(len(results), 1)
@@ -1024,8 +1049,7 @@ class TestQuerying(SolrTestCase):
         timestamp = "%s-%s-%sT%s:%s:%s.%sZ" % (year, month, day, hour, minute,
                                                 second, microsecond)
 
-        self.conn.add(id=id, user_id=user_id, data=data,
-                        creation_time=timestamp)
+        self.add(id=id, user_id=user_id, data=data, creation_time=timestamp)
         self.conn.commit()
 
         results = self.conn.query("id:" + id).results
@@ -1061,7 +1085,7 @@ class TestQuerying(SolrTestCase):
         self.conn.optimize()
 
         for i in range(0,12):
-            self.conn.add(id=i,user_id=i%3,data=get_rand_string(),num=10)
+            self.add(id=i,user_id=i%3,data=get_rand_string(),num=10)
 
         self.conn.optimize()
 
@@ -1078,7 +1102,28 @@ class TestQuerying(SolrTestCase):
         self.assertEqual(results.facet_counts[u'facet_fields'][u'user_id'],{u'0':4,u'1':4,u'2':4})
 
 
-class TestCommitingOptimizing(SolrTestCase):
+    # Exception tests
+
+    def test_exception_highlight_true_no_fields(self):
+        """ A ValueError should be raised when querying and highlight is True
+        but no fields are given.
+        """
+        self.assertRaises(ValueError, self.conn.query, "id:" + "abc",
+                            **{"highlight":True})
+
+    def test_exception_invalid_sort_order(self):
+        """ A ValueError should be raised when sort_order is other
+        than "asc" or "desc".
+        """
+        self.assertRaises(ValueError, self.conn.query, "id:" + "abc",
+                            **{"sort":"id", "sort_order":"invalid_sort_order"})
+
+
+class TestSolrQuerying(SolrBased, TestQuerying):
+    pass
+
+
+class TestCommitingOptimizing(SolrConnectionBased):
 
     def setUp(self):
         super(TestCommitingOptimizing, self).setUp()
@@ -1089,7 +1134,7 @@ class TestCommitingOptimizing(SolrTestCase):
         """
         # Same id, data and user_id
         id = data = user_id = get_rand_string()
-        self.conn.add(id=id, user_id=user_id, data=data)
+        self.add(id=id, user_id=user_id, data=data)
 
         # Make sure the changes weren't commited.
         results = self.conn.query("id:" + id).results
@@ -1109,7 +1154,7 @@ class TestCommitingOptimizing(SolrTestCase):
         """
         # Same id, data and user_id
         id = data = user_id = get_rand_string()
-        self.conn.add(id=id, user_id=user_id, data=data)
+        self.add(id=id, user_id=user_id, data=data)
 
         # Make sure the changes weren't commited.
         results = self.conn.query("id:" + id).results
@@ -1132,7 +1177,7 @@ class TestCommitingOptimizing(SolrTestCase):
         """
         # Same id, data and user_id
         id = data = user_id = get_rand_string()
-        self.conn.add(id=id, user_id=user_id, data=data)
+        self.add(id=id, user_id=user_id, data=data)
 
         # Make sure the changes weren't commited.
         results = self.conn.query("id:" + id).results
@@ -1148,25 +1193,8 @@ class TestCommitingOptimizing(SolrTestCase):
             "No documents returned, results:%s" % (repr(results)))
 
 
-class TestQueryExceptions(SolrTestCase):
-
-    def setUp(self):
-        super(TestQueryExceptions, self).setUp()
-        self.conn = self.new_connection()
-
-    def test_exception_highlight_true_no_fields(self):
-        """ A ValueError should be raised when querying and highlight is True
-        but no fields are given.
-        """
-        self.assertRaises(ValueError, self.conn.query, "id:" + "abc",
-                            **{"highlight":True})
-
-    def test_exception_invalid_sort_order(self):
-        """ A ValueError should be raised when sort_order is other
-        than "asc" or "desc".
-        """
-        self.assertRaises(ValueError, self.conn.query, "id:" + "abc",
-                            **{"sort":"id", "sort_order":"invalid_sort_order"})
+class TestSolrCommitingOptimizing(SolrBased, TestCommitingOptimizing):
+    pass
 
 
 class TestResponse(SolrTestCase):
@@ -1320,6 +1348,11 @@ class TestRetries(SolrTestCase):
         self.conn.query("user_id:12345")
 
         self.assertEqual(t.calls, 2)
+
+
+class TestSolrRetries(TestRetries):
+
+    connection_factory = solr.Solr
 
 
 if __name__ == "__main__":
