@@ -303,6 +303,8 @@ def committing(function=None):
         content = function(self, *args, **kw)
         if content:
             return self._update(content, query)
+        # If there's nothing to do (no content), should we issue a
+        # commit/optimize if those are requested by the options?
 
     wrapper.__doc__ = function.__doc__
     wrapper.__name__ = function.__name__
@@ -543,36 +545,21 @@ class Solr:
         """
         Delete a specific document by id.
         """
-        if not ids:
-            ids = []
-        if id:
-            ids.insert(0, id)
-        lst = [u'<delete>\n']
-        for id in ids:
-            lst.append(u'<id>%s</id>\n' % escape(unicode(id)))
-        for query in (queries or ()):
-            lst.append(u'<query>%s</query>\n' % escape(unicode(query)))
-        lst.append(u'</delete>')
-        return ''.join(lst)
+        return self._delete(id=id, ids=ids, queries=queries)
 
     @committing
     def delete_many(self, ids):
         """
         Delete documents using a list of IDs.
         """
-        if ids:
-            lst = [u'<delete>\n']
-            for id in ids:
-                lst.append(u'<id>%s</id>\n' % id)
-            lst.append(u'</delete>')
-            return ''.join(lst)
+        return self._delete(ids=ids)
 
     @committing
     def delete_query(self, query):
         """
         Delete all documents returned by a query.
         """
-        return u'<delete><query>%s</query></delete>' % escape(query)
+        return self._delete(queries=[query])
 
     @committing
     def add(self, doc):
@@ -679,6 +666,24 @@ class Solr:
                     (quoteattr(field),
                     escape(unicode(value)))))
         lst.append('</doc>')
+
+    def _delete(self, id=None, ids=None, queries=None):
+        """
+        Delete a specific document by id.
+        """
+        if not ids:
+            ids = []
+        if id:
+            ids.insert(0, id)
+        lst = []
+        for id in ids:
+            lst.append(u'<id>%s</id>\n' % escape(unicode(id)))
+        for query in (queries or ()):
+            lst.append(u'<query>%s</query>\n' % escape(unicode(query)))
+        if lst:
+            lst.insert(0, u'<delete>\n')
+            lst.append(u'</delete>')
+            return ''.join(lst)
 
     def __repr__(self):
         return (
