@@ -31,11 +31,11 @@ def get_rand_string():
     return "".join(choice(digits)  for x in range(12))
 
 
-def get_rand_userdoc():
+def get_rand_userdoc(id=None, user_id=None, data=None):
     return {
-        "user_id": get_rand_string(),
-        "data": get_rand_string(),
-        "id": get_rand_string(),
+        "user_id": user_id or get_rand_string(),
+        "data": data or get_rand_string(),
+        "id": id or get_rand_string(),
         }
 
 
@@ -64,6 +64,31 @@ class SolrConnectionTestCase(unittest.TestCase):
         # with the ``solr.Solr`` connection class.
         self._connections[-1].add(**doc)
 
+    def check_added(self, doc=None, docs=None):
+        if docs is None:
+            docs = []
+        if doc is not None:
+            docs.append(doc)
+        for doc in docs:
+            # Search for a single document and verify the fields.
+            results = self._connections[-1].query("id:" + doc["id"]).results
+            self.assertEquals(
+                len(results), 1,
+                "Could not find expected data (id:%s)" % doc["id"])
+            self.assertEquals(results[0]["user_id"], doc["user_id"])
+            self.assertEquals(results[0]["data"], doc["data"])
+
+    def check_removed(self, doc=None, docs=None):
+        if docs is None:
+            docs = []
+        if doc is not None:
+            docs.append(doc)
+        for doc in docs:
+            results = self._connections[-1].query("id:" + doc["id"]).results
+            self.assertEquals(
+                len(results), 0,
+                "Document (id:%s) should've been deleted" % doc["id"])
+
 
 class SolrBased(SolrConnectionTestCase):
 
@@ -71,6 +96,40 @@ class SolrBased(SolrConnectionTestCase):
 
     def add(self, **doc):
         self._connections[-1].add(doc)
+
+
+class RequestTracking(SolrConnectionTestCase):
+    """ Mix in request tracking for tests.
+
+    After each request, the ``method``, ``selector`` and ``postbody``
+    methods will returned the indicated information about the last request.
+
+    """
+
+    def new_connection(self, **kw):
+        conn = super(RequestTracking, self).new_connection(**kw)
+        request = conn.conn.request
+
+        def wrap(*args, **kw):
+            self._update = args, kw
+            return request(*args, **kw)
+
+        conn.conn.request = wrap
+        return conn
+
+    # Access information from the most recent request:
+
+    def method(self):
+        return self._update[0][0]
+
+    def selector(self):
+        s = self._update[0][1]
+        if s.startswith(SOLR_PATH):
+            return s[len(SOLR_PATH):]
+        self.fail("URL path doesn't start with expected prefix: ")
+
+    def postbody(self):
+        return self._update[0][2]
 
 
 class TestHTTPConnection(SolrConnectionTestCase):
@@ -161,10 +220,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
             ]
 
         for lset in letters:
-            doc = {}
-            doc["user_id"] = user_id
-            doc["data"] = data
-            doc["id"] = get_rand_string()
+            doc = get_rand_userdoc(user_id=user_id, data=data)
             doc["letters"] = lset
             self.add(**doc)
             self.conn.commit()
@@ -179,14 +235,6 @@ class TestAddingDocuments(SolrConnectionTestCase):
             self.assertEquals(doc["data"], data)
             self.assertEquals(doc["letters"], list(letters[i]))
 
-    def _check_one_result(self, doc):
-        # Search for a single document and verify the fields.
-        results = self.conn.query("id:" + doc["id"]).results
-        self.assertEquals(len(results), 1,
-            "Could not find expected data (id:%s)" % doc["id"])
-        self.assertEquals(results[0]["user_id"], doc["user_id"])
-        self.assertEquals(results[0]["data"], doc["data"])
-
     def test_add_one_document_implicit_commit(self):
         """ Try to add one document and commit changes in one operation.
         """
@@ -197,7 +245,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
 
         # Commit the changes
         self.conn.add(True, **doc)
-        self._check_one_result(doc)
+        self.check_added(doc)
 
     def test_add_no_commit(self):
         """ Add one document without commiting the operation.
@@ -298,8 +346,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
         """
         # "bile" in Polish (UTF-8).
         data = "\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87".decode("utf-8")
-        doc = get_rand_userdoc()
-        doc["data"] = data
+        doc = get_rand_userdoc(data=data)
 
         self.add(**doc)
         self.conn.commit()
@@ -332,11 +379,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
         chars = ("\xc4\x99\xc3\xb3\xc4\x85\xc5\x9b\xc5\x82"
                  "\xc4\x98\xc3\x93\xc4\x84\xc5\x9a\xc5\x81").decode("utf-8")
 
-        documents = []
-        for char in chars:
-            doc = get_rand_userdoc()
-            doc["data"] = char
-            documents.append(doc)
+        documents = [get_rand_userdoc(data=char) for char in chars]
 
         user_ids = [doc["user_id"] for doc in documents]
         ids = [doc["id"] for doc in documents]
@@ -499,9 +542,7 @@ class TestDocumentsDeletion(SolrConnectionTestCase):
         user_id = get_rand_string()
 
         for x in range(doc_count):
-            doc = get_rand_userdoc()
-            doc["user_id"] = user_id
-            self.add(**doc)
+            self.add(**get_rand_userdoc(user_id=user_id))
 
         self.conn.commit()
         results = self.conn.query("user_id:" + user_id).results
@@ -1092,8 +1133,8 @@ class TestCommitingOptimizing(SolrConnectionTestCase):
         """ Check whether commiting works.
         """
         # Same id, data and user_id
-        id = data = user_id = get_rand_string()
-        self.add(id=id, user_id=user_id, data=data)
+        id = get_rand_string()
+        self.add(id=id, user_id=id, data=id)
 
         # Make sure the changes weren't commited.
         results = self.conn.query("id:" + id).results
@@ -1112,8 +1153,8 @@ class TestCommitingOptimizing(SolrConnectionTestCase):
         """ Check whether optimizing works.
         """
         # Same id, data and user_id
-        id = data = user_id = get_rand_string()
-        self.add(id=id, user_id=user_id, data=data)
+        id = get_rand_string()
+        self.add(id=id, user_id=id, data=id)
 
         # Make sure the changes weren't commited.
         results = self.conn.query("id:" + id).results
@@ -1135,8 +1176,8 @@ class TestCommitingOptimizing(SolrConnectionTestCase):
         commited.
         """
         # Same id, data and user_id
-        id = data = user_id = get_rand_string()
-        self.add(id=id, user_id=user_id, data=data)
+        id = get_rand_string()
+        self.add(id=id, user_id=id, data=id)
 
         # Make sure the changes weren't commited.
         results = self.conn.query("id:" + id).results
@@ -1163,8 +1204,8 @@ class TestResponse(SolrConnectionTestCase):
         and also checks that they are of the correct type
         """
         # Same id, data and user_id
-        id = data = user_id = get_rand_string()
-        self.conn.add(id=id, user_id=user_id, data=data)
+        id = get_rand_string()
+        self.conn.add(id=id, user_id=id, data=id)
         self.conn.commit()
 
         response = self.conn.query(q="id:" + id)
@@ -1308,36 +1349,7 @@ class TestRetries(SolrConnectionTestCase):
 class TestSolrHTTPConnection(SolrBased, TestHTTPConnection):
     pass
 
-class RequestTracker(object):
-
-    def __init__(self, conn, test):
-        self.wrap = conn.conn.request
-        self.test = test
-        conn.conn.request = self
-
-    def __call__(self, *args, **kwargs):
-        self.test._update = args, kwargs
-        return self.wrap(*args, **kwargs)
-
-class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
-
-    def new_connection(self, **args):
-        # Hook the _update method of the connection to pick up the
-        # querystring passed in; we want to see what options are being
-        # passed along.
-        conn = super(TestSolrAddingDocuments, self).new_connection()
-        RequestTracker(conn, self)
-        return conn
-
-    def selector(self):
-        s = self._update[0][1]
-        if s.startswith(SOLR_PATH):
-            return s[len(SOLR_PATH):]
-        self.fail("URL path doesn't start with expected prefix: ")
-
-    def _check_one_result(self, doc):
-        super(TestSolrAddingDocuments, self)._check_one_result(doc)
-        self.assertEqual(self._update[0][0], "POST")
+class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
 
     # Override tests that are affected by API differences:
 
@@ -1348,7 +1360,8 @@ class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
         # Add with commit:
         self.conn.add(doc, commit=True)
         self.assertEqual(self.selector(), "/update?commit=true")
-        self._check_one_result(doc)
+        self.assertEqual(self.method(), "POST")
+        self.check_added(doc)
 
     def test_add_many_implicit_commit(self):
         """ Try to add more than one document and commit changes,
@@ -1360,13 +1373,12 @@ class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
         # Pass in the commit flag.
         self.conn.add_many(documents, commit=True)
         self.assertEqual(self.selector(), "/update?commit=true")
-
-        for doc in documents:
-            self._check_one_result(doc)
+        self.assertEqual(self.method(), "POST")
+        self.check_added(docs=documents)
 
     # Additional tests related to the solr.Solr API:
 
-    def test_add_one_document_inline_optimize(self):
+    def test_add_inline_optimize(self):
         """ Try to add one document and commit changes, with optimization,
         in one operation.
         """
@@ -1374,7 +1386,8 @@ class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
         # Add with optimize:
         self.conn.add(doc, optimize=True)
         self.assertEqual(self.selector(), "/update?optimize=true")
-        self._check_one_result(doc)
+        self.assertEqual(self.method(), "POST")
+        self.check_added(doc)
 
     def test_add_many_inline_optimize(self):
         """ Try to add more than one document and commit changes,
@@ -1386,33 +1399,252 @@ class TestSolrAddingDocuments(SolrBased, TestAddingDocuments):
         # Pass in the commit flag.
         self.conn.add_many(documents, optimize=True)
         self.assertEqual(self.selector(), "/update?optimize=true")
+        self.assertEqual(self.method(), "POST")
+        self.check_added(docs=documents)
 
-        for doc in documents:
-            self._check_one_result(doc)
-
-    def test_add_one_noflush(self):
+    def test_add_noflush(self):
         doc = get_rand_userdoc()
-        # Add with optimize:
+        # Add with commit:
         self.conn.add(doc, commit=True, wait_flush=False)
         self.assertEqual(
             self.selector(),
             "/update?commit=true&waitFlush=false&waitSearcher=false")
-        self._check_one_result(doc)
+        # Can't verify the add since we said we weren't going to wait
+        # for the flush.
+        self.assert_("<add>" in self.postbody())
 
-    def test_add_one_nosearcher(self):
+    def test_add_nosearcher(self):
         doc = get_rand_userdoc()
-        # Add with optimize:
+        # Add with commit:
         self.conn.add(doc, commit=True, wait_searcher=False)
         self.assertEqual(
             self.selector(),
             "/update?commit=true&waitSearcher=false")
-        self._check_one_result(doc)
+        # Can't verify the add since we said we weren't going to wait
+        # for a searcher.
+        self.assert_("<add>" in self.postbody())
+
+    def test_add_waitflush_without_commit(self):
+        doc = get_rand_userdoc()
+        self.assertRaises(TypeError, self.conn.add, doc, wait_flush=False)
+
+    def test_add_waitsearcher_without_commit(self):
+        doc = get_rand_userdoc()
+        self.assertRaises(TypeError, self.conn.add, doc, wait_searcher=False)
+
+    def test_add_many_commit_noflush(self):
+        documents = [get_rand_userdoc() for i in range(3)]
+        # Add with optimize:
+        self.conn.add_many(documents, commit=True, wait_flush=False)
+        self.assertEqual(
+            self.selector(),
+            "/update?commit=true&waitFlush=false&waitSearcher=false")
+        # Can't verify the add since we said we weren't going to wait
+        # for the flush.
+        self.assert_("<add>" in self.postbody())
+
+    def test_add_many_commit_nosearcher(self):
+        documents = [get_rand_userdoc() for i in range(3)]
+        # Add with optimize:
+        self.conn.add_many(documents, commit=True, wait_searcher=False)
+        self.assertEqual(
+            self.selector(),
+            "/update?commit=true&waitSearcher=false")
+        # Can't verify the add since we said we weren't going to wait
+        # for a searcher.
+        self.assert_("<add>" in self.postbody())
+
+    def test_add_many_waitflush_without_commit(self):
+        docs = [get_rand_userdoc(), get_rand_userdoc()]
+        self.assertRaises(
+            TypeError, self.conn.add_many, docs, wait_flush=False)
+
+    def test_add_many_waitsearcher_without_commit(self):
+        docs = [get_rand_userdoc(), get_rand_userdoc()]
+        self.assertRaises(
+            TypeError, self.conn.add_many, docs, wait_searcher=False)
 
 class TestSolrUpdatingDocuments(SolrBased, TestUpdatingDocuments):
     pass
 
-class TestSolrDocumentDeletion(SolrBased, TestDocumentsDeletion):
-    pass
+class TestSolrDocumentDeletion(SolrBased, RequestTracking,
+                               TestDocumentsDeletion):
+
+    def test_delete_one_document_by_query_inline_commit(self, what="commit"):
+        """ Try to delete a single document matching a given query.
+        """
+        doc = get_rand_userdoc()
+        self.conn.add(doc, commit=True)
+        self.check_added(doc)
+        id = doc["id"]
+
+        self.conn.delete_query("id:" + id, **{what: True})
+        self.check_removed(doc)
+        results = self.conn.query("id:" + id).results
+        self.assertEquals(len(results), 0,
+            "Document (id:%s) should've been deleted" % id)
+
+    def test_delete_many_documents_by_query_inline_commit(self, what="commit"):
+        """ Try to delete many documents matching a given query.
+        """
+        doc_count = 10
+        # Same user ID will be used for all documents.
+        user_id = get_rand_string()
+        documents = [get_rand_userdoc(user_id=user_id)
+                     for i in range(doc_count)]
+        self.conn.add_many(documents, commit=True)
+
+        # Make sure the docs were in fact added.
+        results = self.conn.query("user_id:" + user_id).results
+        self.assertEquals(
+            len(results), doc_count,
+            ("There should be %d documents for user_id:%s"
+             % (doc_count, user_id)))
+
+        # Now delete documents and commit the changes
+        self.conn.delete_query("user_id:" + user_id, **{what: True})
+
+        results = self.conn.query("user_id:" + user_id).results
+        self.assertEquals(len(results), 0,
+            "There should be no documents for user_id:%s" % (user_id))
+        self.check_removed(docs=documents)
+
+    def test_delete_many_inline_commit(self, what="commit"):
+        """ Delete many documents in one pass.
+        """
+        doc_count = 10
+        ids = [get_rand_string() for x in range(doc_count)]
+        # Same data and user_id for all documents
+        data = get_rand_string()
+        documents = [dict(id=id, user_id=data, data=data) for id in ids]
+        self.conn.add_many(documents, commit=True)
+
+        # Make sure they've been added
+        self.check_added(docs=documents)
+
+        # Delete documents by their ID and commit changes
+        self.conn.delete_many(ids, **{what: True})
+
+        # Make sure they've been deleted
+        self.check_removed(docs=documents)
+
+    def test_delete_by_unique_key_inline_commit(self, what="commit"):
+        """ Delete a document by using its unique key.
+        """
+        id = get_rand_string()
+        # Same data and user_id
+        user_id = get_rand_string()
+        doc = dict(id=id, user_id=user_id, data=user_id)
+        self.conn.add(doc, commit=True)
+
+        # Make sure it's been added
+        results = self.conn.query("id:" + id).results
+
+        # Make sure the docs were in fact added.
+        self.assertEquals(len(results), 1,
+            "No results returned for query id:%s"% (id))
+
+        # Delete the document and make sure it's no longer in the index
+        self.conn.delete(id, **{what: True})
+        self.check_removed(doc)
+
+    def test_delete_noflush(self):
+        doc = get_rand_userdoc()
+        # Add with commit:
+        self.conn.add(doc, commit=True)
+        self.check_added(doc)
+        self.conn.delete(doc["id"], commit=True, wait_flush=False)
+        self.assertEqual(
+            self.selector(),
+            "/update?commit=true&waitFlush=false&waitSearcher=false")
+        # Can't verify the add since we said we weren't going to wait
+        # for the flush.
+        self.assert_("<delete>" in self.postbody())
+
+    def test_delete_nosearcher(self):
+        doc = get_rand_userdoc()
+        # Add with commit:
+        self.conn.add(doc, commit=True)
+        self.check_added(doc)
+        self.conn.delete(doc["id"], commit=True, wait_searcher=False)
+        self.assertEqual(
+            self.selector(),
+            "/update?commit=true&waitSearcher=false")
+        # Can't verify the add since we said we weren't going to wait
+        # for the flush.
+        self.assert_("<delete>" in self.postbody())
+
+    def test_delete_waitflush_without_commit(self):
+        doc = get_rand_userdoc()
+        self.conn.add(doc, commit=True)
+        self.assertRaises(
+            TypeError, self.conn.delete, doc["id"], wait_flush=False)
+
+    def test_delete_waitsearcher_without_commit(self):
+        doc = get_rand_userdoc()
+        self.conn.add(doc, commit=True)
+        self.assertRaises(
+            TypeError, self.conn.delete, doc["id"], wait_searcher=False)
+
+    def test_delete_one_document_by_query_inline_optimize(self):
+        self.test_delete_one_document_by_query_inline_commit(what="optimize")
+
+    def test_delete_many_documents_by_query_inline_optimize(self):
+        self.test_delete_many_documents_by_query_inline_commit(what="optimize")
+
+    def test_delete_many_inline_optimize(self):
+        self.test_delete_many_inline_commit(what="optimize")
+
+    def test_delete_by_unique_key_inline_optimize(self):
+        self.test_delete_by_unique_key_inline_commit(what="optimize")
+
+    def test_delete_many_waitflush_without_commit(self):
+        documents = [get_rand_userdoc(), get_rand_userdoc()]
+        self.conn.add_many(documents, commit=True)
+        ids = [doc["id"] for doc in documents]
+        self.assertRaises(
+            TypeError, self.conn.delete_many, ids, wait_flush=False)
+
+    def test_delete_many_waitsearcher_without_commit(self):
+        documents = [get_rand_userdoc(), get_rand_userdoc()]
+        self.conn.add_many(documents, commit=True)
+        ids = [doc["id"] for doc in documents]
+        self.assertRaises(
+            TypeError, self.conn.delete_many, ids, wait_searcher=False)
+
+    def test_delete_queries_inline_commit(self):
+        uid1 = get_rand_string()
+        uid2 = get_rand_string()
+        documents = (
+            [get_rand_userdoc(user_id=uid1) for i in range(3)] +
+            [get_rand_userdoc(user_id=uid2) for i in range(3)]
+            )
+        self.conn.add_many(documents, commit=True)
+        self.check_added(docs=documents)
+
+        self.conn.delete(queries=["user_id:" + uid2, "user_id:" + uid1],
+                         commit=True)
+
+        self.check_removed(docs=documents)
+
+    def test_delete_combined_inline_commit(self):
+        doc1 = get_rand_userdoc()
+        doc2 = get_rand_userdoc()
+        doc3 = get_rand_userdoc()
+        user_id = get_rand_string()
+        docs = [get_rand_userdoc(user_id=user_id) for i in range(10)]
+        alldocs = [doc1, doc2, doc3] + docs
+        self.conn.add_many(alldocs, commit=True)
+        self.check_added(docs=alldocs)
+
+        # Let's combine the three flavors of the delete method, just to
+        # make sure it all works together:
+        self.conn.delete(id=doc1["id"], ids=[doc2["id"], doc3["id"]],
+                         queries=["user_id:" + user_id],
+                         commit=True)
+
+        self.check_removed(docs=alldocs)
+
 
 class TestSolrQuerying(SolrBased, TestQuerying):
     pass

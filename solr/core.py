@@ -294,6 +294,12 @@ def committing(function=None):
             if not wait_flush:
                 query["waitFlush"] = "false"
                 query["waitSearcher"] = "false"
+        elif "wait_flush" in kw:
+            raise TypeError(
+                "wait_flush cannot be specified without commit or optimize")
+        elif "wait_searcher" in kw:
+            raise TypeError(
+                "wait_searcher cannot be specified without commit or optimize")
         content = function(self, *args, **kw)
         if content:
             return self._update(content, query)
