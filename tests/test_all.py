@@ -1258,31 +1258,6 @@ class TestPaginator(unittest.TestCase):
         self.conn.close()
 
 
-class TestTimeout(unittest.TestCase):
-
-    # This test assumes that the Solr instance is slow enough that it
-    # can't respond in the allowed time; that's not always the case.
-    #
-    # Reducing the allowed time can help, but a better test needs to be
-    # devised.
-    #
-    # This is really testing that the timeout is provided to the socket
-    # library; perhaps that should be mocked to check that the timeout
-    # is provided correctly, rather than assuming that these tests are
-    # running on a slow machine.
-
-    def setUp(self):
-        self.conn = SolrConnection(SOLR_HTTP,timeout=0.00000001)
-
-    def test_timout_exception(self):
-        """ A socket.timeout exception should be raised
-        """
-
-        self.assertRaises(socket.timeout,self.conn.query,"user_id:[* TO *]")
-
-    def tearDown(self):
-        self.conn.close()
-
 class ThrowBadStatusLineExceptions(object):
     def __init__(self, max=None, wrap=None):
         self.calls = 0
