@@ -1,4 +1,5 @@
 syntax: glob
 
+*.egg
 *.pyc
 solrpy.egg-info
