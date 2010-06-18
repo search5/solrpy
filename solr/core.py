@@ -52,6 +52,9 @@ Only `url` is required,.
     ssl_key, ssl_cert -- If using client-side key files for
         SSL authentication,  these should be, respectively,
         your PEM key file and certificate file
+        
+    http_user, http_pass -- If given, include HTTP Basic authentication 
+        in all request headers.
 
 Once created, a connection object has the following public methods:
 
@@ -322,6 +325,8 @@ class Solr:
                  timeout=None,
                  ssl_key=None,
                  ssl_cert=None,
+                 http_user=None,
+                 http_pass=None,
                  post_headers={},
                  max_retries=3,
                  debug=False):
@@ -343,7 +348,10 @@ class Solr:
 
             ssl_key, ssl_cert -- If using client-side key files for
                 SSL authentication,  these should be, respectively,
-                your PEM key file and certificate file
+                your PEM key file and certificate file.
+
+            http_user, http_pass -- If given, include HTTP Basic authentication 
+                in all request headers.
 
         """
 
@@ -393,7 +401,14 @@ class Solr:
 
         self.form_headers = {
             'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
-
+        
+        if http_user is not None and http_pass is not None:
+            http_auth = http_user + ':' + http_pass
+            http_auth = 'Basic ' + http_auth.encode('base64').strip()
+            self.auth_headers = {'Authorization': http_auth}
+        else:
+            self.auth_headers = {}
+        
         if not self.persistent:
             self.form_headers['Connection'] = 'close'
 
@@ -703,10 +718,12 @@ class Solr:
                 self.conn.sock.sock.settimeout(self.timeout)
 
     def _post(self, url, body, headers):
+        _headers = self.auth_headers.copy()
+        _headers.update(headers)
         attempts = self.max_retries + 1
         while attempts > 0:
             try:
-                self.conn.request('POST', url, body.encode('UTF-8'), headers)
+                self.conn.request('POST', url, body.encode('UTF-8'), _headers)
                 return check_response_status(self.conn.getresponse())
             except (socket.error,
                     httplib.ImproperConnectionState,
