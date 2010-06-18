@@ -11,7 +11,8 @@ setup(
     license = 'http://opensource.org/licenses/apache2.0.php',
     packages=find_packages(),
     install_requires = [],
-    description = 'client for the solr search service',
+    description = 'Client for the Solr search service',
+    long_description=open('README.txt').read(),
     tests_require = ["nose>=0.10.1"],
     test_suite = 'nose.collector',
-)
+    )
