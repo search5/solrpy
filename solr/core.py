@@ -58,8 +58,8 @@ Only `url` is required,.
 
 Once created, a connection object has the following public methods:
 
-    query (q, fields=None, highlight=None,
-           score=True, sort=None, **params)
+    query(q, fields=None, highlight=None,
+          score=True, sort=None, **params)
 
             q -- the query string.
 
