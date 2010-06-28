@@ -21,10 +21,10 @@ A simple Solr client for python.
 
 Features
 --------
- * Supports SOLR 1.2+
+ * Supports Solr 1.2+
  * Supports http/https and SSL client-side certificates
  * Uses persistent HTTP connections by default
- * Properly converts to/from SOLR data types, including datetime objects
+ * Properly converts to/from Solr data types, including datetime objects
  * Supports both querying and update commands (add, delete)
  * Requires Python 2.3+
 
@@ -34,7 +34,7 @@ Connections
 `SolrConnection` can be passed in the following parameters.
 Only `url` is required,.
 
-    url -- URI pointing to the SOLR instance. Examples:
+    url -- URI pointing to the Solr instance. Examples:
 
         http://localhost:8080/solr
         https://solr-server/solr
@@ -64,7 +64,7 @@ Once created, a connection object has the following public methods:
             q -- the query string.
 
             fields -- optional list of fields to include. It can be either
-                a string in the format that SOLR expects ('id,f1,f2'), or
+                a string in the format that Solr expects ('id,f1,f2'), or
                 a python list/tuple of field names.   Defaults to returning
                 all fields. ("*")
 
@@ -80,10 +80,10 @@ Once created, a connection object has the following public methods:
 
             sort -- list of fields to sort by.
 
-            Any parameters available to SOLR 'select' calls can also be
+            Any parameters available to Solr 'select' calls can also be
             passed in as named parameters (e.g., fq='...', rows=20, etc).
 
-            Many SOLR parameters are in a dotted notation (e.g.,
+            Many Solr parameters are in a dotted notation (e.g.,
             `hl.simple.post`).  For such parameters, replace the dots with
             underscores when calling this method. (e.g.,
             hl_simple_post='</pre'>)
@@ -140,11 +140,11 @@ Once created, a connection object has the following public methods:
     raw_query(**params)
 
             Send a query command (unprocessed by this library) to
-            the SOLR server. The resulting text is returned un-parsed.
+            the Solr server. The resulting text is returned un-parsed.
 
                 raw_query(q='id:1', wt='python', indent='on')
 
-            Many SOLR parameters are in a dotted notation (e.g.,
+            Many Solr parameters are in a dotted notation (e.g.,
             `hl.simple.post`).  For such parameters, replace the dots with
             underscores when calling this method. (e.g.,
             hl_simple_post='</pre'>)
@@ -180,8 +180,8 @@ Query Responses
 
             header['status'] -- status code.
 
-            See SOLR documentation for other/typical return values.
-            This may be settable at the SOLR-level in your config files.
+            See Solr documentation for other/typical return values.
+            This may be settable at the Solr-level in your config files.
 
 
         next_batch() -- If only a partial set of matches were returned
@@ -263,7 +263,24 @@ _python_version = sys.version_info[0]+(sys.version_info[1]/10.0)
 # Exceptions
 # ===================================================================
 class SolrException(Exception):
-    """ An exception thrown by solr connections """
+    """An exception thrown by solr connections.
+
+    Detailed information is provided in attributes of the exception object.
+    """
+
+    httpcode = 400
+    """HTTP response code from Solr."""
+
+    reason = None
+    """Error message from the HTTP response sent by Solr."""
+
+    body = None
+    """Response body returned by Solr.
+
+    This can contain much more information about the error, including
+    tracebacks from the Java runtime.
+    """
+
     def __init__(self, httpcode, reason=None, body=None):
         self.httpcode = httpcode
         self.reason = reason
@@ -332,7 +349,7 @@ class Solr:
                  debug=False):
 
         """
-            url -- URI pointing to the SOLR instance. Examples:
+            url -- URI pointing to the Solr instance. Examples:
 
                 http://localhost:8080/solr
                 https://solr-server/solr
@@ -415,6 +432,7 @@ class Solr:
         self.debug = debug
 
     def close(self):
+        """Close the underlying HTTP(S) connection."""
         self.conn.close()
 
 
@@ -423,40 +441,40 @@ class Solr:
     def query(self, q, fields=None, highlight=None,
               score=True, sort=None, sort_order="asc", **params):
         """
-        q is the query string.
+        `q` is the query string.
 
-        fields is an optional list of fields to include. It can
-        be either a string in the format that SOLR expects, or
-        a python list/tuple of field names.   Defaults to
-        all fields. ("*")
+        `fields` is an optional list of fields to include.  It can
+        be either a string in the format that Solr expects, or
+        a python list or tuple of field names.   Defaults to
+        all fields ("*").
 
-        score indicates whether "score" should be included
+        `score` indicates whether "score" should be included
         in the field list.  Note that if you explicitly list
         "score" in your fields value, then score is
         effectively ignored.  Defaults to true.
 
-        highlight indicates whether highlighting should be included.
-        highlight can either be False, indicating "No" (the default),
-        a list of fields in the same format as "fields" or True, indicating
-        to highlight any fields included in "fields". If True and no "fields"
-        are given, raise a ValueError.
+        `highlight` indicates whether highlighting should be performed.
+        `highlight` can either be ``False``, indicating "No" (the default),
+        a list of fields in the same format as `fields`, or ``True``,
+        indicating to highlight any fields included in `fields`.
+        If ``True`` and `fields` is not specified, raise a ValueError.
 
-        sort is a list of fields to sort by. See "fields" for
-        formatting. Each sort element can have be in the form
-        "fieldname asc|desc" as specified by SOLR specs.
+        `sort` is a list of fields to sort by.  See `fields` for
+        formatting.  Each sort element can have be in the form
+        "fieldname asc|desc" as specified by Solr specs.
 
-        sort_order is the backward compatible way to add the same ordering
-        to all the sort field when it is not specified.
+        `sort_order` is the backward compatible way to add the same ordering
+        to all the sort fields when it is not specified.
 
-        Optional parameters can also be passed in.  Many SOLR
-        parameters are in a dotted notation (e.g., hl.simple.post).
+        Optional parameters can also be passed in.  Many Solr
+        parameters are in a dotted notation (e.g., ``hl.simple.post``).
         For such parameters, replace the dots with underscores when
-        calling this method. (e.g., hl_simple_post='</pre'>)
+        calling this method. (e.g., ``hl_simple_post='</pre'>``)
 
         Returns a Response instance.
         """
 
-        # Clean up optional parameters to match SOLR spec.
+        # Clean up optional parameters to match Solr spec.
         params = dict([(key.replace('_','.'), value)
                       for key, value in params.items()])
 
@@ -529,14 +547,14 @@ class Solr:
 
     def raw_query(self, **params):
         """
-        Issue a query against a SOLR server.
+        Issue a query against a Solr server.
 
         Return the raw result.  No pre-processing or
         post-processing happends to either
         input parameters or responses
         """
 
-        # Clean up optional parameters to match SOLR spec.
+        # Clean up optional parameters to match Solr spec.
         params = dict([(key.replace('_','.'), value)
                        for key, value in params.items()])
 
@@ -579,11 +597,13 @@ class Solr:
     @committing
     def add(self, doc):
         """
-        Add a document to the SOLR server.  Document fields
+        Add a document to the Solr server.  Document fields
         should be specified as arguments to this function
 
-        Example:
-            connection.add(id="mydoc", author="Me")
+        Example::
+
+            doc = {"id": "mydoc", "author": "Me"}
+            connection.add(doc)
         """
         lst = [u'<add>']
         self.__add(lst, doc)
@@ -593,10 +613,11 @@ class Solr:
     @committing
     def add_many(self, docs):
         """
-        Add several documents to the SOLR server.
+        Add several documents to the Solr server.
 
-        docs -- a list of dicts, where each dict is a document to add
-            to SOLR.
+        `docs`
+            A list of document dictionaries.
+
         """
         lst = [u'<add>']
         for doc in docs:
@@ -606,8 +627,30 @@ class Solr:
 
     def commit(self, wait_flush=True, wait_searcher=True, _optimize=False):
         """
-        Issue a commit command to the SOLR server.
+        Issue a commit command to the Solr server.
+
+        `wait_flush`
+            Wait for updated indexes to be flushed to disk before returning.
+            If set to ``False``, `wait_searcher` will be ``False`` as well.
+
+        `wait_searcher`
+            Wait for new searchers to be prepared before returning.
+            This implies `wait_flush` is ``True``.
+
         """
+        return self._commit("commit", wait_flush, wait_searcher)
+
+    def optimize(self, wait_flush=True, wait_searcher=True):
+        """
+        Issue an optimize command to the Solr server.
+
+        `wait_flush` and `wait_searcher` are the same interpretations as
+        for :meth:`solr.Solr.commit`.
+
+        """
+        return self._commit("optimize", wait_flush, wait_searcher)
+
+    def _commit(self, verb, wait_flush, wait_searcher):
         if not wait_searcher:  #just handle deviations from the default
             if not wait_flush:
                 options = 'waitFlush="false" waitSearcher="false"'
@@ -615,20 +658,8 @@ class Solr:
                 options = 'waitSearcher="false"'
         else:
             options = ''
-
-        if _optimize:
-            xstr = u'<optimize %s/>' % options
-        else:
-            xstr = u'<commit %s/>' % options
-
+        xstr = u'<%s %s/>' % (verb, options)
         return self._update(xstr)
-
-    def optimize(self, wait_flush=True, wait_searcher=True):
-        """
-        Issue an optimize command to the SOLR server.
-        """
-        self.commit(wait_flush, wait_searcher, _optimize=True)
-
 
     # Helper methods.
 
@@ -730,7 +761,7 @@ class Solr:
                     httplib.BadStatusLine):
                     # We include BadStatusLine as they are spurious
                     # and may randomly happen on an otherwise fine
-                    # SOLR connection (though not often)
+                    # Solr connection (though not often)
                 self._reconnect()
                 attempts -= 1
                 if attempts <= 0:
@@ -741,16 +772,48 @@ class SolrConnection(Solr):
     """
     Represents a Solr connection.
 
-    Designed to work with the 2.2 response format (SOLR 1.2+).
-    (though 2.1 will likely work.)
+    Designed to work with the 2.2 response format (Solr 1.2+),
+    though will likely work with 2.1 responses as well.
     """
 
     # Backward compatible update interfaces.
 
     def add(self, _commit=False, **fields):
+        """
+        Add or update a single document with field values given by
+        keyword arguments.
+
+        The `_commit` argument is treated specially, causing an immediate
+        commit if present.  It may be specified either positionally or as
+        a keyword.  If `_commit` is true, the commit will be issued as
+        part of the same HTTP request to the Solr server.
+
+        Example::
+
+            connection.add(id="mydoc", author="Me")
+
+        This is equialent to ``solr.Solr.add(fields, commit=_commit)``.
+        """
         return Solr.add_many(self, [fields], commit=_commit)
 
     def add_many(self, docs, _commit=False):
+        """
+        Add or update multiple documents. with field values for each given
+        by dictionaries in the sequence `docs`.
+
+        The `_commit` argument is treated specially, causing an immediate
+        commit if present.  It may be specified either positionally or as
+        a keyword.  If `_commit` is true, the commit will be issued as
+        part of the same HTTP request to the Solr server.
+
+        Example::
+
+            doc1 = {...}
+            doc2 = {...}
+            connection.add_many([doc1, doc2], _commit=True)
+
+        This is equialent to ``solr.Solr.add_many(docs, commit=_commit)``.
+        """
         return Solr.add_many(self, docs, commit=_commit)
 
 
@@ -827,7 +890,7 @@ class Response(object):
         """
         Load the next set of matches.
 
-        By default, SOLR returns 10 at a time.
+        By default, Solr returns 10 at a time.
         """
         try:
             start = int(self.results.start)
@@ -1022,9 +1085,9 @@ def check_response_status(response):
 
 
 # -------------------------------------------------------------------
-# Datetime extensions to parse/generate SOLR date formats
+# Datetime extensions to parse/generate Solr date formats
 # -------------------------------------------------------------------
-# A UTC class, for parsing SOLR's returned dates.
+# A UTC class, for parsing Solr's returned dates.
 class UTC(datetime.tzinfo):
     """
     UTC timezone.
@@ -1043,7 +1106,7 @@ utc = UTC()
 
 def utc_to_string(value):
     """
-    Convert datetimes to the subset of ISO 8601 that SOLR expects.
+    Convert datetimes to the subset of ISO 8601 that Solr expects.
     """
     value = value.astimezone(utc).isoformat()
     if '+' in value:
@@ -1055,7 +1118,7 @@ def utc_from_string(value):
     """
     Parse a string representing an ISO 8601 date.
     Note: this doesn't process the entire ISO 8601 standard,
-    onle the specific format SOLR promises to generate.
+    onle the specific format Solr promises to generate.
     """
     try:
         if not value.endswith('Z') and value[10] == 'T':
@@ -1070,7 +1133,7 @@ def utc_from_string(value):
         return datetime.datetime(year, month, day, hour,
             minute, second, microsecond, utc)
     except ValueError:
-        raise ValueError ("'%s' is not a valid ISO 8601 SOLR date" % value)
+        raise ValueError ("'%s' is not a valid ISO 8601 Solr date" % value)
 
 def qs_from_items(query):
     # This deals with lists of values since multiple filter queries can
