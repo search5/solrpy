@@ -255,7 +255,8 @@ from xml.dom.minidom import parseString
 
 __version__ = "0.9.1"
 
-__all__ = ['SolrException', 'Solr', 'SolrConnection', 'Response']
+__all__ = ['SolrException', 'Solr', 'SolrConnection',
+           'Response', 'SearchHandler']
 
 _python_version = sys.version_info[0]+(sys.version_info[1]/10.0)
 
@@ -430,128 +431,11 @@ class Solr:
             self.form_headers['Connection'] = 'close'
 
         self.debug = debug
+        self.select = SearchHandler(self, "/select")
 
     def close(self):
         """Close the underlying HTTP(S) connection."""
         self.conn.close()
-
-
-    # Query interface.
-
-    def query(self, q, fields=None, highlight=None,
-              score=True, sort=None, sort_order="asc", **params):
-        """
-        `q` is the query string.
-
-        `fields` is an optional list of fields to include.  It can
-        be either a string in the format that Solr expects, or
-        a python list or tuple of field names.   Defaults to
-        all fields ("*").
-
-        `score` indicates whether "score" should be included
-        in the field list.  Note that if you explicitly list
-        "score" in your fields value, then score is
-        effectively ignored.  Defaults to true.
-
-        `highlight` indicates whether highlighting should be performed.
-        `highlight` can either be ``False``, indicating "No" (the default),
-        a list of fields in the same format as `fields`, or ``True``,
-        indicating to highlight any fields included in `fields`.
-        If ``True`` and `fields` is not specified, raise a ValueError.
-
-        `sort` is a list of fields to sort by.  See `fields` for
-        formatting.  Each sort element can have be in the form
-        "fieldname asc|desc" as specified by Solr specs.
-
-        `sort_order` is the backward compatible way to add the same ordering
-        to all the sort fields when it is not specified.
-
-        Optional parameters can also be passed in.  Many Solr
-        parameters are in a dotted notation (e.g., ``hl.simple.post``).
-        For such parameters, replace the dots with underscores when
-        calling this method. (e.g., ``hl_simple_post='</pre'>``)
-
-        Returns a Response instance.
-        """
-        # Optional parameters with '_' instead of '.' will be converted
-        # later by raw_query().
-
-        if highlight:
-            params['hl'] = 'true'
-            if not isinstance(highlight, (bool, int, float)):
-                if not isinstance(highlight, basestring):
-                    highlight = ",".join(highlight)
-                params['hl_fl'] = highlight
-            else:
-                if not fields:
-                    raise ValueError("highlight is True and no fields were given")
-                elif isinstance(fields, basestring):
-                    params['hl_fl'] = [fields]
-                else:
-                    params['hl_fl'] = ",".join(fields)
-
-        if q is not None:
-            params['q'] = q
-
-        if fields:
-            if not isinstance(fields, basestring):
-                fields = ",".join(fields)
-        if not fields:
-            fields = '*'
-
-        if sort:
-            if not sort_order or sort_order not in ("asc", "desc"):
-                raise ValueError("sort_order must be 'asc' or 'desc'")
-            if isinstance(sort, basestring):
-                sort = [ f.strip() for f in sort.split(",") ]
-            sorting = []
-            for e in sort:
-                if not (e.endswith("asc") or e.endswith("desc")):
-                    sorting.append("%s %s" % (e, sort_order))
-                else:
-                    sorting.append(e)
-            sort = ",".join(sorting)
-            params['sort'] = sort
-
-        if score and not 'score' in fields.replace(',',' ').split():
-            fields += ',score'
-
-        params['fl'] = fields
-        params['version'] = self.response_version
-        params['wt'] = 'standard'
-
-        xml = self.raw_query(**params)
-        return parse_query_response(
-            StringIO(xml),  params=params, connection=self)
-
-    def raw_query(self, **params):
-        """
-        Issue a query against a Solr server.
-
-        Return the raw result.  No pre-processing or
-        post-processing happends to either
-        input parameters or responses
-        """
-
-        # Clean up optional parameters to match Solr spec.
-        params = dict([(key.replace('_','.'), value)
-                       for key, value in params.items()])
-
-        request = urllib.urlencode(params, doseq=True)
-        if self.debug:
-            logging.info("solrpy request: %s" % request)
-
-        try:
-            rsp = self._post(self.path+'/select',
-                              request, self.form_headers)
-            data = rsp.read()
-            if self.debug:
-                logging.info("solrpy got response: %s" % data)
-        finally:
-            if not self.persistent:
-                self.close()
-
-        return data
 
 
     # Update interface.
@@ -799,6 +683,132 @@ class SolrConnection(Solr):
         """
         return Solr.add_many(self, docs, commit=_commit)
 
+    # Backward compatible query interfaces.
+
+    def query(self, *args, **params):
+        return self.select(*args, **params)
+
+    def raw_query(self, **params):
+        return self.select.raw(**params)
+
+
+class SearchHandler(object):
+
+    def __init__(self, conn, relpath="/select"):
+        self.conn = conn
+        self.selector = conn.path + relpath
+
+    def __call__(self, q=None, fields=None, highlight=None,
+                 score=True, sort=None, sort_order="asc", **params):
+        """
+        q is the query string.
+
+        fields is an optional list of fields to include. It can
+        be either a string in the format that SOLR expects, or
+        a python list/tuple of field names.   Defaults to
+        all fields. ("*")
+
+        score indicates whether "score" should be included
+        in the field list.  Note that if you explicitly list
+        "score" in your fields value, then score is
+        effectively ignored.  Defaults to true.
+
+        highlight indicates whether highlighting should be included.
+        highlight can either be False, indicating "No" (the default),
+        a list of fields in the same format as "fields" or True, indicating
+        to highlight any fields included in "fields". If True and no "fields"
+        are given, raise a ValueError.
+
+        sort is a list of fields to sort by. See "fields" for
+        formatting. Each sort element can have be in the form
+        "fieldname asc|desc" as specified by SOLR specs.
+
+        sort_order is the backward compatible way to add the same ordering
+        to all the sort field when it is not specified.
+
+        Optional parameters can also be passed in.  Many SOLR
+        parameters are in a dotted notation (e.g., hl.simple.post).
+        For such parameters, replace the dots with underscores when
+        calling this method. (e.g., hl_simple_post='</pre'>)
+
+        Returns a Response instance.
+        """
+        # Optional parameters with '_' instead of '.' will be converted
+        # later by raw_query().
+
+        if highlight:
+            params['hl'] = 'true'
+            if not isinstance(highlight, (bool, int, float)):
+                if not isinstance(highlight, basestring):
+                    highlight = ",".join(highlight)
+                params['hl_fl'] = highlight
+            else:
+                if not fields:
+                    raise ValueError("highlight is True and no fields were given")
+                elif isinstance(fields, basestring):
+                    params['hl_fl'] = [fields]
+                else:
+                    params['hl_fl'] = ",".join(fields)
+
+        if q is not None:
+            params['q'] = q
+
+        if fields:
+            if not isinstance(fields, basestring):
+                fields = ",".join(fields)
+        if not fields:
+            fields = '*'
+
+        if sort:
+            if not sort_order or sort_order not in ("asc", "desc"):
+                raise ValueError("sort_order must be 'asc' or 'desc'")
+            if isinstance(sort, basestring):
+                sort = [ f.strip() for f in sort.split(",") ]
+            sorting = []
+            for e in sort:
+                if not (e.endswith("asc") or e.endswith("desc")):
+                    sorting.append("%s %s" % (e, sort_order))
+                else:
+                    sorting.append(e)
+            sort = ",".join(sorting)
+            params['sort'] = sort
+
+        if score and not 'score' in fields.replace(',',' ').split():
+            fields += ',score'
+
+        params['fl'] = fields
+        params['version'] = self.conn.response_version
+        params['wt'] = 'standard'
+
+        xml = self.raw(**params)
+        return parse_query_response(StringIO(xml),  params, self)
+
+    def raw(self, **params):
+        """
+        Issue a query against a SOLR server.
+
+        Return the raw result.  No pre-processing or post-processing
+        happens to either input parameters or responses.
+        """
+        # Clean up optional parameters to match SOLR spec.
+        params = dict([(key.replace('_','.'), value)
+                       for key, value in params.items()])
+        request = urllib.urlencode(params, doseq=True)
+        conn = self.conn
+        if conn.debug:
+            logging.info("solrpy request: %s" % request)
+
+        try:
+            rsp = conn._post(self.selector, request, conn.form_headers)
+            data = rsp.read()
+            if conn.debug:
+                logging.info("solrpy got response: %s" % data)
+        finally:
+            if not conn.persistent:
+                conn.close()
+
+        return data
+
 
 # ===================================================================
 # Response objects
@@ -814,14 +824,14 @@ class Response(object):
           results -- a list of matching documents. Each list item will
               be a dict.
     """
-    def __init__(self, connection):
+    def __init__(self, query):
         # These are set in ResponseContentHandler.endElement()
         self.header = {}
         self.results = []
 
         # These are set by parse_query_response().
         # Used only if .next_batch()/previous_batch() is called
-        self._connection = connection
+        self._query = query
         self._params = {}
 
     def _set_numFound(self, value):
@@ -885,7 +895,7 @@ class Response(object):
         params['start'] = start
         q = params['q']
         del params['q']
-        return self._connection.query(q, **params)
+        return self._query(q, **params)
 
     def previous_batch(self):
         """
@@ -906,13 +916,13 @@ class Response(object):
         params['rows'] = rows
         q = params['q']
         del params['q']
-        return self._connection.query(q, **params)
+        return self._query(q, **params)
 
 
 # ===================================================================
 # XML Parsing support
 # ===================================================================
-def parse_query_response(data, params, connection):
+def parse_query_response(data, params, query):
     """
     Parse the XML results of a /select call.
     """
@@ -923,7 +933,7 @@ def parse_query_response(data, params, connection):
     if handler.stack[0].children:
         response = handler.stack[0].children[0].final
         response._params = params
-        response._connection = connection
+        response._query = query
         return response
     else:
         return None

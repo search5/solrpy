@@ -25,7 +25,7 @@ class SolrPaginator:
     def __init__(self, result, default_page_size=None):
         self.params = result.header['params']
         self.result = result
-        self.conn = result._connection
+        self.query = result._query
 
         if 'rows' in self.params:
             self.page_size = int(self.params['rows'])
@@ -69,7 +69,7 @@ class SolrPaginator:
 
         # get the new start index
         new_params['start'] = start
-        return self.conn.query(**new_params)
+        return self.query(**new_params)
 
     def page(self, page_num=1):
         """Return the requested Page object"""
