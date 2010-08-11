@@ -159,7 +159,8 @@ class TestHTTPConnection(SolrConnectionTestCase):
             self.fail("Connection to %s failed" % (SOLR_HTTP))
 
         status = conn.conn.getresponse().status
-        self.assertEquals(status, 302, "Expected FOUND (302), got: %d" % status)
+        self.assertEquals(status, 302,
+                          "Expected FOUND (302), got: %d" % status)
 
     def test_close_connection(self):
         """ Make sure connections to Solr are being closed properly.
@@ -314,8 +315,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
             "IDs sets differ (difference:%s)" % (ids_symdiff))
 
     def test_add_many_implicit_commit(self):
-        """ Try to add more than one document and commit changes,
-        all in one operation.
+        """ Add more than one document and commit changes, in one operation.
         """
 
         # That one fails in r5 (<commit/> must be made on its own)
@@ -338,7 +338,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
             results.append(res[0])
 
     def test_add_many_no_commit(self):
-        """ Try to add many documents in a single operation without commiting it.
+        """ Add many documents in a single operation without commiting.
         """
         doc_count = 10
         user_ids = [get_rand_string() for x in range(doc_count)]
@@ -355,8 +355,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
                 "Document (id:%s) shouldn't have been fetched" % (id))
 
     def test_add_unicode(self):
-        """ Check whether adding Unicode data actually works for single
-        document.
+        """ Check whether Unicode data actually works for single document.
         """
         # "bile" in Polish (UTF-8).
         data = "\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87".decode("utf-8")
@@ -607,7 +606,7 @@ class TestDocumentsDeletion(SolrConnectionTestCase):
                 "Document (id:%s) should've been deleted from index" % id)
 
     def test_delete_by_unique_key(self):
-        """ Delete a document by using its unique key (as defined in Solr's schema).
+        """ Delete a document by its unique key (as defined in Solr's schema).
         """
         id = get_rand_string()
 
@@ -708,7 +707,8 @@ class TestQuerying(SolrConnectionTestCase):
         self.conn.commit()
 
         # We want to return only the "id" field
-        results = self.query(self.conn, "data:" + data, fields=field_to_return).results
+        results = self.query(
+            self.conn, "data:" + data, fields=field_to_return).results
         self.assertEquals(len(results), doc_count,
             "There should be exactly %d documents returned, got: %d" % (
                 doc_count, len(results)))
@@ -719,8 +719,10 @@ class TestQuerying(SolrConnectionTestCase):
         query_ids = [doc[field_to_return] for doc in results]
         ids_symdiff = set(ids) ^ set(query_ids)
 
-        self.assertEquals(ids_symdiff, set([]),
-            "Query didn't return expected fields (difference:%s)" % (ids_symdiff))
+        self.assertEquals(
+            ids_symdiff, set([]),
+            "Query didn't return expected fields (difference:%s)"
+            % (ids_symdiff))
 
         # Make sure no other field has been returned, note: by default
         # queries also return score for each document.
@@ -735,9 +737,10 @@ class TestQuerying(SolrConnectionTestCase):
                 "expected:%s and score, the result is:%s)" % (
                     field_to_return,result)))
 
-            self.assertEquals(fields[0], "score",
-                "Query returned some other fields then %s and score, result:%s" % (
-                    field_to_return,result))
+            self.assertEquals(
+                fields[0], "score",
+                "Query returned some other fields then %s and score, result:%s"
+                % (field_to_return,result))
 
     def test_query_score(self):
         """ Make sure the score field is returned and is a float instance.
@@ -756,7 +759,8 @@ class TestQuerying(SolrConnectionTestCase):
 
         doc = results[0]
 
-        self.assertTrue("score" in doc, "No score returned, doc:%s" % repr(doc))
+        self.assertTrue(
+            "score" in doc, "No score returned, doc:%s" % repr(doc))
         self.assertTrue(isinstance(doc["score"], float),
             "Score should be a float instance, doc:%s" % repr(doc))
 
@@ -795,7 +799,8 @@ class TestQuerying(SolrConnectionTestCase):
         self.conn.commit()
 
         # Specify the fields to highlight as a string
-        response = self.query(self.conn, "id:" + id, highlight=True, fields="id")
+        response = self.query(
+            self.conn, "id:" + id, highlight=True, fields="id")
 
         self.assertTrue(hasattr(response, "highlighting"),
             ("No fields have been highlighted "
@@ -820,7 +825,8 @@ class TestQuerying(SolrConnectionTestCase):
                 id, highlighting_id))
 
         # Now do the same but use a list instead
-        response = self.query(self.conn, "id:" + id, highlight=True, fields=["id"])
+        response = self.query(
+            self.conn, "id:" + id, highlight=True, fields=["id"])
 
         self.assertTrue(hasattr(response, "highlighting"),
             "No fields have been highlighted, id:%s" % (id))
@@ -931,7 +937,8 @@ class TestQuerying(SolrConnectionTestCase):
             self.add(id=get_rand_string(), user_id=user_id, data=datum)
         self.conn.commit()
 
-        results = self.query(self.conn, q="user_id:" + user_id, sort="data").results
+        results = self.query(
+            self.conn, q="user_id:" + user_id, sort="data").results
 
         self.assertEquals(len(results), doc_count,
             "There should be %d documents returned, got:%d, results:%s" % (
@@ -945,7 +952,7 @@ class TestQuerying(SolrConnectionTestCase):
                     datum, query_data[idx], idx, query_data))
 
     def test_query_sort_nondefault_sort_order(self):
-        """ Test whether sorting works (using non-default, descending, sort order).
+        """ Test sorting (using non-default, descending, sort order).
         """
         doc_count = 10
         prefix = get_rand_string()
@@ -974,7 +981,7 @@ class TestQuerying(SolrConnectionTestCase):
                     datum, query_data[idx], idx, query_data))
 
     def test_query_sort_complex_sort_order(self):
-        """ Test whether sorting works (using non-default, descending, sort order).
+        """ Test sorting (using non-default, descending, sort order).
         """
         doc_count = 10
         prefix = get_rand_string()
@@ -1093,7 +1100,8 @@ class TestQuerying(SolrConnectionTestCase):
         # solr.utc_from_string adds "000" which doesn't seem to be actually
         # needed but removing it would break the backward compatibility with
         # solrpy 0.1
-        self.assertTrue(str(query_timestamp.microsecond).startswith(microsecond))
+        self.assertTrue(
+            str(query_timestamp.microsecond).startswith(microsecond))
         self.assertTrue(query_timestamp.microsecond/int(microsecond) == 1000)
 
     def test_facet_field(self):
@@ -1116,9 +1124,15 @@ class TestQuerying(SolrConnectionTestCase):
         self.assertTrue(u'num' in results.facet_counts[u'facet_fields'])
         self.assertTrue(u'user_id' in results.facet_counts[u'facet_fields'])
         self.assertEqual(len(results.facet_counts[u'facet_fields'][u'num']),1)
-        self.assertEqual(len(results.facet_counts[u'facet_fields'][u'user_id']),3)
-        self.assertEqual(results.facet_counts[u'facet_fields'][u'num'],{u'10':12})
-        self.assertEqual(results.facet_counts[u'facet_fields'][u'user_id'],{u'0':4,u'1':4,u'2':4})
+        self.assertEqual(
+            len(results.facet_counts[u'facet_fields'][u'user_id']),
+            3)
+        self.assertEqual(
+            results.facet_counts[u'facet_fields'][u'num'],
+            {u'10':12})
+        self.assertEqual(
+            results.facet_counts[u'facet_fields'][u'user_id'],
+            {u'0':4,u'1':4,u'2':4})
 
 
     # Exception tests
@@ -1135,7 +1149,7 @@ class TestQuerying(SolrConnectionTestCase):
         than "asc" or "desc".
         """
         self.assertRaises(ValueError, self.query, self.conn, "id:" + "abc",
-                            **{"sort":"id", "sort_order":"invalid_sort_order"})
+                          **{"sort":"id", "sort_order":"invalid_sort_order"})
 
 
 class TestCommitingOptimizing(SolrConnectionTestCase):
@@ -1254,7 +1268,8 @@ class TestPaginator(SolrConnectionTestCase):
         for i in range(0,15):
             self.conn.add(id=i, data='data_%02i' % i)
         self.conn.commit()
-        self.result = self.query(self.conn, '*:*', sort='data', sort_order='desc')
+        self.result = self.query(
+            self.conn, '*:*', sort='data', sort_order='desc')
 
     def test_num_pages(self):
         """ Check the number of pages reported by the paginator """
