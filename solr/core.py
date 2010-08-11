@@ -473,24 +473,22 @@ class Solr:
 
         Returns a Response instance.
         """
-
-        # Clean up optional parameters to match Solr spec.
-        params = dict([(key.replace('_','.'), value)
-                      for key, value in params.items()])
+        # Optional parameters with '_' instead of '.' will be converted
+        # later by raw_query().
 
         if highlight:
             params['hl'] = 'true'
             if not isinstance(highlight, (bool, int, float)):
                 if not isinstance(highlight, basestring):
                     highlight = ",".join(highlight)
-                params['hl.fl'] = highlight
+                params['hl_fl'] = highlight
             else:
                 if not fields:
                     raise ValueError("highlight is True and no fields were given")
                 elif isinstance(fields, basestring):
-                    params['hl.fl'] = [fields]
+                    params['hl_fl'] = [fields]
                 else:
-                    params['hl.fl'] = ",".join(fields)
+                    params['hl_fl'] = ",".join(fields)
 
         if q is not None:
             params['q'] = q
@@ -522,28 +520,9 @@ class Solr:
         params['version'] = self.response_version
         params['wt'] = 'standard'
 
-        request = urllib.urlencode(params, doseq=True)
-
-        if self.debug:
-            logging.info("solrpy request: %s" % request)
-
-        try:
-            rsp = self._post(self.path + '/select',
-                              request, self.form_headers)
-            # If we pass in rsp directly, instead of using rsp.read())
-            # and creating a StringIO, then Persistence breaks with
-            # an internal python error.
-            xml = StringIO(rsp.read())
-            if self.debug:
-                logging.info("solrpy got response: %s" % xml.getvalue())
-
-            data = parse_query_response(xml,  params=params, connection=self)
-
-        finally:
-            if not self.persistent:
-                self.close()
-
-        return data
+        xml = self.raw_query(**params)
+        return parse_query_response(
+            StringIO(xml),  params=params, connection=self)
 
     def raw_query(self, **params):
         """
@@ -559,11 +538,15 @@ class Solr:
                        for key, value in params.items()])
 
         request = urllib.urlencode(params, doseq=True)
+        if self.debug:
+            logging.info("solrpy request: %s" % request)
 
         try:
             rsp = self._post(self.path+'/select',
                               request, self.form_headers)
             data = rsp.read()
+            if self.debug:
+                logging.info("solrpy got response: %s" % data)
         finally:
             if not self.persistent:
                 self.close()
