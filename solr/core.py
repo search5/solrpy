@@ -443,21 +443,35 @@ class Solr:
     @committing
     def delete(self, id=None, ids=None, queries=None):
         """
-        Delete a specific document by id.
+        Delete documents by ids or queries.
+
+        Any or all of `id`, `ids`, or `queries` may be given; all
+        provided will be used.  If none are provided, no request will be
+        sent to Solr.
+
+        `id` is a single value for the schema's unique id field.  `ids`
+        is an iterable of unique ids.
+
+        `queries` is an iterable of standard-syntax queries.
+
         """
         return self._delete(id=id, ids=ids, queries=queries)
 
     @committing
     def delete_many(self, ids):
         """
-        Delete documents using a list of IDs.
+        Delete documents using a list of ids.
+
+        This is equivalent to ``delete(ids=[ids])``.
         """
         return self._delete(ids=ids)
 
     @committing
     def delete_query(self, query):
         """
-        Delete all documents returned by a query.
+        Delete all documents identified by a query.
+
+        This is equivalent to ``delete(queries=[query])``.
         """
         return self._delete(queries=[query])
 
