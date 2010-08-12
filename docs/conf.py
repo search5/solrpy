@@ -140,6 +140,7 @@ html_static_path = ['_static']
 
 # If false, no module index is generated.
 #html_domain_indices = True
+html_domain_indices = False
 
 # If false, no index is generated.
 #html_use_index = True
@@ -149,6 +150,7 @@ html_static_path = ['_static']
 
 # If true, links to the reST sources are added to the pages.
 #html_show_sourcelink = True
+html_show_sourcelink = False
 
 # If true, "Created using Sphinx" is shown in the HTML footer. Default is True.
 #html_show_sphinx = True
@@ -220,7 +222,7 @@ man_pages = [
 # -- Options for Epub output ---------------------------------------------------
 
 # Bibliographic Dublin Core info.
-epub_title = u'solrpy'
+epub_title = u'Solr API for Python'
 epub_author = u'solrpy developers'
 epub_publisher = u'solrpy developers'
 epub_copyright = u'2010, solrpy developers'
@@ -231,10 +233,12 @@ epub_copyright = u'2010, solrpy developers'
 
 # The scheme of the identifier. Typical schemes are ISBN or URL.
 #epub_scheme = ''
+epub_scheme = 'url'
 
 # The unique identifier of the text. This can be a ISBN number
 # or the project homepage.
 #epub_identifier = ''
+epub_identifier = 'http://code.google.com/p/solrpy/'
 
 # A unique identification for the text.
 #epub_uid = ''
@@ -251,4 +255,4 @@ epub_copyright = u'2010, solrpy developers'
 #epub_exclude_files = []
 
 # The depth of the table of contents in toc.ncx.
-#epub_tocdepth = 3
+#epub_tocdepth = 2
