@@ -1,11 +1,8 @@
 syntax: glob
 
-bin
 _build
 _styles
 _templates
-.installed.cfg
-develop-eggs
 *.egg
 *.pyc
 solrpy.egg-info
