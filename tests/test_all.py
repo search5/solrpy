@@ -1152,6 +1152,86 @@ class TestQuerying(SolrConnectionTestCase):
                           **{"sort":"id", "sort_order":"invalid_sort_order"})
 
 
+class EmptyResponse(object):
+
+    _empty_results = '''\
+<response> 
+<lst name="responseHeader"> 
+ <int name="status">0</int> 
+ <int name="QTime">2</int> 
+ <lst name="params"> 
+  <str name="q">keyword:ttestdocument</str> 
+  <str name="wt">standard</str> 
+ </lst> 
+</lst> 
+<result name="response" numFound="0" start="0"/> 
+</response> 
+'''
+
+    _headers = {
+        "server": "Apache-Coyote/1.1",
+        "content-type": "text/xml;charset=UTF-8",
+        "content-length": "307",
+        "connection": "close",
+        }
+
+    getheaders = _headers.items
+    status = 200
+    reason = "Ok"
+    version = 11
+
+    def getheader(self, name, default=None):
+        return self._headers.get(name.lower, default)
+
+    def read(self):
+        return self._empty_results
+
+
+class TestSolrConnectionSearchHandler(SolrConnectionTestCase):
+
+    def new_connection(self):
+        # Whenever we create a connection, we want to hook the _post
+        # method to capture information about the request, and suppress
+        # sending it to the server.
+
+        def post(selector, body, headers):
+            self.request_selector = selector
+            self.request_body = body
+            return EmptyResponse()
+
+        conn = super(TestSolrConnectionSearchHandler, self).new_connection()
+        conn._post = post
+        return conn
+
+    def test_select_request(self):
+        conn = self.new_connection()
+        conn.select("id:foobar", score=False)
+        self.assertEqual(self.request_selector, SOLR_PATH + "/select")
+        self.assertEqual(self.request_body,
+                         "q=id%3Afoobar&version=2.2&fl=%2A&wt=standard")
+
+    def test_select_raw_request(self):
+        conn = self.new_connection()
+        conn.select.raw(q="id:foobar")
+        self.assertEqual(self.request_selector, SOLR_PATH + "/select")
+        self.assertEqual(self.request_body, "q=id%3Afoobar")
+
+    def test_alternate_request(self):
+        conn = self.new_connection()
+        alternate = solr.SearchHandler(conn, "/alternate/path")
+        alternate("id:foobar", score=False)
+        self.assertEqual(self.request_selector, SOLR_PATH + "/alternate/path")
+        self.assertEqual(self.request_body,
+                         "q=id%3Afoobar&version=2.2&fl=%2A&wt=standard")
+
+    def test_alternate_raw_request(self):
+        conn = self.new_connection()
+        alternate = solr.SearchHandler(conn, "/alternate/path")
+        alternate.raw(q="id:foobar")
+        self.assertEqual(self.request_selector, SOLR_PATH + "/alternate/path")
+        self.assertEqual(self.request_body, "q=id%3Afoobar")
+
+
 class TestCommitingOptimizing(SolrConnectionTestCase):
 
     def setUp(self):
@@ -1319,7 +1399,6 @@ class TestPaginator(SolrConnectionTestCase):
 
     def test_unicode_query(self):
         """ Test for unicode support in subsequent paginator queries """
-        from solr import SolrException
         chinese_data = '\xe6\xb3\xb0\xe5\x9b\xbd'.decode('utf-8')
         self.conn.add(id=100, data=chinese_data)
         self.conn.commit()
@@ -1327,7 +1406,7 @@ class TestPaginator(SolrConnectionTestCase):
         paginator = solr.SolrPaginator(result, default_page_size=10)
         try:
             paginator.page(1)
-        except SolrException:
+        except solr.SolrException:
             self.fail('Unicode not encoded correctly in paginator')
 
 
@@ -1374,7 +1453,8 @@ class TestRetries(SolrConnectionTestCase):
         self.assertEqual(t.calls, 2)
 
 
-# Now let's do the same thing again, but with the solr.Solr connection:
+# Now let's do the same thing again, but with the solr.Solr connection.
+# Some tests are overridden, and many more are added.
 
 class TestSolrHTTPConnection(SolrBased, TestHTTPConnection):
     pass
@@ -1677,6 +1757,9 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
 
 
 class TestSolrQuerying(SolrBased, TestQuerying):
+    pass
+
+class TestSolrSearchHandler(SolrBased, TestSolrConnectionSearchHandler):
     pass
 
 class TestSolrCommitingOptimizing(SolrBased, TestCommitingOptimizing):
