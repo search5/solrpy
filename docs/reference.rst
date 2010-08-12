@@ -99,15 +99,60 @@ older 2.1 response format as well.
        :exc:`httplib.BadStatusLine` exceptions are generated from calls
        into :mod:`httplib`.
 
+
+Commit-control arguments
+++++++++++++++++++++++++
+
+Some methods support optional Boolean arguments to control commits that
+may be made by the method.  These arguments are always optional, and no
+commit will be performed if they are not given.
+
+Methods that accept these arguments are identified as supporting
+commit-control arguments, but the arguments are not listed or described
+for the individual methods.
+
+The following commit-control keyword arguments are defined:
+
+`commit`
+    Indicates whether a commit should be performed before the method
+    returns.
+
+`optimize`
+    Indicates whether index optimization should be performed before the
+    method returns.  If true, implies a `commit` value of ``True``.
+
+`wait_flush`
+    Indicates whether the request should block until the commit has been
+    flushed to disk on the server.  If not specified, this defaults to
+    ``True``.  (There's some question about whether this is honored in
+    recent versions of Solr.)
+
+`wait_searcher`
+    Indicates whether the request should block until searcher objects
+    have been warmed for use before returning.  If not specified, this
+    defaults to ``True``.  If true, implies a `wait_flush` value of
+    ``True`` (a false `wait_flush` value will be ignored).
+
+If `wait_flush` or `wait_searcher` are specified when neither `commit`
+nor `optimize` are true, a :exc:`TypeError` will be raised.
+
+Whenever possible, the request to commit or optimize the index will be
+collapsed into an update request being performed by the method being
+called.  This avoids a separate HTTP round-trip to commit changes.
+
+
 Methods common to connections
 +++++++++++++++++++++++++++++
 
 These methods are available on both connection classes.
 
+.. The signatures on the delete* methods are required since those
+   methods are wrapped by the ``committing`` decorator.
+
 .. automethod:: solr.Solr.delete(id=None, ids=None, queries=None)
 .. automethod:: solr.Solr.delete_many(ids)
 .. automethod:: solr.Solr.delete_query(query)
-.. automethod:: solr.Solr.commit
+.. automethod:: solr.Solr.commit(wait_flush=True, wait_searcher=True)
 .. automethod:: solr.Solr.optimize
 .. automethod:: solr.Solr.close
 
@@ -123,7 +168,8 @@ methods on :class:`SolrConnection` may exist with different signatures.
    A :class:`SearchHandler` instance for the commonly-defined ``select``
    request handler on the server.
 
-.. automethod:: solr.Solr.add
+.. automethod:: solr.Solr.add(doc)
+.. automethod:: solr.Solr.add_many(docs)
 
 
 Compatibility support
@@ -137,8 +183,18 @@ Compatibility support
    The constructor arguments and most methods are the same as for
    :class:`solr.Solr`; only these method signatures differ:
 
+
 .. automethod:: solr.SolrConnection.add
+
+   Unlike the same-named method of :class:`Solr`, this does *not*
+   support commit-control arguments.
+
+
 .. automethod:: solr.SolrConnection.add_many
+
+   Unlike the same-named method of :class:`Solr`, this does *not*
+   support commit-control arguments.
+
 
 .. method:: SolrConnection.query(q, fields=None, highlight=None, score=True, sort=None, sort_order="asc", **params)
 
@@ -175,9 +231,9 @@ as needed.
        conn = solr.Solr("http://solr.example.net/solr")
        select = solr.SearchHandler(conn, "/select")
 
-   This is exactly how the `select` attribute of :class:`Solr` instances
-   is constructed.  An alternate request handler can be used by
-   providing an alternate `path`::
+   This is exactly how the :attr:`select` attribute of :class:`Solr`
+   instances is constructed.  An alternate request handler can be used
+   by providing an alternate `path`::
 
        find_stuff = solr.SearchHandler(conn, "/find_stuff")
 
@@ -191,8 +247,8 @@ as needed.
    handler in the Solr server.
 
    :var:`fields` is an optional list of fields to include.  It can be
-   either a string in the format that Solr expects, or a python
-   list/tuple of field names.  Defaults to all fields (``'*'``).
+   either a string in the format that Solr expects, or an iterable of
+   field names.  Defaults to all fields (``'*'``).
 
    :var:`score` indicates whether score should be included in the field
    list.  Note that if you explicitly list "score" in your fields
@@ -223,8 +279,9 @@ as needed.
 
 .. method:: SearchHandler.raw(**params)
 
-   Issue a query against a Solr server.  No pre-processing is performed
-   on the parameters.
+   Issue a query against a Solr server.  No logical interpretation of
+   the parameters is performed, but encoding for transfer as form fields
+   over HTTP is handled.
 
    Return the raw result as text.  No processing is performed on the
    response.

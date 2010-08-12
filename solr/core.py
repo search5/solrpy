@@ -453,16 +453,17 @@ class Solr:
         is an iterable of unique ids.
 
         `queries` is an iterable of standard-syntax queries.
-
+        Supports commit-control arguments.
         """
         return self._delete(id=id, ids=ids, queries=queries)
 
     @committing
     def delete_many(self, ids):
         """
-        Delete documents using a list of ids.
+        Delete documents using an iterable of ids.
 
         This is equivalent to ``delete(ids=[ids])``.
+        Supports commit-control arguments.
         """
         return self._delete(ids=ids)
 
@@ -472,6 +473,7 @@ class Solr:
         Delete all documents identified by a query.
 
         This is equivalent to ``delete(queries=[query])``.
+        Supports commit-control arguments.
         """
         return self._delete(queries=[query])
 
@@ -485,6 +487,8 @@ class Solr:
 
             doc = {"id": "mydoc", "author": "Me"}
             connection.add(doc)
+
+        Supports commit-control arguments.
         """
         lst = [u'<add>']
         self.__add(lst, doc)
@@ -497,8 +501,9 @@ class Solr:
         Add several documents to the Solr server.
 
         `docs`
-            A list of document dictionaries.
+            An iterable of document dictionaries.
 
+        Supports commit-control arguments.
         """
         lst = [u'<add>']
         for doc in docs:
@@ -510,13 +515,8 @@ class Solr:
         """
         Issue a commit command to the Solr server.
 
-        `wait_flush`
-            Wait for updated indexes to be flushed to disk before returning.
-            If set to ``False``, `wait_searcher` will be ``False`` as well.
-
-        `wait_searcher`
-            Wait for new searchers to be prepared before returning.
-            This implies `wait_flush` is ``True``.
+        `wait_flush` and `wait_searcher` have the same interpretations as
+        the like-name `commit-control arguments`_.
 
         """
         return self._commit("commit", wait_flush, wait_searcher)
@@ -525,8 +525,8 @@ class Solr:
         """
         Issue an optimize command to the Solr server.
 
-        `wait_flush` and `wait_searcher` are the same interpretations as
-        for :meth:`solr.Solr.commit`.
+        `wait_flush` and `wait_searcher` have the same interpretations as
+        the like-name `commit-control arguments`_.
 
         """
         return self._commit("optimize", wait_flush, wait_searcher)
