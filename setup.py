@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'solrpy',
-    version = '0.9.1', # don't forget to update solr.core.__version__
+    version = '0.9.2', # don't forget to update solr.core.__version__
     url = 'http://code.google.com/p/solrpy',
     license = 'http://opensource.org/licenses/apache2.0.php',
     packages=find_packages(),
