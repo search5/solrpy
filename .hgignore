@@ -3,6 +3,8 @@ syntax: glob
 _build
 _styles
 _templates
+build
+dist
 *.egg
 *.pyc
 solrpy.egg-info
