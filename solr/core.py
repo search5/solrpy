@@ -805,9 +805,14 @@ class SearchHandler(object):
         happens to either input parameters or responses.
         """
         # Clean up optional parameters to match SOLR spec.
-        params = dict([(key.replace('_','.'), value)
-                       for key, value in params.items()])
-        request = urllib.urlencode(params, doseq=True)
+        query = []
+        for key, value in params.items():
+            key = key.replace('_', '.')
+            if isinstance(value, (list, tuple)):
+                query.extend([(key, unicode(v)) for v in value])
+            else:
+                query.append((key, unicode(value)))
+        request = urllib.urlencode(query, doseq=True)
         conn = self.conn
         if conn.debug:
             logging.info("solrpy request: %s" % request)
