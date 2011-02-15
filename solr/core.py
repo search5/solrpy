@@ -806,7 +806,7 @@ class SearchHandler(object):
         """
         # Clean up optional parameters to match SOLR spec.
         query = []
-        to_str = lambda s: unicode(s).encode('utf-8')
+        to_str = lambda s: s.encode('utf-8') if isinstance(s, unicode) else s
         for key, value in params.items():
             key = key.replace('_', '.')
             if isinstance(value, (list, tuple)):
