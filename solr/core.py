@@ -708,9 +708,10 @@ class SolrConnection(Solr):
 
 class SearchHandler(object):
 
-    def __init__(self, conn, relpath="/select"):
+    def __init__(self, conn, relpath="/select", arg_separator="_"):
         self.conn = conn
         self.selector = conn.path + relpath
+        self.arg_separator = arg_separator
 
     def __call__(self, q=None, fields=None, highlight=None,
                  score=True, sort=None, sort_order="asc", **params):
@@ -808,7 +809,7 @@ class SearchHandler(object):
         query = []
         to_str = lambda s: s.encode('utf-8') if isinstance(s, unicode) else s
         for key, value in params.items():
-            key = key.replace('_', '.')
+            key = key.replace(self.arg_separator, '.')
             if isinstance(value, (list, tuple)):
                 query.extend([(key, to_str(v)) for v in value])
             else:
