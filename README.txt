@@ -15,7 +15,7 @@ Here's the basic gist::
     import solr
 
     # create a connection to a solr server
-    s = solr.Solr('http://example.org:8083/solr')
+    s = solr.SolrConnection('http://example.org:8083/solr')
 
     # add a document to the index
     doc = dict(
