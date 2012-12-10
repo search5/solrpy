@@ -1809,9 +1809,7 @@ class SolrExceptionHttpStatusPickleTestCase(unittest.TestCase):
             '\x01ub.')
 
     def _test_unpickle(self, s):
-        self._check(self.module.loads(s))
-
-    def _check(self, loaded):
+        loaded = self.module.loads(s)
         self.assertEqual(loaded.httpcode, self.initial.httpcode)
         self.assertEqual(loaded.reason, self.initial.reason)
         self.assertEqual(loaded.body, self.initial.body)
