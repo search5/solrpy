@@ -282,7 +282,7 @@ class SolrException(Exception):
     tracebacks from the Java runtime.
     """
 
-    def __init__(self, httpcode, reason=None, body=None):
+    def __init__(self, httpcode=None, reason=None, body=None):
         self.httpcode = httpcode
         self.reason = reason
         self.body = body
