@@ -807,13 +807,12 @@ class SearchHandler(object):
         """
         # Clean up optional parameters to match SOLR spec.
         query = []
-        to_str = lambda s: s.encode('utf-8') if isinstance(s, unicode) else s
         for key, value in params.items():
             key = key.replace(self.arg_separator, '.')
             if isinstance(value, (list, tuple)):
-                query.extend([(key, to_str(v)) for v in value])
+                query.extend([(key, strify(v)) for v in value])
             else:
-                query.append((key, to_str(value)))
+                query.append((key, strify(value)))
         request = urllib.urlencode(query, doseq=True)
         conn = self.conn
         if conn.debug:
@@ -830,6 +829,12 @@ class SearchHandler(object):
 
         return data
 
+
+def strify(s):
+    if isinstance(s, unicode):
+        return s.encode('utf-8')
+    else:
+        return s
 
 # ===================================================================
 # Response objects
