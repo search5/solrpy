@@ -30,7 +30,7 @@ SOLR_HTTPS = "https://" + SOLR_HOST + ":" + SOLR_PORT_HTTPS + SOLR_PATH
 
 
 def get_rand_string():
-    return "".join(choice(digits)  for x in range(12))
+    return "".join(choice(digits) for x in range(12))
 
 
 def get_rand_userdoc(id=None, user_id=None, data=None):
@@ -97,7 +97,7 @@ class SolrConnectionTestCase(unittest.TestCase):
             results = self.query(conn, "id:" + doc["id"]).results
             self.assertEquals(
                 len(results), 0,
-                "Document (id:%s) should've been deleted" % doc["id"])
+                "Document (id:%s) should have been deleted" % doc["id"])
 
 
 class SolrBased(SolrConnectionTestCase):
