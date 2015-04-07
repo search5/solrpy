@@ -1,4 +1,4 @@
-# solr - A Python Client for Solr
+# solrpy
 
 solrpy is a Python client for [Solr], an enterprise search server
 built on top of [Lucene].  solrpy allows you to add documents to a
