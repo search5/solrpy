@@ -16,11 +16,11 @@ import solr
 s = solr.SolrConnection('http://example.org:8083/solr')
 
 # add a document to the index
-doc = dict(
-    id=1,
-    title='Lucene in Action',
-    author=['Erik Hatcher', 'Otis Gospodnetić'],
-    )
+doc = {
+  "id": 1,
+  "title": "Lucene in Action",
+  "author": ["Erik Hatcher", "Otis Gospodnetić"]
+)
 s.add(doc, commit=True)
 
 # do a search
