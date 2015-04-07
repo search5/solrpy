@@ -52,15 +52,11 @@ response = s.query('title:lucene', facet='true', facet_field=['subject', 'publis
 
 ## Tests
 
-To run the tests, you need to have a running solr instance:
+To run the tests, you need to have a running solr instance. The easiest
+way to do this is:
 
 ```
-wget http://archive.apache.org/dist/lucene/solr/1.4.1/apache-solr-1.4.1.zip
-unzip apache-solr-1.4.1.zip
-cp tests/schema.xml apache-solr-1.4.1/example/solr/conf
-cd apache-solr-1.4.1/example
-java -jar start.jar &
-python setup.py test
+curl -sSL https://raw.githubusercontent.com/moliware/travis-solr/master/travis-solr.sh | SOLR_VERSION=4.10.3 SOLR_CONFS=tests bash
 ```
 
 ## Community

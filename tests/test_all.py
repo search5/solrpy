@@ -21,7 +21,7 @@ from xml.dom.minidom import parseString
 import solr
 import solr.core
 
-SOLR_PATH = "/solr"
+SOLR_PATH = "/solr/core0"
 SOLR_HOST = "localhost"
 SOLR_PORT_HTTP = "8983"
 SOLR_PORT_HTTPS = "8943"
@@ -156,13 +156,13 @@ class TestHTTPConnection(SolrConnectionTestCase):
         conn = self.new_connection()
 
         try:
-            conn.conn.request("GET", SOLR_PATH)
+            conn.conn.request("GET", "/solr/")
         except socket.error:
             self.fail("Connection to %s failed" % (SOLR_HTTP))
 
         status = conn.conn.getresponse().status
-        self.assertEquals(status, 302,
-                          "Expected FOUND (302), got: %d" % status)
+        self.assertEquals(status, 200,
+                          "Expected FOUND (200), got: %d" % status)
 
     def test_close_connection(self):
         """ Make sure connections to Solr are being closed properly.
