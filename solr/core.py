@@ -419,6 +419,7 @@ class Solr:
 
         self.form_headers = {
             'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+        self.form_headers.update(post_headers)
         
         if http_user is not None and http_pass is not None:
             http_auth = http_user + ':' + http_pass
