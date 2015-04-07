@@ -50,6 +50,19 @@ and if the parameter takes multiple values you just pass them in as a list::
 response = s.query('title:lucene', facet='true', facet_field=['subject', 'publisher'])
 ```
 
+## Tests
+
+To run the tests, you need to have a running solr instance:
+
+```
+wget http://archive.apache.org/dist/lucene/solr/1.4.1/apache-solr-1.4.1.zip
+unzip apache-solr-1.4.1.zip
+cp tests/schema.xml apache-solr-1.4.1/example/solr/conf
+cd apache-solr-1.4.1/example
+java -jar start.jar &
+python setup.py test
+```
+
 ## Community
 
 Feel free to join our [discussion list] if you have ideas or suggestions.

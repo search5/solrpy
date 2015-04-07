@@ -1,0 +1,6 @@
+language: python
+before_script: curl -sSL https://raw.githubusercontent.com/moliware/travis-solr/master/travis-solr.sh | SOLR_VERSION=3.6.1 bash
+script: python setup.py test
+python:
+  - "2.7"
+

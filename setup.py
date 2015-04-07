@@ -14,7 +14,6 @@ setup(
     packages=find_packages(),
     install_requires = [],
     description = 'Client for the Solr search service',
-    long_description=open('README.txt').read(),
     tests_require = ["nose>=0.10.1"],
     test_suite = 'nose.collector',
     )
