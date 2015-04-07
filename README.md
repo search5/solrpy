@@ -20,7 +20,7 @@ doc = {
   "id": 1,
   "title": "Lucene in Action",
   "author": ["Erik Hatcher", "Otis Gospodnetić"]
-)
+}
 s.add(doc, commit=True)
 
 # do a search
