@@ -23,7 +23,7 @@ class SolrPaginator:
     """
 
     def __init__(self, result, default_page_size=None):
-        self.params = result.header['params']
+        self.params = result._params
         self.result = result
         self.query = result._query
 
@@ -65,7 +65,7 @@ class SolrPaginator:
         # need to convert the keys to strings to pass them as parameters
         new_params = {}
         for k, v in self.params.items():
-            new_params[str(k)] = v.encode('utf-8')
+            new_params[str(k)] = v
 
         # get the new start index
         new_params['start'] = start
