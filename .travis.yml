@@ -3,4 +3,4 @@ before_script: curl -sSL https://raw.githubusercontent.com/moliware/travis-solr/
 script: python setup.py test
 python:
   - "2.7"
-
+  - "2.6"
