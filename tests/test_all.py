@@ -951,7 +951,7 @@ class TestQuerying(SolrConnectionTestCase):
             self.add(id=get_rand_string(), user_id=user_id, data=datum)
         self.conn.commit()
 
-        results = self.query(self.conn, q="user_id:" + user_id, sort="data",
+        results = self.query(self.conn, q="user_id:" + user_id, sort="data_sort",
             sort_order="desc").results
 
         self.assertEquals(len(results), doc_count,
@@ -985,7 +985,7 @@ class TestQuerying(SolrConnectionTestCase):
 
         results = self.query(self.conn, 
             q="user_id:%s OR user_id:%s" % (user_ids[0], user_ids[1]),
-            sort=["user_id asc", "data desc"]).results
+            sort=["user_id asc", "data_sort desc"]).results
 
         self.assertEquals(len(results), doc_count,
             "There should be %d documents returned, got:%d, results:%s" % (

@@ -24,6 +24,10 @@
     <field name="multi_time" type="date" indexed="true" stored="true" required="false" multiValued="true" />
     <field name="_version_" type="long" indexed="true" stored="true"/>
 
+    <!-- http://stackoverflow.com/a/7790127/1763984 -->
+    <field name="data_sort" type="string" indexed="true" stored="false"/>
+    <copyField source="data" dest="data_sort" />
+
     <uniqueKey>id</uniqueKey>
 
     <defaultSearchField>data</defaultSearchField>
