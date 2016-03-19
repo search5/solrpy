@@ -1,19 +1,33 @@
 # bootstrap easy_install
-import ez_setup
-ez_setup.use_setuptools()
-
 from setuptools import setup, find_packages
-import solr.core
+import sys
+
+#support for python2 and python3
+if sys.version_info[0] == 2:
+    base_dir = 'python2'
+elif sys.version_info[0] == 3:
+    base_dir = 'python3'
 
 setup(
-    name = 'solrpy',
-    # We can do this because we don't rely on getting "built" to be importable:
-    version = solr.core.__version__, # update only solr.core.__version__
-    url = 'http://code.google.com/p/solrpy',
+    name = 'solrpy3',
+    version = '0.98',
+    author = 'Ed Summers',
+    author_email = 'ehs@pobox.com',
+    url = 'https://github.com/edsu/solrpy',
     license = 'http://opensource.org/licenses/apache2.0.php',
-    packages=find_packages(),
-    install_requires = [],
+    packages=['solr'],
+    package_dir={
+        'solr' : base_dir + '/solr',
+    },
     description = 'Client for the Solr search service',
     tests_require = ["nose>=0.10.1"],
     test_suite = 'nose.collector',
-    )
+
+    classifiers=
+    [
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'Programming Language :: Python'
+    ],
+
+)

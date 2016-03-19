@@ -40,8 +40,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'solrpy'
-copyright = u'2010, solrpy developers'
+project = 'solrpy'
+copyright = '2010, solrpy developers'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -183,8 +183,8 @@ htmlhelp_basename = 'solrpydoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'solrpy.tex', u'solrpy Documentation',
-   u'solrpy developers', 'manual'),
+  ('index', 'solrpy.tex', 'solrpy Documentation',
+   'solrpy developers', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -216,18 +216,18 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'solrpy', u'solrpy Documentation',
-     [u'solrpy developers'], 1)
+    ('index', 'solrpy', 'solrpy Documentation',
+     ['solrpy developers'], 1)
 ]
 
 
 # -- Options for Epub output ---------------------------------------------------
 
 # Bibliographic Dublin Core info.
-epub_title = u'Solr API for Python'
-epub_author = u'solrpy developers'
-epub_publisher = u'solrpy developers'
-epub_copyright = u'2010, solrpy developers'
+epub_title = 'Solr API for Python'
+epub_author = 'solrpy developers'
+epub_publisher = 'solrpy developers'
+epub_copyright = '2010, solrpy developers'
 
 # The language of the text. It defaults to the language option
 # or en if the language is not set.
