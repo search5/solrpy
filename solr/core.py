@@ -258,9 +258,9 @@ import codecs
 import datetime
 import logging
 try:
-    from io import StringIO
-except ImportError:
     from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 long = getattr(__builtins__, 'long', int)
 basestring = getattr(__builtins__, 'basestring', str)
