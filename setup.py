@@ -12,8 +12,8 @@ setup(
     url = 'http://code.google.com/p/solrpy',
     license = 'http://opensource.org/licenses/apache2.0.php',
     packages=find_packages(),
-    install_requires = ['future', 'six'],
+    install_requires = ["future", "six"],
     description = 'Client for the Solr search service',
-    tests_require = ["nose>=0.10.1", 'future', 'six'],
+    tests_require = ["nose>=0.10.1", "future", "six"],
     test_suite = 'nose.collector',
     )
