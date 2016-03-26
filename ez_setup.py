@@ -14,9 +14,6 @@ the appropriate options to ``use_setuptools()``.
 
 This file can also be run as a script to install or upgrade setuptools.
 """
-from future.standard_library import install_aliases
-install_aliases()
-
 import sys
 
 DEFAULT_VERSION = "0.6c9"
