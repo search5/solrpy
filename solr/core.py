@@ -248,17 +248,24 @@ try:
 except ImportError:
     import http.client as client
 
-from future.standard_library import hooks
-
-with hooks():
+try:
     from urllib.parse import urlparse, urlencode, quote, quote_plus
+except ImportError:
+    from urllib2 import urlparse, quote
+    from urllib import urlencode, quote_plus
 
 import codecs
 import datetime
 import logging
-from six import StringIO
-from six import string_types, text_type
-from past.builtins import long
+try:
+    from io import StringIO
+except ImportError:
+    from StringIO import StringIO
+
+long = getattr(__builtins__, 'long', int)
+basestring = getattr(__builtins__, 'basestring', str)
+unicode = getattr(__builtins__, 'unicode', str)
+
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
@@ -384,7 +391,7 @@ class Solr:
 
         """
 
-        self.scheme, self.host, self.path = urlparse(url, 'http')[:3]
+        self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]
         self.url = url
 
         assert self.scheme in ('http','https')
@@ -765,13 +772,13 @@ class SearchHandler(object):
         if highlight:
             params['hl'] = 'true'
             if not isinstance(highlight, (bool, int, float)):
-                if not isinstance(highlight, string_types):
+                if not isinstance(highlight, basestring):
                     highlight = ",".join(highlight)
                 params['hl_fl'] = highlight
             else:
                 if not fields:
                     raise ValueError("highlight is True and no fields were given")
-                elif isinstance(fields, string_types):
+                elif isinstance(fields, basestring):
                     params['hl_fl'] = [fields]
                 else:
                     params['hl_fl'] = ",".join(fields)
@@ -780,7 +787,7 @@ class SearchHandler(object):
             params['q'] = q
 
         if fields:
-            if not isinstance(fields, string_types):
+            if not isinstance(fields, basestring):
                 fields = ",".join(fields)
         if not fields:
             fields = '*'
@@ -788,7 +795,7 @@ class SearchHandler(object):
         if sort:
             if not sort_order or sort_order not in ("asc", "desc"):
                 raise ValueError("sort_order must be 'asc' or 'desc'")
-            if isinstance(sort, string_types):
+            if isinstance(sort, basestring):
                 sort = [ f.strip() for f in sort.split(",") ]
             sorting = []
             for e in sort:
@@ -844,7 +851,7 @@ class SearchHandler(object):
 
 
 def strify(s):
-    if isinstance(s, text_type):
+    if isinstance(s, unicode):
         return s.encode('utf-8')
     else:
         return s
@@ -1175,7 +1182,7 @@ def qs_from_items(query):
         sep = '?'
         for k, v in query.items():
             k = quote(k)
-            if isinstance(v, string_types):
+            if isinstance(v, basestring):
                 v = [v]
             for s in v:
                 qs += "%s%s=%s" % (sep, k, quote_plus(s))

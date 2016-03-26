@@ -1,5 +1,4 @@
 import math
-from six import reraise as raise_
 
 class SolrPaginator:
     """
@@ -34,11 +33,11 @@ class SolrPaginator:
             try:
                 self.page_size = int(default_page_size)
             except ValueError:
-                raise_(ValueError('default_page_size must be an integer'))
+                raise ValueError('default_page_size must be an integer')
 
             if self.page_size < len(self.result.results):
-                raise_(ValueError('Invalid default_page_size specified, lower '
-                                 'than number of results'))
+                raise ValueError('Invalid default_page_size specified, lower '
+                                 'than number of results')
 
         else:
             self.page_size = len(self.result.results)
@@ -77,10 +76,10 @@ class SolrPaginator:
         try:
             int(page_num)
         except:
-            raise_('PageNotAnInteger')
+            raise PageNotAnInteger()
 
         if page_num not in self.page_range:
-            raise_('EmptyPage', 'That page does not exist.')
+            raise EmptyPage('That page does not exist.')
 
         # Page 1 starts at 0; take one off before calculating
         start = (page_num - 1) * self.page_size
@@ -131,3 +130,10 @@ class SolrPage:
     def previous_page_number(self):
         return self.number - 1
 
+
+class PageNotAnInteger(BaseException):
+	pass
+
+
+class EmptyPage(BaseException):
+	pass
