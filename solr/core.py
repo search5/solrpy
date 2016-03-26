@@ -247,7 +247,11 @@ try:
     import httplib as client
 except ImportError:
     import http.client as client
-from six.moves import urllib
+
+from future.standard_library import hooks
+
+with hooks():
+    from urllib.parse import urlparse, urlencode, quote, quote_plus
 
 import codecs
 import datetime
@@ -380,7 +384,7 @@ class Solr:
 
         """
 
-        self.scheme, self.host, self.path = urllib.parse.urlparse(url, 'http')[:3]
+        self.scheme, self.host, self.path = urlparse(url, 'http')[:3]
         self.url = url
 
         assert self.scheme in ('http','https')
@@ -822,7 +826,7 @@ class SearchHandler(object):
                 query.extend([(key, strify(v)) for v in value])
             else:
                 query.append((key, strify(value)))
-        request = urllib.parse.urlencode(query, doseq=True)
+        request = urlencode(query, doseq=True)
         conn = self.conn
         if conn.debug:
             logging.info("solrpy request: %s" % request)
@@ -1170,10 +1174,10 @@ def qs_from_items(query):
     if query:
         sep = '?'
         for k, v in query.items():
-            k = urllib.parse.quote(k)
+            k = quote(k)
             if isinstance(v, string_types):
                 v = [v]
             for s in v:
-                qs += "%s%s=%s" % (sep, k, urllib.parse.quote_plus(s))
+                qs += "%s%s=%s" % (sep, k, quote_plus(s))
                 sep = '&'
     return qs
