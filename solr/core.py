@@ -794,10 +794,11 @@ class SearchHandler(object):
 
         params['fl'] = fields
         params['version'] = self.conn.response_version
-        params['wt'] = 'standard'
+        params['wt'] = 'xml'
 
-        xml = self.raw(**params)
-        return parse_query_response(StringIO(xml),  params, self)
+        json = self.raw(**params)
+        return parse_query_response("XML", StringIO(json),  params, self)
+        # return parse_query_response("JSON", StringIO(json), params, self)
 
     def raw(self, **params):
         """
@@ -949,21 +950,24 @@ class Response(object):
 # ===================================================================
 # XML Parsing support
 # ===================================================================
-def parse_query_response(data, params, query):
+def parse_query_response(data_type, data, params, query):
     """
     Parse the XML results of a /select call.
     """
-    parser = make_parser()
-    handler = ResponseContentHandler()
-    parser.setContentHandler(handler)
-    parser.parse(data)
-    if handler.stack[0].children:
-        response = handler.stack[0].children[0].final
-        response._params = params
-        response._query = query
-        return response
-    else:
-        return None
+    if data_type == "XML":
+        parser = make_parser()
+        handler = ResponseContentHandler()
+        parser.setContentHandler(handler)
+        parser.parse(data)
+        if handler.stack[0].children:
+            response = handler.stack[0].children[0].final
+            response._params = params
+            response._query = query
+            return response
+        else:
+            return None
+    elif data_type == "JSON":
+        pass
 
 
 class ResponseContentHandler(ContentHandler):
@@ -1021,6 +1025,7 @@ class ResponseContentHandler(ContentHandler):
         elif name in ('float','double', 'status','QTime'):
             node.final = float(value.strip())
 
+
         elif name == 'response':
             node.final = response = Response(self)
             for child in node.children:
@@ -1043,7 +1048,12 @@ class ResponseContentHandler(ContentHandler):
                         for cnode in node.children])
 
         elif name in ('arr',):
-            node.final = [cnode.final for cnode in node.children]
+            def node_data(node):
+                if node.name == "str":
+                    return "".join(node.chars)
+                else:
+                    return node.final
+            node.final = [node_data(cnode) for cnode in node.children][0]
 
         elif name == 'result':
             node.final = Results([cnode.final for cnode in node.children])
