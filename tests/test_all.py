@@ -1520,8 +1520,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with commit:
         self.conn.add(doc, commit=True, wait_flush=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitFlush=false&waitSearcher=false")
+            sorted(self.selector().split("&")),
+            sorted("/update?commit=true&waitFlush=false&waitSearcher=false".split("&")))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         if six.PY3:
@@ -1534,8 +1534,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with commit:
         self.conn.add(doc, commit=True, wait_searcher=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitSearcher=false")
+            sorted(self.selector().split("&")),
+            sorted("/update?commit=true&waitSearcher=false".split("&")))
         # Can't verify the add since we said we weren't going to wait
         # for a searcher.
         if six.PY3:
@@ -1556,8 +1556,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with optimize:
         self.conn.add_many(documents, commit=True, wait_flush=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitFlush=false&waitSearcher=false")
+            sorted(self.selector().split("&")),
+            sorted("/update?commit=true&waitFlush=false&waitSearcher=false".split("&")))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         if six.PY3:
@@ -1570,8 +1570,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with optimize:
         self.conn.add_many(documents, commit=True, wait_searcher=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitSearcher=false")
+            sorted(self.selector().split("&")),
+            sorted("/update?commit=true&waitSearcher=false".split("&")))
         # Can't verify the add since we said we weren't going to wait
         # for a searcher.
         if six.PY3:
@@ -1680,8 +1680,8 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
         self.check_added(doc)
         self.conn.delete(doc["id"], commit=True, wait_flush=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitFlush=false&waitSearcher=false")
+            sorted(self.selector().split("&")),
+            sorted("/update?commit=true&waitFlush=false&waitSearcher=false".split("&")))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         if six.PY3:
@@ -1696,8 +1696,8 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
         self.check_added(doc)
         self.conn.delete(doc["id"], commit=True, wait_searcher=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitSearcher=false")
+            sorted(self.selector().split("&")),
+            sorted("/update?commit=true&waitSearcher=false".split("&")))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         if six.PY3:
