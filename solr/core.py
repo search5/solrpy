@@ -252,7 +252,8 @@ except ImportError:
 try:
     from urllib.parse import urlparse, urlencode, quote, quote_plus
 except ImportError:
-    from urllib2 import urlparse, quote
+    from urllib2.urlparse import urlparse
+    from urllib2 import quote
     from urllib import urlencode, quote_plus
 
 import codecs
