@@ -1704,7 +1704,7 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
         self.check_added(doc)
         self.conn.delete(doc["id"], commit=True, wait_searcher=False)
         self.assertEqual(
-            query_parse(self.selector().split("&")),
+            query_parse(self.selector()),
             query_parse("/update?commit=true&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
