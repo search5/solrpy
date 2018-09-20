@@ -46,6 +46,11 @@ def get_rand_userdoc(id=None, user_id=None, data=None):
         }
 
 
+def query_parse(query_string):
+    uri, query_data = query_string.split("?")
+    return "{0}?{1}".format(uri, "&".join(sorted(query_data.split("&"))))
+
+
 # The names of the following two classes relate specifically to the
 # class names in solr.core.
 
@@ -1207,8 +1212,8 @@ class TestSolrConnectionSearchHandler(SolrConnectionTestCase):
         conn = self.new_connection()
         conn.select("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/select")
-        self.assertEqual(sorted(self.request_body.split("&")),
-                         sorted("q=id%3Afoobar&version=2.2&fl=%2A&wt=xml".split("&")))
+        self.assertEqual(query_parse(self.request_body),
+                         query_parse("q=id%3Afoobar&version=2.2&fl=%2A&wt=xml"))
 
     def test_select_raw_request(self):
         conn = self.new_connection()
@@ -1221,8 +1226,8 @@ class TestSolrConnectionSearchHandler(SolrConnectionTestCase):
         alternate = solr.SearchHandler(conn, "/alternate/path")
         alternate("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/alternate/path")
-        self.assertEqual(sorted(self.request_body.split("&")),
-                         sorted("q=id%3Afoobar&version=2.2&fl=%2A&wt=xml".split("&")))
+        self.assertEqual(query_parse(self.request_body),
+                         query_parse("q=id%3Afoobar&version=2.2&fl=%2A&wt=xml"))
 
     def test_alternate_raw_request(self):
         conn = self.new_connection()
@@ -1520,8 +1525,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with commit:
         self.conn.add(doc, commit=True, wait_flush=False)
         self.assertEqual(
-            sorted(self.selector().split("&")),
-            sorted("/update?commit=true&waitFlush=false&waitSearcher=false".split("&")))
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitFlush=false&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         if six.PY3:
@@ -1534,8 +1539,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with commit:
         self.conn.add(doc, commit=True, wait_searcher=False)
         self.assertEqual(
-            sorted(self.selector().split("&")),
-            sorted("/update?commit=true&waitSearcher=false".split("&")))
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for a searcher.
         if six.PY3:
@@ -1556,8 +1561,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with optimize:
         self.conn.add_many(documents, commit=True, wait_flush=False)
         self.assertEqual(
-            sorted(self.selector().split("&")),
-            sorted("/update?commit=true&waitFlush=false&waitSearcher=false".split("&")))
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitFlush=false&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         if six.PY3:
@@ -1570,8 +1575,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with optimize:
         self.conn.add_many(documents, commit=True, wait_searcher=False)
         self.assertEqual(
-            sorted(self.selector().split("&")),
-            sorted("/update?commit=true&waitSearcher=false".split("&")))
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for a searcher.
         if six.PY3:
@@ -1680,8 +1685,8 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
         self.check_added(doc)
         self.conn.delete(doc["id"], commit=True, wait_flush=False)
         self.assertEqual(
-            sorted(self.selector().split("&")),
-            sorted("/update?commit=true&waitFlush=false&waitSearcher=false".split("&")))
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitFlush=false&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         if six.PY3:
@@ -1696,8 +1701,8 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
         self.check_added(doc)
         self.conn.delete(doc["id"], commit=True, wait_searcher=False)
         self.assertEqual(
-            sorted(self.selector().split("&")),
-            sorted("/update?commit=true&waitSearcher=false".split("&")))
+            query_parse(self.selector().split("&")),
+            query_parse("/update?commit=true&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         if six.PY3:
