@@ -239,15 +239,35 @@ Enter a raw query, without processing the returned HTML contents.
     >>> print c.raw_query(q='id:[* TO *]', wt='python', rows='10')
 
 """
+from __future__ import unicode_literals
+
 import sys
 import socket
-import httplib
-import urlparse
+import six
+try:
+    import httplib as client
+except ImportError:
+    import http.client as client
+
+try:
+    from urllib.parse import urlparse, urlencode, quote, quote_plus
+except ImportError:
+    from urllib2 import urlparse, quote
+    from urllib import urlencode, quote_plus
+    urlparse = urlparse.urlparse
+
 import codecs
-import urllib
 import datetime
 import logging
-from StringIO import StringIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+
+long = getattr(__builtins__, 'long', int)
+basestring = getattr(__builtins__, 'basestring', str)
+unicode = getattr(__builtins__, 'unicode', str)
+
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
@@ -373,7 +393,7 @@ class Solr:
 
         """
 
-        self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]
+        self.scheme, self.host, self.path = urlparse(url, 'http')[:3]
         self.url = url
 
         assert self.scheme in ('http','https')
@@ -393,10 +413,10 @@ class Solr:
             kwargs['timeout'] = self.timeout
 
         if self.scheme == 'https':
-            self.conn = httplib.HTTPSConnection(self.host,
+            self.conn = client.HTTPSConnection(self.host,
                    key_file=ssl_key, cert_file=ssl_cert, **kwargs)
         else:
-            self.conn = httplib.HTTPConnection(self.host, **kwargs)
+            self.conn = client.HTTPConnection(self.host, **kwargs)
 
         self.response_version = 2.2
         self.encoder = codecs.getencoder('utf-8')
@@ -550,6 +570,8 @@ class Solr:
         try:
             rsp = self._post(selector, request, self.xmlheaders)
             data = rsp.read()
+            if six.PY3:
+                data = data.decode('utf-8')
         finally:
             if not self.persistent:
                 self.close()
@@ -590,9 +612,12 @@ class Solr:
                 elif isinstance(value, bool):
                     value = value and 'true' or 'false'
 
-                lst.append('<field name=%s>%s</field>' % (
-                    (quoteattr(field),
-                    escape(unicode(value)))))
+                if six.PY3:
+                    lst.append('<field name=%s>%s</field>' % (
+                        (quoteattr(field), escape(str(value)))))
+                else:
+                    lst.append('<field name=%s>%s</field>' % (
+                        (quoteattr(field), escape(value))))
         lst.append('</doc>')
 
     def _delete(self, id=None, ids=None, queries=None):
@@ -605,9 +630,9 @@ class Solr:
             ids.insert(0, id)
         lst = []
         for id in ids:
-            lst.append(u'<id>%s</id>\n' % escape(unicode(id)))
+            lst.append(u'<id>%s</id>\n' % escape(id))
         for query in (queries or ()):
-            lst.append(u'<query>%s</query>\n' % escape(unicode(query)))
+            lst.append(u'<query>%s</query>\n' % escape(query))
         if lst:
             lst.insert(0, u'<delete>\n')
             lst.append(u'</delete>')
@@ -639,8 +664,8 @@ class Solr:
                 self.conn.request('POST', url, body.encode('UTF-8'), _headers)
                 return check_response_status(self.conn.getresponse())
             except (socket.error,
-                    httplib.ImproperConnectionState,
-                    httplib.BadStatusLine):
+                    client.ImproperConnectionState,
+                    client.BadStatusLine):
                     # We include BadStatusLine as they are spurious
                     # and may randomly happen on an otherwise fine
                     # Solr connection (though not often)
@@ -796,9 +821,11 @@ class SearchHandler(object):
         params['version'] = self.conn.response_version
         params['wt'] = 'xml'
 
-        json = self.raw(**params)
-        return parse_query_response("XML", StringIO(json),  params, self)
-        # return parse_query_response("JSON", StringIO(json), params, self)
+        xml = self.raw(**params)
+        if six.PY3:
+            if type(xml) == bytes:
+                xml = xml.decode('utf-8')
+        return parse_query_response(StringIO(xml),  params, self)
 
     def raw(self, **params):
         """
@@ -815,7 +842,7 @@ class SearchHandler(object):
                 query.extend([(key, strify(v)) for v in value])
             else:
                 query.append((key, strify(value)))
-        request = urllib.urlencode(query, doseq=True)
+        request = urlencode(query, doseq=True)
         conn = self.conn
         if conn.debug:
             logging.info("solrpy request: %s" % request)
@@ -950,24 +977,21 @@ class Response(object):
 # ===================================================================
 # XML Parsing support
 # ===================================================================
-def parse_query_response(data_type, data, params, query):
+def parse_query_response(data, params, query):
     """
     Parse the XML results of a /select call.
     """
-    if data_type == "XML":
-        parser = make_parser()
-        handler = ResponseContentHandler()
-        parser.setContentHandler(handler)
-        parser.parse(data)
-        if handler.stack[0].children:
-            response = handler.stack[0].children[0].final
-            response._params = params
-            response._query = query
-            return response
-        else:
-            return None
-    elif data_type == "JSON":
-        pass
+    parser = make_parser()
+    handler = ResponseContentHandler()
+    parser.setContentHandler(handler)
+    parser.parse(data)
+    if handler.stack[0].children:
+        response = handler.stack[0].children[0].final
+        response._params = params
+        response._query = query
+        return response
+    else:
+        return None
 
 
 class ResponseContentHandler(ContentHandler):
@@ -1025,7 +1049,6 @@ class ResponseContentHandler(ContentHandler):
         elif name in ('float','double', 'status','QTime'):
             node.final = float(value.strip())
 
-
         elif name == 'response':
             node.final = response = Response(self)
             for child in node.children:
@@ -1048,12 +1071,19 @@ class ResponseContentHandler(ContentHandler):
                         for cnode in node.children])
 
         elif name in ('arr',):
+            is_found_str = False
+
             def node_data(node):
                 if node.name == "str":
+                    is_found_str = True
                     return "".join(node.chars)
                 else:
                     return node.final
-            node.final = [node_data(cnode) for cnode in node.children][0]
+
+            if not is_found_str:
+                node.final = [cnode.final for cnode in node.children]
+            else:
+                node.final = [node_data(cnode) for cnode in node.children][0]
 
         elif name == 'result':
             node.final = Results([cnode.final for cnode in node.children])
@@ -1105,9 +1135,14 @@ class Node(object):
 # ===================================================================
 def check_response_status(response):
     if response.status != 200:
+        print(response.msg)
+        print(response.version)
+        print(response.read())
+
         ex = SolrException(response.status, response.reason)
         try:
-            ex.body = response.read()
+            # ex.body = response.read()
+            ex.body = ""
         except:
             pass
         raise ex
@@ -1172,10 +1207,10 @@ def qs_from_items(query):
     if query:
         sep = '?'
         for k, v in query.items():
-            k = urllib.quote(k)
+            k = quote(k)
             if isinstance(v, basestring):
                 v = [v]
             for s in v:
-                qs += "%s%s=%s" % (sep, k, urllib.quote_plus(s))
+                qs += "%s%s=%s" % (sep, k, quote_plus(s))
                 sep = '&'
     return qs
