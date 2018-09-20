@@ -662,7 +662,11 @@ class Solr:
         while attempts > 0:
             try:
                 self.conn.request('POST', url, body.encode('UTF-8'), _headers)
-                print(dir(self.conn.getresponse()))
+                print(self.conn.getresponse().getheaders())
+                print(self.conn.getresponse().msg)
+                print(self.conn.getresponse().reason)
+                print(self.conn.getresponse().status)
+                print(self.conn.getresponse().version)
                 return check_response_status(self.conn.getresponse())
             except (socket.error,
                     client.ImproperConnectionState,
