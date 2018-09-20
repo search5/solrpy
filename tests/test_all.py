@@ -51,7 +51,7 @@ def query_parse(query_string):
         uri, query_data = query_string.split("?")
         return "{0}?{1}".format(uri, "&".join(sorted(query_data.split("&"))))
     else:
-        return "{0}".format("&".join(sorted(query_data.split("&"))))
+        return "{0}".format("&".join(sorted(query_string.split("&"))))
 
 
 # The names of the following two classes relate specifically to the
