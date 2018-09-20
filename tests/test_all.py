@@ -1208,7 +1208,7 @@ class TestSolrConnectionSearchHandler(SolrConnectionTestCase):
         conn.select("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/select")
         self.assertEqual(sorted(self.request_body.split("&")),
-                         sorted("q=id%3Afoobar&version=2.2&fl=%2A&wt=standard".split("&")))
+                         sorted("q=id%3Afoobar&version=2.2&fl=%2A&wt=xml".split("&")))
 
     def test_select_raw_request(self):
         conn = self.new_connection()
@@ -1222,7 +1222,7 @@ class TestSolrConnectionSearchHandler(SolrConnectionTestCase):
         alternate("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/alternate/path")
         self.assertEqual(sorted(self.request_body.split("&")),
-                         sorted("q=id%3Afoobar&version=2.2&fl=%2A&wt=standard".split("&")))
+                         sorted("q=id%3Afoobar&version=2.2&fl=%2A&wt=xml".split("&")))
 
     def test_alternate_raw_request(self):
         conn = self.new_connection()

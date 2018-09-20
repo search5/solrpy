@@ -814,7 +814,7 @@ class SearchHandler(object):
 
         params['fl'] = fields
         params['version'] = self.conn.response_version
-        params['wt'] = 'standard'
+        params['wt'] = 'xml'
 
         xml = self.raw(**params)
         if six.PY3:
