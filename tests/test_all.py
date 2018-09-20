@@ -7,12 +7,16 @@ Meant to be run against Solr 1.2+.
 """
 
 # stdlib
-import cPickle
+import six
 import pickle
 import socket
 import datetime
 import unittest
-import httplib
+import six.moves.http_client as httplib
+from six.moves import cPickle
+from past.builtins import long
+from six import BytesIO
+from six import StringIO
 from string import digits
 from random import choice
 from xml.dom.minidom import parseString
@@ -27,6 +31,7 @@ SOLR_PORT_HTTP = "8983"
 SOLR_PORT_HTTPS = "8943"
 SOLR_HTTP = "http://" + SOLR_HOST + ":" + SOLR_PORT_HTTP  + SOLR_PATH
 SOLR_HTTPS = "https://" + SOLR_HOST + ":" + SOLR_PORT_HTTPS + SOLR_PATH
+
 
 
 def get_rand_string():
@@ -343,7 +348,11 @@ class TestAddingDocuments(SolrConnectionTestCase):
         """ Check whether Unicode data actually works for single document.
         """
         # "bile" in Polish (UTF-8).
-        data = "\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87".decode("utf-8")
+        if six.PY3:
+            data = bytes("\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87", "latin1").decode("utf-8")
+        else:
+            data = "\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87".decode("utf-8")
+        
         doc = get_rand_userdoc(data=data)
 
         self.add(**doc)
@@ -374,8 +383,12 @@ class TestAddingDocuments(SolrConnectionTestCase):
         documents.
         """
         # Some Polish characters (UTF-8)
-        chars = ("\xc4\x99\xc3\xb3\xc4\x85\xc5\x9b\xc5\x82"
-                 "\xc4\x98\xc3\x93\xc4\x84\xc5\x9a\xc5\x81").decode("utf-8")
+        if six.PY3:
+            chars = bytes("\xc4\x99\xc3\xb3\xc4\x85\xc5\x9b\xc5\x82"
+                     "\xc4\x98\xc3\x93\xc4\x84\xc5\x9a\xc5\x81", "latin1").decode("utf-8")
+        else:
+            chars = ("\xc4\x99\xc3\xb3\xc4\x85\xc5\x9b\xc5\x82"
+                     "\xc4\x98\xc3\x93\xc4\x84\xc5\x9a\xc5\x81").decode("utf-8")
 
         documents = [get_rand_userdoc(data=char) for char in chars]
 
@@ -714,6 +727,8 @@ class TestQuerying(SolrConnectionTestCase):
 
         for result in results:
             fields = result.keys()
+            if six.PY3:
+                fields = list(fields)
             fields.remove(field_to_return)
 
             # Now there should only a score field
@@ -1192,8 +1207,8 @@ class TestSolrConnectionSearchHandler(SolrConnectionTestCase):
         conn = self.new_connection()
         conn.select("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/select")
-        self.assertEqual(self.request_body,
-                         "q=id%3Afoobar&version=2.2&fl=%2A&wt=standard")
+        self.assertEqual(sorted(self.request_body.split("&")),
+                         sorted("q=id%3Afoobar&version=2.2&fl=%2A&wt=standard".split("&")))
 
     def test_select_raw_request(self):
         conn = self.new_connection()
@@ -1206,8 +1221,8 @@ class TestSolrConnectionSearchHandler(SolrConnectionTestCase):
         alternate = solr.SearchHandler(conn, "/alternate/path")
         alternate("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/alternate/path")
-        self.assertEqual(self.request_body,
-                         "q=id%3Afoobar&version=2.2&fl=%2A&wt=standard")
+        self.assertEqual(sorted(self.request_body.split("&")),
+                         sorted("q=id%3Afoobar&version=2.2&fl=%2A&wt=standard".split("&")))
 
     def test_alternate_raw_request(self):
         conn = self.new_connection()
@@ -1349,7 +1364,7 @@ class TestPaginator(SolrConnectionTestCase):
     def test_page_range(self):
         """ Check the page range returned by the paginator """
         paginator = solr.SolrPaginator(self.result)
-        self.assertEqual(paginator.page_range, [1,2])
+        self.assertEqual(list(paginator.page_range), [1,2])
 
     def test_default_page_size(self):
         """ Test invalid/impproper default page sizes for paginator """
@@ -1384,7 +1399,10 @@ class TestPaginator(SolrConnectionTestCase):
 
     def test_unicode_query(self):
         """ Test for unicode support in subsequent paginator queries """
-        chinese_data = '\xe6\xb3\xb0\xe5\x9b\xbd'.decode('utf-8')
+        if six.PY3:
+            chinese_data = bytes('\xe6\xb3\xb0\xe5\x9b\xbd', 'latin1').decode('utf-8')
+        else:
+            chinese_data = '\xe6\xb3\xb0\xe5\x9b\xbd'.decode('utf-8')
         self.conn.add(id=100, data=chinese_data)
         self.conn.commit()
         result = self.query(self.conn, chinese_data.encode('utf-8'))
@@ -1506,7 +1524,10 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
             "/update?commit=true&waitFlush=false&waitSearcher=false")
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
-        self.assert_("<add>" in self.postbody())
+        if six.PY3:
+            self.assert_(b"<add>" in self.postbody())
+        else:
+            self.assert_("<add>" in self.postbody())
 
     def test_add_nosearcher(self):
         doc = get_rand_userdoc()
@@ -1517,7 +1538,10 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
             "/update?commit=true&waitSearcher=false")
         # Can't verify the add since we said we weren't going to wait
         # for a searcher.
-        self.assert_("<add>" in self.postbody())
+        if six.PY3:
+            self.assert_(b"<add>" in self.postbody())
+        else:
+            self.assert_("<add>" in self.postbody())
 
     def test_add_waitflush_without_commit(self):
         doc = get_rand_userdoc()
@@ -1536,7 +1560,10 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
             "/update?commit=true&waitFlush=false&waitSearcher=false")
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
-        self.assert_("<add>" in self.postbody())
+        if six.PY3:
+            self.assert_(b"<add>" in self.postbody())
+        else:
+            self.assert_("<add>" in self.postbody())
 
     def test_add_many_commit_nosearcher(self):
         documents = [get_rand_userdoc() for i in range(3)]
@@ -1547,7 +1574,10 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
             "/update?commit=true&waitSearcher=false")
         # Can't verify the add since we said we weren't going to wait
         # for a searcher.
-        self.assert_("<add>" in self.postbody())
+        if six.PY3:
+            self.assert_(b"<add>" in self.postbody())
+        else:
+            self.assert_("<add>" in self.postbody())
 
     def test_add_many_waitflush_without_commit(self):
         docs = [get_rand_userdoc(), get_rand_userdoc()]
@@ -1654,7 +1684,10 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
             "/update?commit=true&waitFlush=false&waitSearcher=false")
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
-        self.assert_("<delete>" in self.postbody())
+        if six.PY3:
+            self.assert_(b"<delete>" in self.postbody())
+        else:
+            self.assert_("<delete>" in self.postbody())
 
     def test_delete_nosearcher(self):
         doc = get_rand_userdoc()
@@ -1667,7 +1700,10 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
             "/update?commit=true&waitSearcher=false")
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
-        self.assert_("<delete>" in self.postbody())
+        if six.PY3:
+            self.assert_(b"<delete>" in self.postbody()) 
+        else:
+            self.assert_("<delete>" in self.postbody())
 
     def test_delete_waitflush_without_commit(self):
         doc = get_rand_userdoc()
@@ -1809,7 +1845,14 @@ class SolrExceptionHttpStatusPickleTestCase(unittest.TestCase):
             '\x01ub.')
 
     def _test_unpickle(self, s):
-        loaded = self.module.loads(s)
+        try:
+            loaded = self.module.loads(s)
+        except TypeError as e:
+            if six.PY3:
+                s_bytes = BytesIO()
+                s_bytes.write(s.encode('latin1'))
+                s = s_bytes.getvalue()
+            loaded = self.module.loads(s)
         self.assertEqual(loaded.httpcode, self.initial.httpcode)
         self.assertEqual(loaded.reason, self.initial.reason)
         self.assertEqual(loaded.body, self.initial.body)
