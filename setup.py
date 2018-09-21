@@ -1,6 +1,9 @@
 # bootstrap easy_install
-import ez_setup
-ez_setup.use_setuptools()
+from past.builtins import PY3
+
+if not PY3:
+    import ez_setup
+    ez_setup.use_setuptools()
 
 from setuptools import setup, find_packages
 import solr.core
@@ -12,8 +15,8 @@ setup(
     url = 'http://code.google.com/p/solrpy',
     license = 'http://opensource.org/licenses/apache2.0.php',
     packages=find_packages(),
-    install_requires = [],
+    install_requires = ["six", "future"],
     description = 'Client for the Solr search service',
-    tests_require = ["nose>=0.10.1"],
+    tests_require = ["nose>=0.10.1", "six", "future"],
     test_suite = 'nose.collector',
     )

@@ -242,8 +242,8 @@ Enter a raw query, without processing the returned HTML contents.
 """
 import sys
 import socket
-import httplib
-import urlparse
+import six.moves.http_client as httplib
+import six.moves.urllib.parse as urlparse
 import codecs
 import urllib
 import datetime
@@ -255,6 +255,7 @@ from xml.dom.minidom import parseString
 from past.builtins import long, unicode, basestring
 from future.utils import iteritems
 from six import StringIO
+
 
 
 __version__ = "0.9.6"
