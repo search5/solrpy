@@ -19,7 +19,7 @@ from random import choice
 from xml.dom.minidom import parseString
 from builtins import bytes
 from future.utils import iteritems
-from past.builtins import PY3
+from past.builtins import PY3, long
 from io import BytesIO
 
 # solrpy
@@ -158,6 +158,8 @@ class RequestTracking(SolrConnectionTestCase):
         self.fail("URL path doesn't start with expected prefix: ")
 
     def postbody(self):
+        if PY3:
+            return self._update[0][2].decode('utf-8')
         return self._update[0][2]
 
 
@@ -726,7 +728,7 @@ class TestQuerying(SolrConnectionTestCase):
         # queries also return score for each document.
 
         for result in results:
-            fields = result.keys()
+            fields = list(result.keys())
             fields.remove(field_to_return)
 
             # Now there should only a score field
@@ -1362,7 +1364,7 @@ class TestPaginator(SolrConnectionTestCase):
     def test_page_range(self):
         """ Check the page range returned by the paginator """
         paginator = solr.SolrPaginator(self.result)
-        self.assertEqual(paginator.page_range, [1,2])
+        self.assertEqual(paginator.page_range, range(1, 3))
 
     def test_default_page_size(self):
         """ Test invalid/impproper default page sizes for paginator """
@@ -1397,10 +1399,17 @@ class TestPaginator(SolrConnectionTestCase):
 
     def test_unicode_query(self):
         """ Test for unicode support in subsequent paginator queries """
-        chinese_data = '\xe6\xb3\xb0\xe5\x9b\xbd'.decode('utf-8')
-        self.conn.add(id=100, data=chinese_data)
-        self.conn.commit()
-        result = self.query(self.conn, chinese_data.encode('utf-8'))
+        if not PY3:
+            chinese_data = '\xe6\xb3\xb0\xe5\x9b\xbd'.decode('utf-8')
+            self.conn.add(id=100, data=chinese_data)
+            self.conn.commit()
+            result = self.query(self.conn, chinese_data.encode('utf-8'))
+        else:
+            chinese_data = bytes('\xe6\xb3\xb0\xe5\x9b\xbd', 'latin1').decode('utf-8')
+            self.conn.add(id=100, data=chinese_data)
+            self.conn.commit()
+            result = self.query(self.conn, chinese_data)
+
         paginator = solr.SolrPaginator(result, default_page_size=10)
         try:
             paginator.page(1)
@@ -1515,8 +1524,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with commit:
         self.conn.add(doc, commit=True, wait_flush=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitFlush=false&waitSearcher=false")
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitFlush=false&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         self.assert_("<add>" in self.postbody())
@@ -1526,8 +1535,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with commit:
         self.conn.add(doc, commit=True, wait_searcher=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitSearcher=false")
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for a searcher.
         self.assert_("<add>" in self.postbody())
@@ -1545,8 +1554,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with optimize:
         self.conn.add_many(documents, commit=True, wait_flush=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitFlush=false&waitSearcher=false")
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitFlush=false&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         self.assert_("<add>" in self.postbody())
@@ -1556,8 +1565,8 @@ class TestSolrAddingDocuments(SolrBased, RequestTracking, TestAddingDocuments):
         # Add with optimize:
         self.conn.add_many(documents, commit=True, wait_searcher=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitSearcher=false")
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for a searcher.
         self.assert_("<add>" in self.postbody())
@@ -1663,8 +1672,8 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
         self.check_added(doc)
         self.conn.delete(doc["id"], commit=True, wait_flush=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitFlush=false&waitSearcher=false")
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitFlush=false&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         self.assert_("<delete>" in self.postbody())
@@ -1676,8 +1685,8 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
         self.check_added(doc)
         self.conn.delete(doc["id"], commit=True, wait_searcher=False)
         self.assertEqual(
-            self.selector(),
-            "/update?commit=true&waitSearcher=false")
+            query_parse(self.selector()),
+            query_parse("/update?commit=true&waitSearcher=false"))
         # Can't verify the add since we said we weren't going to wait
         # for the flush.
         self.assert_("<delete>" in self.postbody())

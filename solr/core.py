@@ -254,7 +254,7 @@ from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
 from past.builtins import long, unicode, basestring, PY3
 from future.utils import iteritems
-from six import BytesIO
+from six import BytesIO as StringIO
 
 
 __version__ = "0.9.6"
@@ -803,7 +803,9 @@ class SearchHandler(object):
         params['wt'] = 'xml'
 
         json = self.raw(**params)
-        return parse_query_response("XML", BytesIO(json),  params, self)
+        if PY3 and type(json) == str:
+            json = json.encode("utf-8")
+        return parse_query_response("XML", StringIO(json),  params, self)
         # return parse_query_response("JSON", StringIO(json), params, self)
 
     def raw(self, **params):
