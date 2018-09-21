@@ -1048,12 +1048,20 @@ class ResponseContentHandler(ContentHandler):
                         for cnode in node.children])
 
         elif name in ('arr',):
+            found_str_node = False
+
             def node_data(node):
                 if node.name == "str":
+                    found_str_node = True
                     return "".join(node.chars)
                 else:
                     return node.final
-            node.final = [node_data(cnode) for cnode in node.children][0]
+
+            if found_str_node:
+                node.final = [node_data(cnode) for cnode in node.children][0]
+            else:
+                node.final = [cnode.final for cnode in node.children]
+            
 
         elif name == 'result':
             node.final = Results([cnode.final for cnode in node.children])

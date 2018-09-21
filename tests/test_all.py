@@ -41,6 +41,14 @@ def get_rand_userdoc(id=None, user_id=None, data=None):
         }
 
 
+def query_parse(query_string):
+    if "?" in query_string:
+        uri, query_data = query_string.split("?")
+        return "{0}?{1}".format(uri, "&".join(sorted(query_data.split("&"))))
+    else:
+        return "{0}".format("&".join(sorted(query_string.split("&"))))
+
+
 # The names of the following two classes relate specifically to the
 # class names in solr.core.
 
@@ -1192,8 +1200,8 @@ class TestSolrConnectionSearchHandler(SolrConnectionTestCase):
         conn = self.new_connection()
         conn.select("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/select")
-        self.assertEqual(self.request_body,
-                         "q=id%3Afoobar&version=2.2&fl=%2A&wt=standard")
+        self.assertEqual(query_parse(self.request_body),
+                         query_parse("q=id%3Afoobar&version=2.2&fl=%2A&wt=xml"))
 
     def test_select_raw_request(self):
         conn = self.new_connection()
@@ -1206,8 +1214,8 @@ class TestSolrConnectionSearchHandler(SolrConnectionTestCase):
         alternate = solr.SearchHandler(conn, "/alternate/path")
         alternate("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/alternate/path")
-        self.assertEqual(self.request_body,
-                         "q=id%3Afoobar&version=2.2&fl=%2A&wt=standard")
+        self.assertEqual(query_parse(self.request_body),
+                         query_parse("q=id%3Afoobar&version=2.2&fl=%2A&wt=xml"))
 
     def test_alternate_raw_request(self):
         conn = self.new_connection()
