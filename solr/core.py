@@ -245,17 +245,16 @@ import socket
 import six.moves.http_client as httplib
 import six.moves.urllib.parse as urlparse
 import codecs
-import urllib
+import six.moves.urllib.parse as urllib
 import datetime
 import logging
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
-from past.builtins import long, unicode, basestring
+from past.builtins import long, unicode, basestring, PY3
 from future.utils import iteritems
-from six import StringIO
-
+from six import BytesIO
 
 
 __version__ = "0.9.6"
@@ -561,6 +560,8 @@ class Solr:
 
         # Detect old-style error response (HTTP response code
         # of 200 with a non-zero status).
+        if PY3:
+            data = data.decode("utf-8")
         starts = data.startswith
         if starts('<result status="') and not starts('<result status="0"'):
             data = self.decoder(data)[0]
@@ -802,7 +803,7 @@ class SearchHandler(object):
         params['wt'] = 'xml'
 
         json = self.raw(**params)
-        return parse_query_response("XML", StringIO(json),  params, self)
+        return parse_query_response("XML", BytesIO(json),  params, self)
         # return parse_query_response("JSON", StringIO(json), params, self)
 
     def raw(self, **params):

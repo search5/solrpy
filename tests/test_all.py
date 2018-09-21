@@ -8,17 +8,19 @@ Meant to be run against Solr 1.2+.
 """
 
 # stdlib
-import cPickle
+import six.moves.cPickle as cPickle
 import pickle
 import socket
 import datetime
 import unittest
-import httplib
+import six.moves.http_client as httplib
 from string import digits
 from random import choice
 from xml.dom.minidom import parseString
 from builtins import bytes
 from future.utils import iteritems
+from past.builtins import PY3
+from io import BytesIO
 
 # solrpy
 import solr
@@ -354,7 +356,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
         """ Check whether Unicode data actually works for single document.
         """
         # "bile" in Polish (UTF-8).
-        data = bytes(b"\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87").decode("utf-8")
+        data = bytes("\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87", "latin1").decode("utf-8")
         doc = get_rand_userdoc(data=data)
 
         self.add(**doc)
@@ -385,8 +387,8 @@ class TestAddingDocuments(SolrConnectionTestCase):
         documents.
         """
         # Some Polish characters (UTF-8)
-        chars = bytes(b"\xc4\x99\xc3\xb3\xc4\x85\xc5\x9b\xc5\x82"
-                 "\xc4\x98\xc3\x93\xc4\x84\xc5\x9a\xc5\x81").decode("utf-8")
+        chars = bytes("\xc4\x99\xc3\xb3\xc4\x85\xc5\x9b\xc5\x82"
+                 "\xc4\x98\xc3\x93\xc4\x84\xc5\x9a\xc5\x81", "latin1").decode("utf-8")
 
         documents = [get_rand_userdoc(data=char) for char in chars]
 
@@ -1820,7 +1822,15 @@ class SolrExceptionHttpStatusPickleTestCase(unittest.TestCase):
             '\x01ub.')
 
     def _test_unpickle(self, s):
-        loaded = self.module.loads(s)
+        try:
+            loaded = self.module.loads(s)
+        except TypeError as e:
+            if PY3:
+                s_bytes = BytesIO()
+                s_bytes.write(s.encode('latin1'))
+                s = s_bytes.getvalue()
+            loaded = self.module.loads(s)
+
         self.assertEqual(loaded.httpcode, self.initial.httpcode)
         self.assertEqual(loaded.reason, self.initial.reason)
         self.assertEqual(loaded.body, self.initial.body)
