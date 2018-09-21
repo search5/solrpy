@@ -248,11 +248,14 @@ import codecs
 import urllib
 import datetime
 import logging
-from StringIO import StringIO
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
+from past.builtins import long, unicode, basestring
+from future.utils import iteritems
+from six import StringIO
+
 
 __version__ = "0.9.6"
 
@@ -569,7 +572,7 @@ class Solr:
 
     def __add(self, lst, fields):
         lst.append(u'<doc>')
-        for field, value in fields.items():
+        for (field, value) in iteritems(fields):
             # Handle multi-valued fields if values
             # is passed in as a list/tuple
             if not isinstance(value, (list, tuple, set)):
@@ -810,7 +813,7 @@ class SearchHandler(object):
         """
         # Clean up optional parameters to match SOLR spec.
         query = []
-        for key, value in params.items():
+        for (key, value) in iteritems(params):
             key = key.replace(self.arg_separator, '.')
             if isinstance(value, (list, tuple)):
                 query.extend([(key, strify(v)) for v in value])
@@ -1074,7 +1077,7 @@ class ResponseContentHandler(ContentHandler):
         else:
             raise SolrException("Unknown tag: %s" % name)
 
-        for attr, val in node.attrs.items():
+        for (attr, val) in iteritems(node.attrs):
             if attr != 'name':
                 setattr(node.final, attr, val)
 
@@ -1106,7 +1109,7 @@ class Node(object):
             self.name,
             "".join(self.chars).strip(),
             ' '.join(['%s="%s"' % (attr, val)
-                            for attr, val in self.attrs.items()]))
+                            for (attr, val) in iteritems(self.attrs)]))
 
 
 # ===================================================================
@@ -1180,7 +1183,7 @@ def qs_from_items(query):
     qs = ''
     if query:
         sep = '?'
-        for k, v in query.items():
+        for (k, v) in iteritems(query):
             k = urllib.quote(k)
             if isinstance(v, basestring):
                 v = [v]

@@ -17,6 +17,8 @@ import httplib
 from string import digits
 from random import choice
 from xml.dom.minidom import parseString
+from builtins import bytes
+from future.utils import iteritems
 
 # solrpy
 import solr
@@ -352,7 +354,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
         """ Check whether Unicode data actually works for single document.
         """
         # "bile" in Polish (UTF-8).
-        data = "\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87".decode("utf-8")
+        data = bytes(b"\xc5\xbc\xc3\xb3\xc5\x82\xc4\x87").decode("utf-8")
         doc = get_rand_userdoc(data=data)
 
         self.add(**doc)
@@ -383,7 +385,7 @@ class TestAddingDocuments(SolrConnectionTestCase):
         documents.
         """
         # Some Polish characters (UTF-8)
-        chars = ("\xc4\x99\xc3\xb3\xc4\x85\xc5\x9b\xc5\x82"
+        chars = bytes(b"\xc4\x99\xc3\xb3\xc4\x85\xc5\x9b\xc5\x82"
                  "\xc4\x98\xc3\x93\xc4\x84\xc5\x9a\xc5\x81").decode("utf-8")
 
         documents = [get_rand_userdoc(data=char) for char in chars]
@@ -1320,7 +1322,7 @@ class TestResponse(SolrConnectionTestCase):
             "header": dict,
             }
 
-        for attr, attr_type in expected_attrs.items():
+        for (attr, attr_type) in iteritems(expected_attrs):
             self.assertTrue(hasattr(response, attr),
                 "Attribute %s not found in response. id:%s" % (attr, id))
 
