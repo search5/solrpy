@@ -1,7 +1,7 @@
 # bootstrap easy_install
-from past.builtins import PY3
+import sys
 
-if not PY3:
+if sys.version_info[0] == 2:
     import ez_setup
     ez_setup.use_setuptools()
 
