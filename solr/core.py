@@ -257,7 +257,7 @@ from future.utils import iteritems
 from six import BytesIO as StringIO
 
 
-__version__ = "0.9.6"
+__version__ = "0.9.9"
 
 __all__ = ['SolrException', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
@@ -596,9 +596,11 @@ class Solr:
                 elif isinstance(value, bool):
                     value = value and 'true' or 'false'
 
-                lst.append('<field name=%s>%s</field>' % (
-                    (quoteattr(field),
-                    escape(unicode(value)))))
+                elem = FieldElement()
+                elem['name'] = quoteattr(field)
+                elem['value'] = escape(unicode(value))
+
+                lst.append(unicode(elem))
         lst.append('</doc>')
 
     def _delete(self, id=None, ids=None, queries=None):
@@ -1033,7 +1035,6 @@ class ResponseContentHandler(ContentHandler):
         elif name in ('float','double', 'status','QTime'):
             node.final = float(value.strip())
 
-
         elif name == 'response':
             node.final = response = Response(self)
             for child in node.children:
@@ -1056,24 +1057,10 @@ class ResponseContentHandler(ContentHandler):
                         for cnode in node.children])
 
         elif name in ('arr',):
-            found_str_node = False
-
-            def node_data(node):
-                if node.name == "str":
-                    found_str_node = True
-                    return "".join(node.chars)
-                else:
-                    return node.final
-
-            if found_str_node:
-                node.final = [node_data(cnode) for cnode in node.children][0]
-            else:
-                node.final = [cnode.final for cnode in node.children]
-            
+            node.final = [cnode.final for cnode in node.children]
 
         elif name == 'result':
             node.final = Results([cnode.final for cnode in node.children])
-
 
         elif name in ('responseHeader',):
             node.final = dict([(cnode.name, cnode.final)
@@ -1116,6 +1103,51 @@ class Node(object):
                             for (attr, val) in iteritems(self.attrs)]))
 
 
+class FieldElement:
+    def __init__(self):
+        self.attrs = {}
+
+    def __setitem__(self, key, value):
+        self.attrs[key] = unicode(value)
+
+        if key == "value" and value.startswith("{'"):
+            tmp = eval(value)
+            allow_keys = ['add', 'set', 'inc']
+            if len(tmp) > 1:
+                raise NotFieldOption('Only one option is available.')
+
+            first_key = tmp.popitem()
+
+            if first_key[0] not in allow_keys:
+                raise NotFieldOption('This option is not allowed.')
+
+            self.attrs["update"] = '"{0}"'.format(first_key[0])
+            if type(first_key[1]) == list:
+                # self.attrs["multi_update"] = self.attrs["update"]
+                self.attrs["multi_value"] = first_key[1]
+            self.attrs["value"] = unicode(first_key[1])
+
+    def get_attr(self):
+        attrs = [u'{0}={1}'.format(attr_name, attr_value)
+                 for attr_name, attr_value in self.attrs.items()
+                 if attr_name not in ('value', 'multi_value')]
+        return ' '.join(attrs)
+
+    def __unicode__(self):
+        if 'multi_value' in self.attrs:
+            res_fields = []
+
+            for entry in self.attrs['multi_value']:
+                res_fields.append(u'<field{0}>{1}</field>'.format(u' {0}'.format(self.get_attr()), unicode(entry)))
+
+            return u'\n'.join(res_fields)
+        else:
+            return u'<field{0}>{1}</field>'.format(u' {0}'.format(self.get_attr()), self.attrs['value'])
+
+
+class NotFieldOption(Exception): pass
+
+
 # ===================================================================
 # Misc utils
 # ===================================================================
@@ -1124,6 +1156,7 @@ def check_response_status(response):
         ex = SolrException(response.status, response.reason)
         try:
             ex.body = response.read()
+            print(ex.body)
         except:
             pass
         raise ex
