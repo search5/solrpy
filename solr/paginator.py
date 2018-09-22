@@ -79,7 +79,7 @@ class SolrPaginator:
             raise 'PageNotAnInteger'
 
         if page_num not in self.page_range:
-            raise 'EmptyPage', 'That page does not exist.'
+            raise EmptyPage('That page does not exist.')
 
         # Page 1 starts at 0; take one off before calculating
         start = (page_num - 1) * self.page_size
@@ -130,3 +130,4 @@ class SolrPage:
     def previous_page_number(self):
         return self.number - 1
 
+class EmptyPage(Exception): pass
