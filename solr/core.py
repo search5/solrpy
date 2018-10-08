@@ -1,3 +1,4 @@
+from __future__ import print_function
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -241,19 +242,22 @@ Enter a raw query, without processing the returned HTML contents.
 """
 import sys
 import socket
-import httplib
-import urlparse
+import six.moves.http_client as httplib
+import six.moves.urllib.parse as urlparse
 import codecs
-import urllib
+import six.moves.urllib.parse as urllib
 import datetime
 import logging
-from StringIO import StringIO
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
+from past.builtins import long, unicode, basestring, PY3
+from future.utils import iteritems
+from six import BytesIO as StringIO
 
-__version__ = "0.9.6"
+
+__version__ = "0.9.9"
 
 __all__ = ['SolrException', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
@@ -556,6 +560,8 @@ class Solr:
 
         # Detect old-style error response (HTTP response code
         # of 200 with a non-zero status).
+        if PY3:
+            data = data.decode("utf-8")
         starts = data.startswith
         if starts('<result status="') and not starts('<result status="0"'):
             data = self.decoder(data)[0]
@@ -568,7 +574,7 @@ class Solr:
 
     def __add(self, lst, fields):
         lst.append(u'<doc>')
-        for field, value in fields.items():
+        for (field, value) in iteritems(fields):
             # Handle multi-valued fields if values
             # is passed in as a list/tuple
             if not isinstance(value, (list, tuple, set)):
@@ -590,9 +596,11 @@ class Solr:
                 elif isinstance(value, bool):
                     value = value and 'true' or 'false'
 
-                lst.append('<field name=%s>%s</field>' % (
-                    (quoteattr(field),
-                    escape(unicode(value)))))
+                elem = FieldElement()
+                elem['name'] = quoteattr(field)
+                elem['value'] = escape(unicode(value))
+
+                lst.append(unicode(elem))
         lst.append('</doc>')
 
     def _delete(self, id=None, ids=None, queries=None):
@@ -797,6 +805,8 @@ class SearchHandler(object):
         params['wt'] = 'xml'
 
         json = self.raw(**params)
+        if PY3 and type(json) == str:
+            json = json.encode("utf-8")
         return parse_query_response("XML", StringIO(json),  params, self)
         # return parse_query_response("JSON", StringIO(json), params, self)
 
@@ -809,7 +819,7 @@ class SearchHandler(object):
         """
         # Clean up optional parameters to match SOLR spec.
         query = []
-        for key, value in params.items():
+        for (key, value) in iteritems(params):
             key = key.replace(self.arg_separator, '.')
             if isinstance(value, (list, tuple)):
                 query.extend([(key, strify(v)) for v in value])
@@ -1025,7 +1035,6 @@ class ResponseContentHandler(ContentHandler):
         elif name in ('float','double', 'status','QTime'):
             node.final = float(value.strip())
 
-
         elif name == 'response':
             node.final = response = Response(self)
             for child in node.children:
@@ -1048,16 +1057,10 @@ class ResponseContentHandler(ContentHandler):
                         for cnode in node.children])
 
         elif name in ('arr',):
-            def node_data(node):
-                if node.name == "str":
-                    return "".join(node.chars)
-                else:
-                    return node.final
-            node.final = [node_data(cnode) for cnode in node.children][0]
+            node.final = [cnode.final for cnode in node.children]
 
         elif name == 'result':
             node.final = Results([cnode.final for cnode in node.children])
-
 
         elif name in ('responseHeader',):
             node.final = dict([(cnode.name, cnode.final)
@@ -1065,7 +1068,7 @@ class ResponseContentHandler(ContentHandler):
         else:
             raise SolrException("Unknown tag: %s" % name)
 
-        for attr, val in node.attrs.items():
+        for (attr, val) in iteritems(node.attrs):
             if attr != 'name':
                 setattr(node.final, attr, val)
 
@@ -1097,7 +1100,55 @@ class Node(object):
             self.name,
             "".join(self.chars).strip(),
             ' '.join(['%s="%s"' % (attr, val)
-                            for attr, val in self.attrs.items()]))
+                            for (attr, val) in iteritems(self.attrs)]))
+
+
+class FieldElement:
+    def __init__(self):
+        self.attrs = {}
+
+    def __setitem__(self, key, value):
+        self.attrs[key] = unicode(value)
+
+        if key == "value" and value.startswith("{'"):
+            tmp = eval(value)
+            allow_keys = ['add', 'set', 'inc']
+            if len(tmp) > 1:
+                raise NotFieldOption('Only one option is available.')
+
+            first_key = tmp.popitem()
+
+            if first_key[0] not in allow_keys:
+                raise NotFieldOption('This option is not allowed.')
+
+            self.attrs["update"] = '"{0}"'.format(first_key[0])
+            if type(first_key[1]) == list:
+                # self.attrs["multi_update"] = self.attrs["update"]
+                self.attrs["multi_value"] = first_key[1]
+            self.attrs["value"] = unicode(first_key[1])
+
+    def get_attr(self):
+        attrs = [u'{0}={1}'.format(attr_name, attr_value)
+                 for attr_name, attr_value in self.attrs.items()
+                 if attr_name not in ('value', 'multi_value')]
+        return ' '.join(attrs)
+
+    def __unicode__(self):
+        if 'multi_value' in self.attrs:
+            res_fields = []
+
+            for entry in self.attrs['multi_value']:
+                res_fields.append(u'<field{0}>{1}</field>'.format(u' {0}'.format(self.get_attr()), unicode(entry)))
+
+            return u'\n'.join(res_fields)
+        else:
+            return u'<field{0}>{1}</field>'.format(u' {0}'.format(self.get_attr()), self.attrs['value'])
+
+    def __str__(self):
+        return self.__unicode__()
+
+
+class NotFieldOption(Exception): pass
 
 
 # ===================================================================
@@ -1108,6 +1159,7 @@ def check_response_status(response):
         ex = SolrException(response.status, response.reason)
         try:
             ex.body = response.read()
+            print(ex.body)
         except:
             pass
         raise ex
@@ -1171,7 +1223,7 @@ def qs_from_items(query):
     qs = ''
     if query:
         sep = '?'
-        for k, v in query.items():
+        for (k, v) in iteritems(query):
             k = urllib.quote(k)
             if isinstance(v, basestring):
                 v = [v]

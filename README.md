@@ -1,6 +1,6 @@
 # solrpy
 
-[![Build Status](https://travis-ci.org/edsu/solrpy.svg)](http://travis-ci.org/edsu/solrpy)
+[![Build Status](https://travis-ci.org/search5/solrpy.svg)](http://travis-ci.org/search5/solrpy)
 
 solrpy is a Python client for [Solr], an enterprise search server
 built on top of [Lucene].  solrpy allows you to add documents to a
