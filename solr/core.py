@@ -242,10 +242,7 @@ Enter a raw query, without processing the returned HTML contents.
 """
 import sys
 import socket
-import six.moves.http_client as httplib
-import six.moves.urllib.parse as urlparse
 import codecs
-import six.moves.urllib.parse as urllib
 import datetime
 import logging
 from xml.sax import make_parser
@@ -255,9 +252,9 @@ from xml.dom.minidom import parseString
 from past.builtins import long, unicode, basestring, PY3
 from future.utils import iteritems
 from six import BytesIO as StringIO
-
-
-__version__ = "0.9.9"
+import six.moves.http_client as httplib
+import six.moves.urllib.parse as urlparse
+import six.moves.urllib.parse as urllib
 
 __all__ = ['SolrException', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
