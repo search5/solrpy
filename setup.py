@@ -1,5 +1,5 @@
 # bootstrap easy_install
-import sys
+from setuptools import setup, find_packages
 
 try:
     import ez_setup
@@ -7,7 +7,8 @@ try:
 except:
     pass
 
-from setuptools import setup, find_packages
+with open('README.md') as f:
+    long_description = f.read()
 
 __version__ = '0.9.9'
 
@@ -18,6 +19,8 @@ setup(
     url='http://code.google.com/p/solrpy',
     license='http://opensource.org/licenses/apache2.0.php',
     packages=find_packages(),
+    long_description=long_description,
+    long_description_content_type='text/markdown',  # This is important!
     install_requires=["future", "six"],
     description='Client for the Solr search service',
     tests_require=["future", "six", "nose>=0.10.1"],
