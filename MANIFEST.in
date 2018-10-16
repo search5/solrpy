@@ -2,3 +2,4 @@ global-exclude *.pyc *.pyo
 graft docs
 graft tests
 include ez_setup.py
+include LICENSE
