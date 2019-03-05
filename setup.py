@@ -21,7 +21,7 @@ setup(
     packages=find_packages(),
     long_description=long_description,
     long_description_content_type='text/markdown',  # This is important!
-    install_requires=["future", "six"],
+    install_requires=["future", "six", "pyyaml"],
     description='Client for the Solr search service',
     tests_require=["future", "six", "nose>=0.10.1"],
     test_suite='nose.collector'

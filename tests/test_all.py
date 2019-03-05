@@ -9,7 +9,7 @@ Meant to be run against Solr 1.2+.
 
 # stdlib
 import six.moves.cPickle as cPickle
-import pickle
+import yaml
 import socket
 import datetime
 import unittest
@@ -1766,11 +1766,14 @@ class TestSolrDocumentDeletion(SolrBased, RequestTracking,
 class TestSolrQuerying(SolrBased, TestQuerying):
     pass
 
+
 class TestSolrSearchHandler(SolrBased, TestSolrConnectionSearchHandler):
     pass
 
+
 class TestSolrCommitingOptimizing(SolrBased, TestCommitingOptimizing):
     pass
+
 
 class TestSolrRetries(SolrBased, TestRetries):
     pass
@@ -1778,67 +1781,27 @@ class TestSolrRetries(SolrBased, TestRetries):
 
 class SolrExceptionHttpStatusPickleTestCase(unittest.TestCase):
 
-    module = pickle
+    module = yaml
 
     def setUp(self):
         self.initial = solr.SolrException(404, "Not Found")
 
     # These tests check current constructions:
 
-    def test_unpicklable0(self):
-        self._test_unpickle(self.module.dumps(self.initial, protocol=0))
-
-    def test_unpicklable1(self):
-        self._test_unpickle(self.module.dumps(self.initial, protocol=1))
-
-    def test_unpicklable2(self):
-        self._test_unpickle(self.module.dumps(self.initial, protocol=2))
+    def test_unpicklable(self):
+        self._test_unserial(self.module.dump(self.initial))
 
     # These tests check legacy constructions, unpickled by self.module.
     # The initial pickles were constructed with past releases of solrpy.
     # (Persistent instances are known to exist in databases.)
 
-    def test_legacy_cPickle_0(self):
-        self._test_unpickle(
-            "csolr.core\nSolrException\np1\n(tRp2\n(dp3\nS'body'\np4\nNs"
-            "S'reason'\np5\nS'Not Found'\np6\nsS'httpcode'\np7\nI404\nsb.")
+    def test_legacy_pickle(self):
+        self._test_unserial(
+            "!!python/object/apply:solr.core.SolrException\nstate:"
+            " {body: null, httpcode: 404, reason: Not Found}\n")
 
-    def test_legacy_cPickle_1(self):
-        self._test_unpickle(
-            'csolr.core\nSolrException\nq\x01)Rq\x02}q\x03(U\x04bodyq\x04NU'
-            '\x06reasonq\x05U\tNot Foundq\x06U\x08httpcodeq\x07M\x94\x01ub.')
-
-    def test_legacy_cPickle_2(self):
-        self._test_unpickle(
-            '\x80\x02csolr.core\nSolrException\nq\x01)Rq\x02}q\x03(U\x04body'
-            'q\x04NU\x06reasonq\x05U\tNot Foundq\x06U\x08httpcodeq\x07M\x94'
-            '\x01ub.')
-
-    def test_legacy_pickle_0(self):
-        self._test_unpickle(
-            "csolr.core\nSolrException\np0\n(tRp1\n(dp2\nS'body'\np3\nNs"
-            "S'reason'\np4\nS'Not Found'\np5\nsS'httpcode'\np6\nI404\nsb.")
-
-    def test_legacy_pickle_1(self):
-        self._test_unpickle(
-            'csolr.core\nSolrException\nq\x00)Rq\x01}q\x02(U\x04bodyq\x03NU'
-            '\x06reasonq\x04U\tNot Foundq\x05U\x08httpcodeq\x06M\x94\x01ub.')
-
-    def test_legacy_pickle_2(self):
-        self._test_unpickle(
-            '\x80\x02csolr.core\nSolrException\nq\x00)Rq\x01}q\x02(U\x04body'
-            'q\x03NU\x06reasonq\x04U\tNot Foundq\x05U\x08httpcodeq\x06M\x94'
-            '\x01ub.')
-
-    def _test_unpickle(self, s):
-        try:
-            loaded = self.module.loads(s)
-        except TypeError as e:
-            if PY3:
-                s_bytes = BytesIO()
-                s_bytes.write(s.encode('latin1'))
-                s = s_bytes.getvalue()
-            loaded = self.module.loads(s)
+    def _test_unserial(self, s):
+        loaded = self.module.load(s)
 
         self.assertEqual(loaded.httpcode, self.initial.httpcode)
         self.assertEqual(loaded.reason, self.initial.reason)
@@ -1856,54 +1819,10 @@ class SolrExceptionSimpleMessagePickleTestCase(
         # continue to work with existing pickled exceptions.
         self.initial = solr.SolrException("Simple message, not HTTP status")
 
-    def test_legacy_cPickle_0(self):
-        self._test_unpickle(
-            "csolr.core\nSolrException\np1\n(tRp2\n(dp3\nS'body'\np4\nNs"
-            "S'reason'\np5\nNsS'httpcode'\np6\n"
-            "S'Simple message, not HTTP status'\np7\nsb.")
-
-    def test_legacy_cPickle_1(self):
-        self._test_unpickle(
-            'csolr.core\nSolrException\nq\x01)Rq\x02}q\x03(U\x04bodyq\x04NU'
-            '\x06reasonq\x05NU\x08httpcodeq\x06U'
-            '\x1fSimple message, not HTTP statusq\x07ub.')
-
-    def test_legacy_cPickle_2(self):
-        self._test_unpickle(
-            '\x80\x02csolr.core\nSolrException\nq\x01)Rq\x02}q\x03(U\x04body'
-            'q\x04NU\x06reasonq\x05NU\x08httpcodeq\x06U'
-            '\x1fSimple message, not HTTP statusq\x07ub.')
-
-    def test_legacy_pickle_0(self):
-        self._test_unpickle(
-            "csolr.core\nSolrException\np0\n(tRp1\n(dp2\nS'body'\np3\nNs"
-            "S'reason'\np4\nNsS'httpcode'\np5\n"
-            "S'Simple message, not HTTP status'\np6\nsb.")
-
-    def test_legacy_pickle_1(self):
-        self._test_unpickle(
-            'csolr.core\nSolrException\nq\x00)Rq\x01}q\x02(U\x04bodyq\x03NU'
-            '\x06reasonq\x04NU\x08httpcodeq\x05U'
-            '\x1fSimple message, not HTTP statusq\x06ub.')
-
-    def test_legacy_pickle_2(self):
-        self._test_unpickle(
-            '\x80\x02csolr.core\nSolrException\nq\x00)Rq\x01}q\x02(U\x04body'
-            'q\x03NU\x06reasonq\x04NU\x08httpcodeq\x05U'
-            '\x1fSimple message, not HTTP statusq\x06ub.')
-
-
-class SolrExceptionHttpStatusCPickleTestCase(
-    SolrExceptionHttpStatusPickleTestCase):
-
-    module = cPickle
-
-
-class SolrExceptionSimpleMessageCPickleTestCase(
-    SolrExceptionSimpleMessagePickleTestCase):
-
-    module = cPickle
-
+    def test_legacy_pickle(self):
+        self._test_unserial(
+            "!!python/object/apply:solr.core.SolrException\nstate: {body: null,"
+            " httpcode: 'Simple message, not HTTP status', reason: null}\n")
 
 
 if __name__ == "__main__":

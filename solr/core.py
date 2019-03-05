@@ -245,6 +245,8 @@ import socket
 import codecs
 import datetime
 import logging
+import six
+import base64
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
@@ -421,10 +423,13 @@ class Solr:
         self.form_headers = {
             'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
         self.form_headers.update(post_headers)
-        
+
+        # Patch: https://github.com/search5/solrpy/issues/51
         if http_user is not None and http_pass is not None:
             http_auth = http_user + ':' + http_pass
-            http_auth = 'Basic ' + http_auth.encode('base64').strip()
+            if six.PY3:
+                http_auth = http_auth.strip().encode('utf-8')
+            http_auth = 'Basic ' + base64.b64encode(http_auth)
             self.auth_headers = {'Authorization': http_auth}
         else:
             self.auth_headers = {}
