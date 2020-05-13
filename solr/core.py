@@ -429,7 +429,7 @@ class Solr:
             http_auth = http_user + ':' + http_pass
             if six.PY3:
                 http_auth = http_auth.strip().encode('utf-8')
-            http_auth = 'Basic ' + base64.b64encode(http_auth)
+            http_auth = b'Basic ' + base64.b64encode(http_auth)
             self.auth_headers = {'Authorization': http_auth}
         else:
             self.auth_headers = {}
