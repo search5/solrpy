@@ -92,16 +92,18 @@ class SolrPaginator:
         # Page 1 starts at 0; take one off before calculating
         start = (page_num - 1) * self.page_size
         new_result = self._fetch_page(start=start)
-        return SolrPage(new_result.results, page_num, self)
+        return SolrPage(new_result.results, page_num, self,
+            highlighting=getattr(new_result, 'highlighting', None),)
 
 
 class SolrPage:
     """A single Paginator-style page."""
 
-    def __init__(self, result, page_num, paginator):
+    def __init__(self, result, page_num, paginator, highlighting):
         self.result = result
         self.number = page_num
         self.paginator = paginator
+        self.highlighting = highlighting
 
     @property
     def object_list(self):
