@@ -241,24 +241,46 @@ Enter a raw query, without processing the returned HTML contents.
 """
 import sys
 import socket
-import httplib
-import urlparse
 import codecs
-import urllib
 import datetime
 import logging
-from StringIO import StringIO
+import base64
+try:
+    import http.client as httplib
+    import urllib.parse as urlparse
+    import urllib.parse as urllib
+    from io import StringIO
+except ImportError:
+    import httplib
+    import urlparse
+    import urllib
+    from StringIO import StringIO
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
+
+try:
+    unicode
+except NameError:
+    unicode = str
+
+try:
+    basestring
+except NameError:
+    basestring = str
+
+try:
+    long
+except NameError:
+    long = int
 
 __version__ = "0.9.6"
 
 __all__ = ['SolrException', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
 
-_python_version = sys.version_info[0]+(sys.version_info[1]/10.0)
+_python_version = sys.version_info[:2]
 
 # ===================================================================
 # Exceptions
@@ -389,7 +411,7 @@ class Solr:
 
         kwargs = {}
 
-        if self.timeout and _python_version >= 2.6 and _python_version < 3:
+        if self.timeout and _python_version >= (2, 6):
             kwargs['timeout'] = self.timeout
 
         if self.scheme == 'https':
@@ -399,13 +421,12 @@ class Solr:
             self.conn = httplib.HTTPConnection(self.host, **kwargs)
 
         self.response_version = 2.2
+        # Deprecated: encoder and decoder will be removed in a future version.
         self.encoder = codecs.getencoder('utf-8')
-
-        # Responses from Solr will always be in UTF-8
         self.decoder = codecs.getdecoder('utf-8')
 
         # Set timeout, if applicable.
-        if self.timeout and _python_version < 2.6:
+        if self.timeout and _python_version < (2, 6):
             self.conn.connect()
             if self.scheme == 'http':
                 self.conn.sock.settimeout(self.timeout)
@@ -423,7 +444,7 @@ class Solr:
         
         if http_user is not None and http_pass is not None:
             http_auth = http_user + ':' + http_pass
-            http_auth = 'Basic ' + http_auth.encode('base64').strip()
+            http_auth = 'Basic ' + base64.b64encode(http_auth.encode('utf-8')).decode('utf-8').strip()
             self.auth_headers = {'Authorization': http_auth}
         else:
             self.auth_headers = {}
@@ -550,6 +571,8 @@ class Solr:
         try:
             rsp = self._post(selector, request, self.xmlheaders)
             data = rsp.read()
+            if isinstance(data, bytes):
+                data = data.decode('utf-8')
         finally:
             if not self.persistent:
                 self.close()
@@ -558,10 +581,9 @@ class Solr:
         # of 200 with a non-zero status).
         starts = data.startswith
         if starts('<result status="') and not starts('<result status="0"'):
-            data = self.decoder(data)[0]
             parsed = parseString(data)
             status = parsed.documentElement.getAttribute('status')
-            if status != 0:
+            if status != "0":
                 reason = parsed.documentElement.firstChild.nodeValue
                 raise SolrException(rsp.status, reason)
         return data
@@ -601,7 +623,7 @@ class Solr:
         """
         if not ids:
             ids = []
-        if id:
+        if id is not None:
             ids.insert(0, id)
         lst = []
         for id in ids:
@@ -624,7 +646,7 @@ class Solr:
         self.reconnects += 1
         self.close()
         self.conn.connect()
-        if self.timeout and _python_version < 2.6:
+        if self.timeout and _python_version < (2, 6):
             if self.scheme == 'http':
                 self.conn.sock.settimeout(self.timeout)
             elif self.scheme == 'https':
@@ -794,11 +816,10 @@ class SearchHandler(object):
 
         params['fl'] = fields
         params['version'] = self.conn.response_version
-        params['wt'] = 'xml'
+        params['wt'] = 'standard'
 
-        json = self.raw(**params)
-        return parse_query_response("XML", StringIO(json),  params, self)
-        # return parse_query_response("JSON", StringIO(json), params, self)
+        xml = self.raw(**params)
+        return parse_query_response(StringIO(xml),  params, self)
 
     def raw(self, **params):
         """
@@ -823,6 +844,8 @@ class SearchHandler(object):
         try:
             rsp = conn._post(self.selector, request, conn.form_headers)
             data = rsp.read()
+            if isinstance(data, bytes):
+                data = data.decode('utf-8')
             if conn.debug:
                 logging.info("solrpy got response: %s" % data)
         finally:
@@ -833,10 +856,9 @@ class SearchHandler(object):
 
 
 def strify(s):
-    if isinstance(s, unicode):
-        return s.encode('utf-8')
-    else:
-        return s
+    if isinstance(s, bytes):
+        return s.decode('utf-8')
+    return str(s)
 
 # ===================================================================
 # Response objects
@@ -921,8 +943,7 @@ class Response(object):
         start += len(self.results)
         params = dict(self._params)
         params['start'] = start
-        q = params['q']
-        del params['q']
+        q = params.pop('q', '')
         return self._query(q, **params)
 
     def previous_batch(self):
@@ -942,32 +963,28 @@ class Response(object):
         params = dict(self._params)
         params['start'] = start
         params['rows'] = rows
-        q = params['q']
-        del params['q']
+        q = params.pop('q', '')
         return self._query(q, **params)
 
 
 # ===================================================================
 # XML Parsing support
 # ===================================================================
-def parse_query_response(data_type, data, params, query):
+def parse_query_response(data, params, query):
     """
     Parse the XML results of a /select call.
     """
-    if data_type == "XML":
-        parser = make_parser()
-        handler = ResponseContentHandler()
-        parser.setContentHandler(handler)
-        parser.parse(data)
-        if handler.stack[0].children:
-            response = handler.stack[0].children[0].final
-            response._params = params
-            response._query = query
-            return response
-        else:
-            return None
-    elif data_type == "JSON":
-        pass
+    parser = make_parser()
+    handler = ResponseContentHandler()
+    parser.setContentHandler(handler)
+    parser.parse(data)
+    if handler.stack[0].children:
+        response = handler.stack[0].children[0].final
+        response._params = params
+        response._query = query
+        return response
+    else:
+        return None
 
 
 class ResponseContentHandler(ContentHandler):
@@ -1025,7 +1042,6 @@ class ResponseContentHandler(ContentHandler):
         elif name in ('float','double', 'status','QTime'):
             node.final = float(value.strip())
 
-
         elif name == 'response':
             node.final = response = Response(self)
             for child in node.children:
@@ -1048,12 +1064,7 @@ class ResponseContentHandler(ContentHandler):
                         for cnode in node.children])
 
         elif name in ('arr',):
-            def node_data(node):
-                if node.name == "str":
-                    return "".join(node.chars)
-                else:
-                    return node.final
-            node.final = [node_data(cnode) for cnode in node.children][0]
+            node.final = [cnode.final for cnode in node.children]
 
         elif name == 'result':
             node.final = Results([cnode.final for cnode in node.children])
@@ -1138,6 +1149,8 @@ def utc_to_string(value):
     """
     Convert datetimes to the subset of ISO 8601 that Solr expects.
     """
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=utc)
     value = value.astimezone(utc).isoformat()
     if '+' in value:
         value = value.split('+')[0]

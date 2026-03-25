@@ -1,4 +1,12 @@
 import math
+try:
+    from .core import SolrException
+except ImportError:
+    from core import SolrException
+
+class EmptyPage(SolrException):
+    pass
+
 
 class SolrPaginator:
     """
@@ -40,7 +48,7 @@ class SolrPaginator:
                                  'than number of results')
 
         else:
-            self.page_size = len(self.result.results)
+            self.page_size = len(self.result.results) or 10
 
     @property
     def count(self):
@@ -75,11 +83,11 @@ class SolrPaginator:
         """Return the requested Page object"""
         try:
             int(page_num)
-        except:
-            raise 'PageNotAnInteger'
+        except (TypeError, ValueError):
+            raise SolrException('PageNotAnInteger')
 
         if page_num not in self.page_range:
-            raise 'EmptyPage', 'That page does not exist.'
+            raise EmptyPage('That page does not exist.')
 
         # Page 1 starts at 0; take one off before calculating
         start = (page_num - 1) * self.page_size

@@ -7,12 +7,18 @@ Meant to be run against Solr 1.2+.
 """
 
 # stdlib
-import cPickle
+try:
+    import cPickle
+except ImportError:
+    import pickle as cPickle
 import pickle
 import socket
 import datetime
 import unittest
-import httplib
+try:
+    import httplib
+except ImportError:
+    import http.client as httplib
 from string import digits
 from random import choice
 from xml.dom.minidom import parseString
