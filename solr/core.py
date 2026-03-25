@@ -737,7 +737,7 @@ class SearchHandler(object):
         self.arg_separator = arg_separator
 
     def __call__(self, q=None, fields=None, highlight=None,
-                 score=True, sort=None, sort_order="asc", **params):
+                 score=True, sort=None, sort_order="asc", op=None, **params):
         """
         q is the query string.
 
@@ -790,6 +790,9 @@ class SearchHandler(object):
 
         if q is not None:
             params['q'] = q
+
+        if op is not None:
+            params['q.op'] = op
 
         if fields:
             if not isinstance(fields, basestring):
