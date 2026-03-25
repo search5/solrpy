@@ -275,7 +275,7 @@ try:
 except NameError:
     long = int
 
-__version__ = "0.9.6"
+__version__ = "0.9.8"
 
 __all__ = ['SolrException', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
