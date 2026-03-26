@@ -1,6 +1,19 @@
 Changelog
 =========
 
+1.8.0 (2026-03-27)
+-------------------
+
+**New features:**
+
+- **Bearer token authentication**: ``Solr(url, auth_token='...')`` sends
+  ``Authorization: Bearer <token>`` header on every request.
+- **Custom auth callable**: ``Solr(url, auth=my_fn)`` calls ``my_fn()`` on
+  every request to produce auth headers dynamically. Enables OAuth2 token
+  refresh and other dynamic authentication schemes.
+- Auth priority: ``auth`` callable > ``auth_token`` > ``http_user/http_pass``.
+
+
 1.7.0 (2026-03-27)
 -------------------
 

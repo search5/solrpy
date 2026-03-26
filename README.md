@@ -102,6 +102,12 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.8.0
+
+- **Bearer token auth**: `Solr(url, auth_token='...')`
+- **Custom auth callable**: `Solr(url, auth=my_fn)` for OAuth2 dynamic refresh
+- Priority: `auth` callable > `auth_token` > `http_user/http_pass`
+
 ### 1.7.0
 
 - **Grouping / Field Collapsing**: `resp.grouped['field'].groups` for grouped results (Solr 3.3+)

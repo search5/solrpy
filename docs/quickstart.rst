@@ -440,6 +440,28 @@ Create a ``SchemaAPI`` instance to manage schema programmatically::
     full = schema.get_schema()
 
 
+Authentication
+--------------
+
+**Basic auth** (username/password)::
+
+    conn = solr.Solr(url, http_user='admin', http_pass='secret')
+
+**Bearer token** (JWT, API key, etc.)::
+
+    conn = solr.Solr(url, auth_token='my-jwt-token')
+
+**Custom auth callable** (OAuth2 with dynamic refresh)::
+
+    def get_oauth_headers():
+        token = refresh_my_token()  # your logic
+        return {'Authorization': 'Bearer ' + token}
+
+    conn = solr.Solr(url, auth=get_oauth_headers)
+
+Priority: ``auth`` callable > ``auth_token`` > ``http_user/http_pass``.
+
+
 Closing the connection
 ----------------------
 

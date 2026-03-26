@@ -91,6 +91,13 @@ Solr class
         - Response format for queries: ``'json'`` (default) or ``'xml'``.
           When ``'json'``, queries use ``wt=json`` and the JSON parser.
           Use ``'xml'`` for legacy compatibility with older code.
+      * - ``auth_token``
+        - Bearer token string. Sends ``Authorization: Bearer <token>`` header.
+          Takes priority over ``http_user``/``http_pass``.
+      * - ``auth``
+        - A callable returning a ``dict[str, str]`` of headers. Called on every
+          request, enabling dynamic token refresh (e.g., OAuth2). Takes priority
+          over ``auth_token`` and ``http_user``/``http_pass``.
       * - ``debug``
         - If ``True``, log all requests and responses.
 

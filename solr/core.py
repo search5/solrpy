@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -46,6 +46,8 @@ class Solr:
                  retry_delay: float = 0.1,
                  always_commit: bool = False,
                  response_format: str = 'json',
+                 auth_token: str | None = None,
+                 auth: Any = None,
                  debug: bool = False) -> None:
 
         self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]
@@ -104,10 +106,17 @@ class Solr:
         }
         self.form_headers.update(post_headers)
 
-        if http_user is not None and http_pass is not None:
+        self._auth_callable = auth
+
+        if auth is not None:
+            # Dynamic auth — headers resolved per-request via _get_auth_headers()
+            self.auth_headers: dict[str, str] = {}
+        elif auth_token is not None:
+            self.auth_headers = {'Authorization': 'Bearer ' + auth_token}
+        elif http_user is not None and http_pass is not None:
             http_auth = http_user + ':' + http_pass
             http_auth = 'Basic ' + base64.b64encode(http_auth.encode('utf-8')).decode('utf-8').strip()
-            self.auth_headers: dict[str, str] = {'Authorization': http_auth}
+            self.auth_headers = {'Authorization': http_auth}
         else:
             self.auth_headers = {}
 
@@ -141,9 +150,16 @@ class Solr:
                 pass
         return False
 
+    def _get_auth_headers(self) -> dict[str, str]:
+        """Return auth headers, calling the auth callable if set."""
+        if self._auth_callable is not None:
+            result: dict[str, str] = self._auth_callable()
+            return result
+        return self.auth_headers.copy()
+
     def _get(self, path: str) -> httplib.HTTPResponse:
         """Issue a GET request and return the response object."""
-        _headers = self.auth_headers.copy()
+        _headers = self._get_auth_headers()
         self.conn.request('GET', path, None, _headers)
         return check_response_status(self.conn.getresponse())
 
@@ -426,7 +442,7 @@ class Solr:
     def _post(self, url: str, body: str | bytes, headers: dict[str, str], timeout: float | None = None) -> httplib.HTTPResponse:  # type: ignore[return]
         import time
         _logger = logging.getLogger('solr')
-        _headers = self.auth_headers.copy()
+        _headers = self._get_auth_headers()
         _headers.update(headers)
         raw_body: bytes = body if isinstance(body, bytes) else body.encode('UTF-8')
         attempts = self.max_retries + 1
