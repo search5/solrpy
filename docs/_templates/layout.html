@@ -1,0 +1,40 @@
+{% extends "!layout.html" %}
+
+{% block extrahead %}
+{{ super() }}
+<meta name="doc-version" content="{{ version }}">
+{% endblock %}
+
+{% block navigation %}
+<div style="padding: 10px 16px; background: #1a242f; border-bottom: 1px solid #37474f;">
+  <label for="version-select" style="font-weight: bold; display: block; margin-bottom: 6px; color: #cfd8dc; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px;">Version</label>
+  <select id="version-select" style="width: 100%; padding: 6px; border: 1px solid #455a64; border-radius: 3px; background: #37474f; color: #eceff1; font-size: 0.9em;" onchange="if(this.value) window.location.href=this.value;">
+    <option value="">Loading...</option>
+  </select>
+</div>
+<script>
+(function() {
+  var basePath = '/solrpy';
+  fetch(basePath + '/versions.json')
+    .then(function(r) { return r.json(); })
+    .then(function(versions) {
+      var sel = document.getElementById('version-select');
+      sel.innerHTML = '';
+      var metaTag = document.querySelector('meta[name="doc-version"]');
+      var currentVer = metaTag ? metaTag.content : '';
+      versions.forEach(function(v) {
+        var opt = document.createElement('option');
+        opt.value = basePath + '/' + v.path + '/';
+        opt.textContent = v.label;
+        if (v.version === currentVer) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    })
+    .catch(function() {
+      var sel = document.getElementById('version-select');
+      sel.innerHTML = '<option>versions unavailable</option>';
+    });
+})();
+</script>
+{{ super() }}
+{% endblock %}

@@ -40,56 +40,46 @@ jobs:
           for tag in $(git tag --list 'v*' --sort=-version:refname); do
             echo "Building docs for $tag"
             git checkout "$tag" -- docs/ solr/ 2>/dev/null || continue
-            version_dir="_site/${tag}"
-            mkdir -p "$version_dir"
-            sphinx-build -b html docs "$version_dir" 2>/dev/null || echo "  Skipped $tag (build failed)"
+            mkdir -p "_site/${tag}"
+            sphinx-build -b html docs "_site/${tag}" 2>/dev/null || echo "  Skipped $tag (build failed)"
             git checkout master -- docs/ solr/ 2>/dev/null
           done
 
-      - name: Generate version index page
+      - name: Generate versions.json
         run: |
           LATEST_TAG=$(git tag --list 'v*' --sort=-version:refname | head -1)
-          cat > _site/index.html << 'HEADER'
+          echo '[' > _site/versions.json
+          echo "  {\"version\": \"latest\", \"label\": \"latest (master)\", \"path\": \"latest\"}," >> _site/versions.json
+          first=true
+          for tag in $(git tag --list 'v*' --sort=-version:refname); do
+            if [ -d "_site/${tag}" ]; then
+              label="${tag}"
+              if [ "$tag" = "$LATEST_TAG" ]; then
+                label="${tag} (stable)"
+              fi
+              if [ "$first" = true ]; then
+                first=false
+              else
+                echo "," >> _site/versions.json
+              fi
+              printf "  {\"version\": \"%s\", \"label\": \"%s\", \"path\": \"%s\"}" "$tag" "$label" "$tag" >> _site/versions.json
+            fi
+          done
+          echo "" >> _site/versions.json
+          echo ']' >> _site/versions.json
+
+      - name: Generate root redirect
+        run: |
+          cat > _site/index.html << 'EOF'
           <!DOCTYPE html>
           <html>
           <head>
-            <meta charset="utf-8">
-            <title>solrpy Documentation</title>
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 700px; margin: 60px auto; padding: 0 20px; color: #333; }
-              h1 { border-bottom: 2px solid #2980b9; padding-bottom: 10px; }
-              a { color: #2980b9; text-decoration: none; }
-              a:hover { text-decoration: underline; }
-              ul { list-style: none; padding: 0; }
-              li { padding: 8px 0; border-bottom: 1px solid #eee; }
-              .latest { font-weight: bold; }
-              .badge { background: #2980b9; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-left: 8px; }
-            </style>
+            <meta http-equiv="refresh" content="0; url=latest/">
+            <link rel="canonical" href="latest/">
           </head>
-          <body>
-          <h1>solrpy Documentation</h1>
-          <p><a href="latest/">Latest (master)</a></p>
-          <h2>Versions</h2>
-          <ul>
-          HEADER
-
-          for tag in $(git tag --list 'v*' --sort=-version:refname); do
-            if [ -d "_site/${tag}" ]; then
-              badge=""
-              if [ "$tag" = "$LATEST_TAG" ]; then
-                badge='<span class="badge">latest release</span>'
-              fi
-              echo "  <li><a href=\"${tag}/\">${tag}</a>${badge}</li>" >> _site/index.html
-            fi
-          done
-
-          cat >> _site/index.html << 'FOOTER'
-          </ul>
-          <hr>
-          <p><a href="https://github.com/search5/solrpy">GitHub</a> · <a href="https://pypi.org/project/solrpy/">PyPI</a></p>
-          </body>
+          <body><a href="latest/">Redirecting to latest documentation...</a></body>
           </html>
-          FOOTER
+          EOF
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

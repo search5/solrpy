@@ -32,6 +32,11 @@ html_domain_indices = False
 
 htmlhelp_basename = 'solrpydoc'
 
+# Version meta tag for the version switcher template
+html_context = {
+    'doc_version': version,
+}
+
 # -- Intersphinx mapping -----------------------------------------------------
 
 intersphinx_mapping = {
