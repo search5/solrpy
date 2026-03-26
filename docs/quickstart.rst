@@ -209,6 +209,28 @@ Find similar documents using the ``/mlt`` handler::
     response = conn.mlt('interesting text', fl='title,body')
 
 
+Cursor pagination (Solr 4.7+)
+------------------------------
+
+For large result sets, use cursor-based deep pagination::
+
+    resp = conn.select('*:*', sort='id asc', cursorMark='*', rows=100)
+    while resp:
+        for doc in resp.results:
+            process(doc)
+        resp = resp.cursor_next()
+
+Or use the convenience generator::
+
+    for batch in conn.iter_cursor('*:*', sort='id asc', rows=100):
+        for doc in batch.results:
+            process(doc)
+
+.. note::
+
+   The ``sort`` clause must include the uniqueKey field (usually ``id``).
+
+
 Deleting documents
 ------------------
 

@@ -1,6 +1,17 @@
 Changelog
 =========
 
+1.2.0 (2026-03-27)
+-------------------
+
+**New features (Solr 4.7+):**
+
+- **Cursor pagination**: ``Response.cursor_next()`` for cursor-based deep
+  pagination. Returns ``None`` when all results are consumed.
+- **Cursor iterator**: ``Solr.iter_cursor(q, sort, rows)`` generator that
+  yields Response batches, automatically following cursor marks.
+
+
 1.1.0 (2026-03-27)
 -------------------
 

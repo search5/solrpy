@@ -173,6 +173,18 @@ Solr class
       :param ids: List of document IDs.
       :param fields: Optional list of fields to return.
 
+   **Cursor pagination (Solr 4.7+):**
+
+   .. method:: Solr.iter_cursor(q, sort, rows=100, **params)
+
+      Generator that yields :class:`Response` objects for each batch of
+      cursor-paginated results. Stops when all results are consumed.
+
+      :param q: Query string.
+      :param sort: Sort clause (must include uniqueKey field).
+      :param rows: Batch size per request.
+      :raises ValueError: If ``sort`` is not provided.
+
    **MoreLikeThis (Solr 4.0+):**
 
    .. attribute:: Solr.mlt
@@ -303,7 +315,22 @@ Response class
 
       Maximum relevance score across all matches.
 
-   **Pagination methods:**
+   **Cursor pagination (Solr 4.7+):**
+
+   .. method:: Response.cursor_next()
+
+      Follow cursor-based pagination. Returns the next page of results,
+      or ``None`` if no more results (``nextCursorMark == cursorMark``)
+      or if the query did not use ``cursorMark``.
+
+      Example::
+
+          resp = conn.select('*:*', sort='id asc', cursorMark='*', rows=100)
+          while resp:
+              process(resp.results)
+              resp = resp.cursor_next()
+
+   **Offset pagination methods:**
 
    .. method:: Response.next_batch()
 

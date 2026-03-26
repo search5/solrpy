@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .core import SearchHandler
 
 
 class Results(list[Any]):
@@ -75,6 +78,36 @@ class Response:
         params['start'] = start
         q = params.pop('q', '')
         return self._query(q, **params)
+
+    def cursor_next(self) -> Response | None:
+        """Follow cursor-based pagination (Solr 4.7+).
+
+        Returns the next page of results using cursorMark, or None if
+        there are no more results (nextCursorMark == cursorMark) or if
+        the original query did not use cursorMark.
+        """
+        current_cursor = self._params.get('cursorMark')
+        if current_cursor is None:
+            return None
+
+        next_cursor = getattr(self, 'nextCursorMark', None)
+        if next_cursor is None or next_cursor == current_cursor:
+            return None
+
+        # Version check via the SearchHandler's conn
+        query = self._query
+        conn = getattr(query, 'conn', None)
+        conn_version = getattr(self, '_conn_version', None) or (
+            conn.server_version if conn else None)
+        if conn_version and conn_version < (4, 7):
+            from .exceptions import SolrVersionError
+            raise SolrVersionError("cursor_next", (4, 7), conn_version)
+
+        params = dict(self._params)
+        params['cursorMark'] = next_cursor
+        q = params.pop('q', '')
+        result: Response | None = self._query(q, **params)
+        return result
 
     def previous_batch(self) -> Any:
         """Return the previous set of matches."""

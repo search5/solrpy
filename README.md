@@ -102,6 +102,10 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.2.0
+
+- **Cursor pagination**: `resp.cursor_next()` and `conn.iter_cursor()` for deep pagination (Solr 4.7+)
+
 ### 1.1.0
 
 - **Soft Commit**: `conn.commit(soft_commit=True)` (Solr 4.0+)

@@ -11,7 +11,7 @@ import http.client as httplib
 import urllib.parse as urlparse
 import urllib.parse as urllib
 from io import StringIO
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 from xml.sax.saxutils import escape, quoteattr
 
 from .exceptions import SolrException, SolrVersionError
@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -293,6 +293,35 @@ class Solr:
             return result
         docs: list[dict[str, Any]] = data.get('response', {}).get('docs', [])
         return docs
+
+    def iter_cursor(self, q: str, sort: str | None = None,
+                    rows: int = 100, **params: Any) -> Iterator[Response]:
+        """Iterate through all results using cursor-based pagination.
+
+        Yields Response objects for each batch. Requires ``sort`` to
+        include a uniqueKey field.
+
+        Example::
+
+            for batch in conn.iter_cursor('*:*', sort='id asc', rows=100):
+                for doc in batch.results:
+                    process(doc)
+        """
+        if not sort:
+            raise ValueError("sort is required for cursor pagination "
+                             "(must include uniqueKey field)")
+        params['sort'] = sort
+        params['rows'] = rows
+        params['cursorMark'] = '*'
+        first: Response | None = self.select(q, **params)
+        if first is None:
+            return
+        yield first
+        resp: Response | None = first
+        while resp is not None:
+            resp = resp.cursor_next()
+            if resp is not None:
+                yield resp
 
     def commit(self, wait_flush: bool = True, wait_searcher: bool = True,
                _optimize: bool = False, soft_commit: bool = False) -> str:

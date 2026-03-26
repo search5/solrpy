@@ -103,7 +103,7 @@ supports them.
      - 4.0
    * - MoreLikeThis (``mlt``)
      - 4.0
-   * - Cursor Pagination
+   * - Cursor Pagination (``cursor_next()``, ``iter_cursor()``)
      - 4.7
    * - JSON Facet API
      - 5.0
