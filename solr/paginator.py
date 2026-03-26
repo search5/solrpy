@@ -3,7 +3,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .core import SolrException, Response, Results
+from .exceptions import SolrException
+from .response import Response, Results
 
 
 class EmptyPage(SolrException):

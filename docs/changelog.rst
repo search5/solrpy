@@ -1,6 +1,24 @@
 Changelog
 =========
 
+1.0.3 (2026-03-27)
+-------------------
+
+**New features:**
+
+- ``response_format`` constructor option: ``Solr(url, response_format='json')``
+  switches the query pipeline to use ``wt=json`` and the JSON parser.
+  Default is ``'xml'`` for backward compatibility.
+- ``SearchHandler`` automatically selects ``wt`` and parser based on the
+  connection's ``response_format`` setting.
+
+**Refactoring:**
+
+- Split ``solr/core.py`` (1287 lines) into five focused modules:
+  ``exceptions.py``, ``utils.py``, ``response.py``, ``parsers.py``, ``core.py``.
+- All existing import paths continue to work via re-exports in ``__init__.py``.
+
+
 1.0.2 (2026-03-27)
 -------------------
 

@@ -82,6 +82,10 @@ Solr class
         - If ``True``, all update methods (``add``, ``add_many``, ``delete``, etc.)
           will automatically commit changes. Individual calls can override this by
           passing ``commit=False``. Defaults to ``False``.
+      * - ``response_format``
+        - Response format for queries: ``'xml'`` (default) or ``'json'``.
+          When ``'json'``, queries use ``wt=json`` and the JSON parser.
+          Recommended for Solr 7.0+ where JSON is the native default.
       * - ``debug``
         - If ``True``, log all requests and responses.
 

@@ -2286,5 +2286,59 @@ class TestGzipResponse(unittest.TestCase):
         conn.close()
 
 
+# ===================================================================
+# 1.0.3 tests — response_format
+# ===================================================================
+
+class TestResponseFormat(unittest.TestCase):
+    """Test the response_format constructor option."""
+
+    def test_default_format_is_xml(self):
+        conn = solr.Solr(SOLR_HTTP)
+        self.assertEqual(conn.response_format, 'xml')
+        conn.close()
+
+    def test_explicit_xml_format(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        self.assertEqual(conn.response_format, 'xml')
+        conn.close()
+
+    def test_json_format(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='json')
+        self.assertEqual(conn.response_format, 'json')
+        conn.close()
+
+    def test_invalid_format_raises(self):
+        with self.assertRaises(ValueError):
+            solr.Solr(SOLR_HTTP, response_format='csv')
+
+    def test_xml_query_returns_response(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        conn.add({'id': 'fmt_xml_test', 'data': 'hello'}, commit=True)
+        resp = conn.select('id:fmt_xml_test')
+        self.assertEqual(resp.numFound, 1)
+        self.assertEqual(resp.results[0]['id'], 'fmt_xml_test')
+        conn.delete(id='fmt_xml_test', commit=True)
+        conn.close()
+
+    def test_json_query_returns_response(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='json')
+        conn.add({'id': 'fmt_json_test', 'data': 'hello'}, commit=True)
+        resp = conn.select('id:fmt_json_test')
+        self.assertEqual(resp.numFound, 1)
+        self.assertEqual(resp.results[0]['id'], 'fmt_json_test')
+        conn.delete(id='fmt_json_test', commit=True)
+        conn.close()
+
+    def test_json_query_has_header(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='json')
+        conn.add({'id': 'fmt_json_hdr', 'data': 'test'}, commit=True)
+        resp = conn.select('id:fmt_json_hdr')
+        self.assertIn('status', resp.header)
+        self.assertEqual(resp.header['status'], 0)
+        conn.delete(id='fmt_json_hdr', commit=True)
+        conn.close()
+
+
 if __name__ == "__main__":
     unittest.main()
