@@ -32,6 +32,9 @@ s = solr.Solr('http://localhost:8983/solr/mycore')
 # the server version is auto-detected
 print(s.server_version)  # e.g. (9, 4, 1)
 
+# check if the server is reachable
+print(s.ping())  # True
+
 # add a document to the index
 doc = {
     "id": 1,
@@ -86,6 +89,13 @@ poetry run pytest tests/
 ```
 
 ## Changelog
+
+### 0.9.11
+
+- Added JSON response parser (`parse_json_response`)
+- Added `Solr.ping()` convenience method
+- Added `always_commit` constructor option for auto-commit behavior
+- Added gzip response support (`Accept-Encoding: gzip`)
 
 ### 0.9.10
 

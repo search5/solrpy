@@ -241,6 +241,7 @@ Enter a raw query, without processing the returned HTML contents.
 """
 import re
 import json
+import gzip
 import socket
 import datetime
 import logging
@@ -254,7 +255,7 @@ from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
 
-__version__ = "0.9.10"
+__version__ = "0.9.11"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
@@ -328,7 +329,8 @@ def requires_version(*min_version):
 def committing(function=None):
 
     def wrapper(self, *args, **kw):
-        commit = kw.pop("commit", False)
+        default_commit = getattr(self, 'always_commit', False)
+        commit = kw.pop("commit", default_commit)
         optimize = kw.pop("optimize", False)
         query = {}
         if commit or optimize:
@@ -375,6 +377,7 @@ class Solr:
                  http_pass=None,
                  post_headers={},
                  max_retries=3,
+                 always_commit=False,
                  debug=False):
 
         """
@@ -428,13 +431,18 @@ class Solr:
 
         self.response_version = 2.2
 
-        self.xmlheaders = {'Content-Type': 'text/xml; charset=utf-8'}
+        self.xmlheaders = {
+            'Content-Type': 'text/xml; charset=utf-8',
+            'Accept-Encoding': 'gzip',
+        }
         self.xmlheaders.update(post_headers)
         if not self.persistent:
             self.xmlheaders['Connection'] = 'close'
 
         self.form_headers = {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+            'Accept-Encoding': 'gzip',
+        }
         self.form_headers.update(post_headers)
         
         if http_user is not None and http_pass is not None:
@@ -447,6 +455,7 @@ class Solr:
         if not self.persistent:
             self.form_headers['Connection'] = 'close'
 
+        self.always_commit = always_commit
         self.debug = debug
         self.select = SearchHandler(self, "/select")
         self.server_version = self._detect_version()
@@ -454,6 +463,21 @@ class Solr:
     def close(self):
         """Close the underlying HTTP(S) connection."""
         self.conn.close()
+
+    def ping(self):
+        """Ping the Solr server. Returns True if reachable, False otherwise."""
+        base_paths = [self.path]
+        parent = self.path.rsplit('/', 1)[0]
+        if parent and parent != self.path:
+            base_paths.append(parent)
+        for base in base_paths:
+            try:
+                rsp = self._get(base + '/admin/ping?wt=json')
+                data = rsp.read().decode('utf-8')
+                return '"OK"' in data or '"status":"OK"' in data
+            except Exception:
+                pass
+        return False
 
     def _get(self, path):
         """Issue a GET request and return the response object."""
@@ -610,7 +634,7 @@ class Solr:
         selector = '%s/update%s' % (self.path, qs_from_items(query))
         try:
             rsp = self._post(selector, request, self.xmlheaders)
-            data = rsp.read().decode('utf-8')
+            data = read_response(rsp)
         finally:
             if not self.persistent:
                 self.close()
@@ -876,7 +900,7 @@ class SearchHandler(object):
 
         try:
             rsp = conn._post(self.selector, request, conn.form_headers)
-            data = rsp.read().decode('utf-8')
+            data = read_response(rsp)
             if conn.debug:
                 logging.info("solrpy got response: %s" % data)
         finally:
@@ -994,6 +1018,36 @@ class Response(object):
         params['rows'] = rows
         q = params.pop('q', '')
         return self._query(q, **params)
+
+
+# ===================================================================
+# JSON Parsing support
+# ===================================================================
+def parse_json_response(data, params, query):
+    """
+    Parse a JSON response dict from Solr into a Response object.
+    """
+    response = Response(query)
+    response._params = params
+
+    response.header = data.get('responseHeader', {})
+
+    resp_data = data.get('response', {})
+    response.numFound = resp_data.get('numFound', 0)
+    response.start = resp_data.get('start', 0)
+    if 'maxScore' in resp_data:
+        response.maxScore = resp_data['maxScore']
+
+    response.results = Results(resp_data.get('docs', []))
+    response.results.numFound = response.numFound
+    response.results.start = response.start
+
+    # Attach any extra top-level keys (highlighting, facet_counts, etc.)
+    for key, value in data.items():
+        if key not in ('responseHeader', 'response'):
+            setattr(response, key, value)
+
+    return response
 
 
 # ===================================================================
@@ -1152,6 +1206,14 @@ def check_response_status(response):
             pass
         raise ex
     return response
+
+
+def read_response(response):
+    """Read an HTTP response body, decompressing gzip if needed."""
+    data = response.read()
+    if response.getheader('Content-Encoding', '') == 'gzip':
+        data = gzip.decompress(data)
+    return data.decode('utf-8')
 
 
 # -------------------------------------------------------------------

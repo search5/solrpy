@@ -1,6 +1,24 @@
 Changelog
 =========
 
+0.9.11 (2026-03-26)
+--------------------
+
+**New features:**
+
+- ``parse_json_response()`` function for parsing JSON responses from Solr.
+  Supports all standard response fields: results, header, highlighting,
+  facet_counts, maxScore, and arbitrary top-level keys.
+- ``Solr.ping()`` convenience method. Returns ``True`` if the Solr server
+  is reachable, ``False`` otherwise.
+- ``always_commit`` constructor option. When ``True``, all add/delete
+  operations automatically commit. Individual calls can override with
+  ``commit=False``.
+- Gzip response support. ``Accept-Encoding: gzip`` header is now sent on
+  all requests. Compressed responses are decompressed transparently via
+  the new ``read_response()`` helper.
+
+
 0.9.10 (2026-03-26)
 --------------------
 

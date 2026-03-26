@@ -10,6 +10,7 @@ import pickle
 import socket
 import datetime
 import unittest
+import http.client
 import http.client as httplib
 from string import digits
 from random import choice
@@ -2123,6 +2124,165 @@ class TestVersionDetection(unittest.TestCase):
         self.assertIsInstance(version, tuple)
         self.assertGreaterEqual(len(version), 2)
         self.assertGreaterEqual(version[0], 6)
+        conn.close()
+
+
+# ===================================================================
+# 0.9.11 tests
+# ===================================================================
+
+class TestParseJsonResponse(unittest.TestCase):
+    """Test the JSON response parser."""
+
+    def test_basic_json_response(self):
+        data = {
+            "responseHeader": {"status": 0, "QTime": 1},
+            "response": {
+                "numFound": 2, "start": 0,
+                "docs": [
+                    {"id": "1", "title": "First"},
+                    {"id": "2", "title": "Second"},
+                ],
+            },
+        }
+        resp = solr.core.parse_json_response(data, {}, None)
+        self.assertEqual(resp.numFound, 2)
+        self.assertEqual(resp.start, 0)
+        self.assertEqual(len(resp.results), 2)
+        self.assertEqual(resp.results[0]['id'], '1')
+        self.assertEqual(resp.header['status'], 0)
+
+    def test_json_response_with_highlighting(self):
+        data = {
+            "responseHeader": {"status": 0, "QTime": 1},
+            "response": {
+                "numFound": 1, "start": 0,
+                "docs": [{"id": "1"}],
+            },
+            "highlighting": {
+                "1": {"title": ["<em>match</em>"]},
+            },
+        }
+        resp = solr.core.parse_json_response(data, {}, None)
+        self.assertTrue(hasattr(resp, 'highlighting'))
+        self.assertIn('1', resp.highlighting)
+
+    def test_json_response_with_facets(self):
+        data = {
+            "responseHeader": {"status": 0, "QTime": 1},
+            "response": {
+                "numFound": 0, "start": 0, "docs": [],
+            },
+            "facet_counts": {
+                "facet_fields": {"category": ["books", 5, "music", 3]},
+            },
+        }
+        resp = solr.core.parse_json_response(data, {}, None)
+        self.assertTrue(hasattr(resp, 'facet_counts'))
+
+    def test_json_response_empty(self):
+        data = {
+            "responseHeader": {"status": 0, "QTime": 0},
+            "response": {"numFound": 0, "start": 0, "docs": []},
+        }
+        resp = solr.core.parse_json_response(data, {}, None)
+        self.assertEqual(resp.numFound, 0)
+        self.assertEqual(len(resp.results), 0)
+
+    def test_json_response_maxScore(self):
+        data = {
+            "responseHeader": {"status": 0, "QTime": 0},
+            "response": {
+                "numFound": 1, "start": 0, "maxScore": 1.5,
+                "docs": [{"id": "1"}],
+            },
+        }
+        resp = solr.core.parse_json_response(data, {}, None)
+        self.assertAlmostEqual(resp.maxScore, 1.5)
+
+
+class TestPing(unittest.TestCase):
+    """Test the Solr.ping() method."""
+
+    def test_ping_returns_true_on_live_server(self):
+        conn = solr.Solr(SOLR_HTTP)
+        self.assertTrue(conn.ping())
+        conn.close()
+
+    def test_ping_returns_false_on_bad_url(self):
+        conn = solr.Solr.__new__(solr.Solr)
+        conn.path = '/solr/nonexistent_core'
+        conn.host = 'localhost:8983'
+        conn.scheme = 'http'
+        conn.auth_headers = {}
+        conn.persistent = True
+        conn.conn = http.client.HTTPConnection(conn.host)
+        self.assertFalse(conn.ping())
+        conn.close()
+
+
+class TestAlwaysCommit(unittest.TestCase):
+    """Test the always_commit constructor option."""
+
+    def test_default_always_commit_is_false(self):
+        conn = solr.Solr(SOLR_HTTP)
+        self.assertFalse(conn.always_commit)
+        conn.close()
+
+    def test_always_commit_true(self):
+        conn = solr.Solr(SOLR_HTTP, always_commit=True)
+        self.assertTrue(conn.always_commit)
+        conn.close()
+
+    def test_always_commit_add_sends_commit(self):
+        conn = solr.Solr(SOLR_HTTP, always_commit=True)
+        sent = {}
+        original_update = conn._update
+        def capture_update(content, query=None):
+            sent['query'] = query
+            return original_update(content, query)
+        conn._update = capture_update
+        conn.add({'id': 'always_commit_test', 'data': 'test'})
+        self.assertIn('commit', sent.get('query', {}))
+        conn.delete(id='always_commit_test', commit=True)
+        conn.close()
+
+    def test_always_commit_override_false(self):
+        conn = solr.Solr(SOLR_HTTP, always_commit=True)
+        sent = {}
+        original_update = conn._update
+        def capture_update(content, query=None):
+            sent['query'] = query
+            return original_update(content, query)
+        conn._update = capture_update
+        conn.add({'id': 'always_commit_test2', 'data': 'test'}, commit=False)
+        self.assertEqual(sent.get('query', {}), {})
+        conn.delete(id='always_commit_test2', commit=True)
+        conn.close()
+
+
+class TestGzipResponse(unittest.TestCase):
+    """Test that gzip-compressed responses are handled."""
+
+    def test_gzip_header_sent(self):
+        conn = solr.Solr(SOLR_HTTP)
+        self.assertIn('Accept-Encoding', conn.form_headers)
+        self.assertIn('gzip', conn.form_headers['Accept-Encoding'])
+        conn.close()
+
+    def test_gzip_header_in_xml_headers(self):
+        conn = solr.Solr(SOLR_HTTP)
+        self.assertIn('Accept-Encoding', conn.xmlheaders)
+        self.assertIn('gzip', conn.xmlheaders['Accept-Encoding'])
+        conn.close()
+
+    def test_query_works_with_gzip(self):
+        """Solr may or may not gzip the response, but the query should work."""
+        conn = solr.Solr(SOLR_HTTP)
+        conn.add({'id': 'gzip_test', 'data': 'test'}, commit=True)
+        response = conn.select('id:gzip_test')
+        self.assertEqual(len(response.results), 1)
+        conn.delete(id='gzip_test', commit=True)
         conn.close()
 
 
