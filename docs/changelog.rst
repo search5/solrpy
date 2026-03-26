@@ -1,6 +1,16 @@
 Changelog
 =========
 
+1.4.2 (2026-03-27)
+-------------------
+
+**Improvements:**
+
+- New ``MoreLikeThis(conn)`` wrapper class in ``solr/mlt.py``.
+  Users no longer need to know the ``/mlt`` handler path.
+- Replaces previous ``SearchHandler(conn, '/mlt')`` pattern.
+
+
 1.4.1 (2026-03-27)
 -------------------
 

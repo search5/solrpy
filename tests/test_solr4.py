@@ -159,15 +159,22 @@ class TestRealtimeGet(unittest.TestCase):
 class TestMoreLikeThis(unittest.TestCase):
 
     def test_mlt_explicit_creation(self):
+        from solr import MoreLikeThis
         conn = solr.Solr(SOLR_HTTP, response_format='xml')
-        mlt = solr.SearchHandler(conn, '/mlt')
-        self.assertIsInstance(mlt, solr.SearchHandler)
-        self.assertTrue(mlt.selector.endswith('/mlt'))
+        mlt = MoreLikeThis(conn)
+        self.assertIsInstance(mlt, MoreLikeThis)
         conn.close()
 
     def test_conn_has_no_mlt_attribute(self):
         conn = solr.Solr(SOLR_HTTP, response_format='xml')
         self.assertFalse(hasattr(conn, 'mlt'))
+        conn.close()
+
+    def test_mlt_has_raw(self):
+        from solr import MoreLikeThis
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        mlt = MoreLikeThis(conn)
+        self.assertTrue(callable(getattr(mlt, 'raw', None)))
         conn.close()
 
 

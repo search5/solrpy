@@ -187,10 +187,26 @@ Solr class
 
    **MoreLikeThis (Solr 4.0+):**
 
-   Create a :class:`SearchHandler` for the ``/mlt`` endpoint::
+   Create a :class:`MoreLikeThis` instance::
 
-       mlt = solr.SearchHandler(conn, '/mlt')
+       from solr import MoreLikeThis
+
+       mlt = MoreLikeThis(conn)
        response = mlt('interesting text', fl='title,body')
+
+.. class:: MoreLikeThis(conn)
+
+   Find similar documents using Solr's ``/mlt`` handler.
+
+   :param conn: A :class:`Solr` instance.
+
+   .. method:: __call__(q=None, **params)
+
+      Query the MLT handler. Same parameters as :class:`SearchHandler`.
+
+   .. method:: raw(**params)
+
+      Issue a raw MLT query.
 
    **Delete methods:**
 

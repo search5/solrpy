@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.4.1"
+__version__ = "1.4.2"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']

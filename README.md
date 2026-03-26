@@ -102,6 +102,10 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.4.2
+
+- New `MoreLikeThis(conn)` wrapper class — no need to know `/mlt` path
+
 ### 1.4.1
 
 - **Breaking**: `conn.schema` and `conn.mlt` removed from auto-initialization

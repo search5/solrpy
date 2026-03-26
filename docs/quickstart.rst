@@ -204,9 +204,11 @@ Make changes visible without flushing to disk::
 MoreLikeThis (Solr 4.0+)
 --------------------------
 
-Find similar documents by creating a handler for ``/mlt``::
+Find similar documents::
 
-    mlt = solr.SearchHandler(conn, '/mlt')
+    from solr import MoreLikeThis
+
+    mlt = MoreLikeThis(conn)
     response = mlt('interesting text', fl='title,body')
 
 
