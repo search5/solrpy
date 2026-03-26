@@ -1,6 +1,23 @@
 Changelog
 =========
 
+1.1.0 (2026-03-27)
+-------------------
+
+**New features (Solr 4.0+):**
+
+- **Soft Commit**: ``conn.commit(soft_commit=True)`` makes changes visible
+  without flushing to disk. Version-gated to Solr 4.0+.
+- **Atomic Update**: ``conn.atomic_update(doc)`` and ``atomic_update_many(docs)``
+  for partial document updates. Supports ``set``, ``add``, ``remove``,
+  ``removeregex`` (Solr 5.0+), and ``inc`` modifiers. ``{'set': None}``
+  removes a field.
+- **Real-time Get**: ``conn.get(id=...)`` retrieves documents directly from the
+  transaction log via ``/get`` handler without waiting for a commit.
+- **MoreLikeThis**: ``conn.mlt`` SearchHandler bound to ``/mlt`` endpoint
+  for finding similar documents.
+
+
 1.0.9 (2026-03-27)
 -------------------
 

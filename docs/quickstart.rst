@@ -163,6 +163,52 @@ Use ``next_batch()`` and ``previous_batch()`` for offset-based pagination::
     prev_page = next_page.previous_batch()
 
 
+Atomic update (Solr 4.0+)
+--------------------------
+
+Update specific fields without resending the entire document::
+
+    conn.atomic_update({
+        'id': 'doc1',
+        'title': {'set': 'Updated Title'},
+        'view_count': {'inc': 1},
+        'old_field': {'set': None},  # remove field
+    }, commit=True)
+
+Batch atomic updates::
+
+    conn.atomic_update_many([
+        {'id': 'doc1', 'status': {'set': 'published'}},
+        {'id': 'doc2', 'status': {'set': 'draft'}},
+    ], commit=True)
+
+
+Real-time Get (Solr 4.0+)
+--------------------------
+
+Retrieve documents directly from the transaction log without waiting for
+a commit::
+
+    doc = conn.get(id='doc1')
+    docs = conn.get(ids=['doc1', 'doc2'], fields=['id', 'title'])
+
+
+Soft Commit (Solr 4.0+)
+-------------------------
+
+Make changes visible without flushing to disk::
+
+    conn.commit(soft_commit=True)
+
+
+MoreLikeThis (Solr 4.0+)
+--------------------------
+
+Find similar documents using the ``/mlt`` handler::
+
+    response = conn.mlt('interesting text', fl='title,body')
+
+
 Deleting documents
 ------------------
 

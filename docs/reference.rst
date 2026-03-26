@@ -138,6 +138,49 @@ Solr class
    .. automethod:: solr.Solr.add(doc)
    .. automethod:: solr.Solr.add_many(docs)
 
+   **Atomic update methods (Solr 4.0+):**
+
+   .. method:: Solr.atomic_update(doc, commit=False)
+
+      Partial update of a single document. Field values can be plain values
+      or dicts with a modifier key: ``set``, ``add``, ``remove``,
+      ``removeregex`` (Solr 5.0+), ``inc``. Use ``{'set': None}`` to remove
+      a field.
+
+      Example::
+
+          conn.atomic_update({
+              'id': 'doc1',
+              'title': {'set': 'New Title'},
+              'count': {'inc': 1},
+              'old_field': {'set': None},  # remove field
+          }, commit=True)
+
+   .. method:: Solr.atomic_update_many(docs, commit=False)
+
+      Partial update of multiple documents. Same modifier syntax as
+      ``atomic_update``.
+
+   **Real-time Get (Solr 4.0+):**
+
+   .. method:: Solr.get(id=None, ids=None, fields=None)
+
+      Retrieve documents directly from the transaction log without waiting
+      for a commit. Returns a dict for single ``id`` (or ``None`` if not
+      found), or a list for ``ids``.
+
+      :param id: Single document ID.
+      :param ids: List of document IDs.
+      :param fields: Optional list of fields to return.
+
+   **MoreLikeThis (Solr 4.0+):**
+
+   .. attribute:: Solr.mlt
+
+      A :class:`SearchHandler` bound to the ``/mlt`` endpoint. Usage::
+
+          response = conn.mlt('interesting text', fl='title,body')
+
    **Delete methods:**
 
    .. automethod:: solr.Solr.delete(id=None, ids=None, queries=None)

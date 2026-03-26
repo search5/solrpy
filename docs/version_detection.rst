@@ -95,11 +95,13 @@ supports them.
      - Minimum Solr
    * - Basic query and indexing
      - 1.2
-   * - Atomic Update
+   * - Atomic Update (``atomic_update``)
      - 4.0
-   * - Soft Commit
+   * - Soft Commit (``commit(soft_commit=True)``)
      - 4.0
-   * - Real-time Get
+   * - Real-time Get (``get()``)
+     - 4.0
+   * - MoreLikeThis (``mlt``)
      - 4.0
    * - Cursor Pagination
      - 4.7

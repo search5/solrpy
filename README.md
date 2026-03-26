@@ -102,6 +102,13 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.1.0
+
+- **Soft Commit**: `conn.commit(soft_commit=True)` (Solr 4.0+)
+- **Atomic Update**: `conn.atomic_update(doc)` with `set`/`add`/`remove`/`inc` modifiers (Solr 4.0+)
+- **Real-time Get**: `conn.get(id='doc1')` via `/get` handler (Solr 4.0+)
+- **MoreLikeThis**: `conn.mlt` handler for similar document search (Solr 4.0+)
+
 ### 1.0.9
 
 - Per-request timeout override: `conn.select('*:*', timeout=5)`

@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.0.9"
+__version__ = "1.1.0"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -120,6 +120,7 @@ class Solr:
         self.always_commit = always_commit
         self.debug = debug
         self.select = SearchHandler(self, "/select")
+        self.mlt = SearchHandler(self, "/mlt")
         self.server_version = self._detect_version()
 
     def close(self) -> None:
@@ -210,8 +211,96 @@ class Solr:
         lst.append('</add>')
         return ''.join(lst)
 
-    def commit(self, wait_flush: bool = True, wait_searcher: bool = True, _optimize: bool = False) -> str:
+    @committing
+    @requires_version(4, 0)
+    def atomic_update(self, doc: dict[str, Any]) -> str:
+        """Atomic (partial) update of a single document.
+
+        Field values can be plain values (full replace) or dicts with a
+        modifier key: ``set``, ``add``, ``remove``, ``removeregex``, ``inc``.
+        Use ``{'set': None}`` to remove a field.
+
+        Example::
+
+            conn.atomic_update({
+                'id': 'doc1',
+                'title': {'set': 'New Title'},
+                'count': {'inc': 1},
+                'old_field': {'set': None},
+            }, commit=True)
+        """
+        lst = ['<add>']
+        self.__atomic_update(lst, doc)
+        lst.append('</add>')
+        return ''.join(lst)
+
+    @committing
+    @requires_version(4, 0)
+    def atomic_update_many(self, docs: Iterable[dict[str, Any]]) -> str:
+        """Atomic (partial) update of multiple documents."""
+        lst = ['<add>']
+        for doc in docs:
+            self.__atomic_update(lst, doc)
+        lst.append('</add>')
+        return ''.join(lst)
+
+    def __atomic_update(self, lst: list[str], fields: dict[str, Any]) -> None:
+        lst.append('<doc>')
+        for field, value in fields.items():
+            if field == 'id':
+                lst.append('<field name="id">%s</field>' % escape(str(value)))
+                continue
+            if isinstance(value, dict):
+                modifier, mod_value = next(iter(value.items()))
+                if mod_value is None:
+                    lst.append('<field name=%s update=%s null="true"/>' % (
+                        quoteattr(field), quoteattr(modifier)))
+                else:
+                    lst.append('<field name=%s update=%s>%s</field>' % (
+                        quoteattr(field), quoteattr(modifier),
+                        escape(str(mod_value))))
+            else:
+                lst.append('<field name=%s>%s</field>' % (
+                    quoteattr(field), escape(str(value))))
+        lst.append('</doc>')
+
+    @requires_version(4, 0)
+    def get(self, id: str | None = None, ids: list[str] | None = None,
+            fields: list[str] | None = None) -> dict[str, Any] | list[dict[str, Any]] | None:
+        """Real-time Get via the /get handler (Solr 4.0+).
+
+        Returns a single doc dict for ``id``, a list for ``ids``,
+        or ``None`` if a single doc is not found.
+        """
+        if id is None and ids is None:
+            raise ValueError("Either id or ids must be specified.")
+        params: dict[str, str] = {'wt': 'json'}
+        if id is not None:
+            params['id'] = str(id)
+        elif ids is not None:
+            params['ids'] = ','.join(str(i) for i in ids)
+        if fields:
+            params['fl'] = ','.join(fields)
+
+        import urllib.parse
+        qs = urllib.parse.urlencode(params)
+        selector = '%s/get?%s' % (self.path, qs)
+        rsp = self._get(selector)
+        data = json.loads(rsp.read().decode('utf-8'))
+
+        if id is not None:
+            result: dict[str, Any] | None = data.get('doc')
+            return result
+        docs: list[dict[str, Any]] = data.get('response', {}).get('docs', [])
+        return docs
+
+    def commit(self, wait_flush: bool = True, wait_searcher: bool = True,
+               _optimize: bool = False, soft_commit: bool = False) -> str:
         """Issue a commit command to the Solr server."""
+        if soft_commit:
+            if self.server_version < (4, 0):
+                raise SolrVersionError("soft_commit", (4, 0), self.server_version)
+            return self._update('<commit softCommit="true"/>')
         verb = "optimize" if _optimize else "commit"
         return self._commit(verb, wait_flush, wait_searcher)
 
