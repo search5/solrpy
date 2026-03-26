@@ -1,5 +1,7 @@
 *.pyc
 solrpy.egg-info
+dist/
+docs/_build/
 CLAUDE.md
 futures.md
 todo.md
