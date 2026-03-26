@@ -105,7 +105,7 @@ supports them.
      - 4.0
    * - Cursor Pagination (``cursor_next()``, ``iter_cursor()``)
      - 4.7
-   * - JSON Facet API
+   * - JSON Facet API (``json_facet`` parameter)
      - 5.0
    * - Dense Vector Search (KNN)
      - 9.0

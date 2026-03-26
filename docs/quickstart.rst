@@ -209,6 +209,25 @@ Find similar documents using the ``/mlt`` handler::
     response = conn.mlt('interesting text', fl='title,body')
 
 
+JSON Facet API (Solr 5.0+)
+---------------------------
+
+Use the ``json_facet`` parameter for advanced faceting::
+
+    response = conn.select('*:*', json_facet={
+        'categories': {
+            'type': 'terms',
+            'field': 'category',
+            'limit': 10,
+        },
+    })
+
+    # Access facet results
+    print(response.facets['categories'])
+
+Works in both JSON and XML response modes.
+
+
 Cursor pagination (Solr 4.7+)
 ------------------------------
 

@@ -1,6 +1,17 @@
 Changelog
 =========
 
+1.3.0 (2026-03-27)
+-------------------
+
+**New features (Solr 5.0+):**
+
+- **JSON Facet API**: ``json_facet`` parameter on ``SearchHandler.__call__``.
+  Accepts a dict, automatically serialized to ``json.facet`` query parameter.
+  Response includes ``facets`` attribute with results.
+  Version-gated to Solr 5.0+. Works in both JSON and XML response modes.
+
+
 1.2.0 (2026-03-27)
 -------------------
 

@@ -102,6 +102,10 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.3.0
+
+- **JSON Facet API**: `json_facet` parameter for advanced faceting (Solr 5.0+)
+
 ### 1.2.0
 
 - **Cursor pagination**: `resp.cursor_next()` and `conn.iter_cursor()` for deep pagination (Solr 4.7+)

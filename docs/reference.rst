@@ -272,6 +272,8 @@ SearchHandler class
    :param score: Include ``score`` in results. Defaults to ``True``.
    :param sort: Fields to sort by. String or iterable.
    :param sort_order: Default sort direction (``'asc'`` or ``'desc'``).
+   :param json_facet: JSON Facet API dict (Solr 5.0+). Serialized to ``json.facet``
+                      query parameter automatically.
    :param params: Additional Solr parameters (use underscores for dots).
    :param timeout: Per-request timeout in seconds (overrides connection-level timeout).
    :returns: A :class:`Response` instance.

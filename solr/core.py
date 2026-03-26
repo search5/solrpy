@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -466,7 +466,15 @@ class SearchHandler:
     def __call__(self, q: str | None = None, fields: str | Iterable[str] | None = None,
                  highlight: bool | str | Iterable[str] | None = None,
                  score: bool = True, sort: str | Iterable[str] | None = None,
-                 sort_order: str = "asc", **params: Any) -> Response | None:
+                 sort_order: str = "asc",
+                 json_facet: dict[str, Any] | None = None,
+                 **params: Any) -> Response | None:
+        if json_facet is not None:
+            if self.conn.server_version < (5, 0):
+                from .exceptions import SolrVersionError
+                raise SolrVersionError("json_facet", (5, 0), self.conn.server_version)
+            params['json.facet'] = json.dumps(json_facet)
+
         if highlight:
             params['hl'] = 'true'
             if not isinstance(highlight, (bool, int, float)):
