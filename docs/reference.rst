@@ -273,6 +273,63 @@ Response class
            print(doc['id'])
 
 
+Paginator
+---------
+
+.. class:: SolrPaginator(result, default_page_size=None)
+
+   Paginator for a Solr response object. Provides Django-like pagination
+   without any Django dependency.
+
+   :param result: A :class:`Response` instance from a query.
+   :param default_page_size: Override the page size. If not given, uses the
+                              ``rows`` parameter from the query, or the number
+                              of results returned.
+
+   .. attribute:: count
+
+      Total number of matching documents.
+
+   .. attribute:: num_pages
+
+      Total number of pages.
+
+   .. attribute:: page_range
+
+      A ``range`` of valid page numbers.
+
+   .. method:: page(page_num=1)
+
+      Return a :class:`SolrPage` for the given page number.
+
+      :raises PageNotAnInteger: If ``page_num`` cannot be converted to int.
+      :raises EmptyPage: If ``page_num`` is out of range.
+
+.. class:: SolrPage
+
+   A single page of results.
+
+   .. attribute:: object_list
+
+      List of documents on this page.
+
+   .. method:: has_next()
+   .. method:: has_previous()
+   .. method:: has_other_pages()
+   .. method:: next_page_number()
+   .. method:: previous_page_number()
+   .. method:: start_index()
+   .. method:: end_index()
+
+.. class:: EmptyPage
+
+   Raised when the requested page is out of range. Subclass of :class:`ValueError`.
+
+.. class:: PageNotAnInteger
+
+   Raised when the page number is not an integer. Subclass of :class:`TypeError`.
+
+
 Response parsing
 ----------------
 

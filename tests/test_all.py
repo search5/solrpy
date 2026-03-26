@@ -1377,7 +1377,7 @@ class TestPaginator(SolrConnectionTestCase):
         paginator = solr.SolrPaginator(result, default_page_size=10)
         try:
             paginator.page(1)
-        except solr.SolrException:
+        except (solr.SolrException, ValueError, TypeError):
             self.fail('Unicode not encoded correctly in paginator')
 
 
@@ -2207,6 +2207,48 @@ class TestURLValidation(unittest.TestCase):
             solr_warnings = [x for x in w if 'solrpy' in str(x.message)]
             self.assertEqual(len(solr_warnings), 0)
             conn.close()
+
+
+# ===================================================================
+# 1.0.7 tests — paginator Django dependency removal
+# ===================================================================
+
+class TestPaginatorExceptions(unittest.TestCase):
+    """EmptyPage and PageNotAnInteger should be standard exceptions."""
+
+    def test_empty_page_is_not_solr_exception(self):
+        from solr.paginator import EmptyPage
+        self.assertFalse(issubclass(EmptyPage, solr.SolrException))
+
+    def test_empty_page_is_value_error(self):
+        from solr.paginator import EmptyPage
+        self.assertTrue(issubclass(EmptyPage, ValueError))
+
+    def test_page_not_an_integer_exists(self):
+        from solr.paginator import PageNotAnInteger
+        self.assertTrue(issubclass(PageNotAnInteger, TypeError))
+
+    def test_page_not_an_integer_raised(self):
+        from solr.paginator import PageNotAnInteger
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        conn.add({'id': 'pagerr_test', 'data': 'x'}, commit=True)
+        result = conn.select('id:pagerr_test')
+        paginator = solr.SolrPaginator(result, default_page_size=10)
+        with self.assertRaises(PageNotAnInteger):
+            paginator.page('abc')  # type: ignore
+        conn.delete(id='pagerr_test', commit=True)
+        conn.close()
+
+    def test_empty_page_raised(self):
+        from solr.paginator import EmptyPage
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        conn.add({'id': 'pagemp_test', 'data': 'x'}, commit=True)
+        result = conn.select('id:pagemp_test')
+        paginator = solr.SolrPaginator(result, default_page_size=10)
+        with self.assertRaises(EmptyPage):
+            paginator.page(999)
+        conn.delete(id='pagemp_test', commit=True)
+        conn.close()
 
 
 if __name__ == "__main__":

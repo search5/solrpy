@@ -3,34 +3,32 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .exceptions import SolrException
 from .response import Response, Results
 
 
-class EmptyPage(SolrException):
+class EmptyPage(ValueError):
+    """Raised when the requested page number is out of range."""
+    pass
+
+
+class PageNotAnInteger(TypeError):
+    """Raised when the page number is not an integer."""
     pass
 
 
 class SolrPaginator:
     """
-    Create a Django-like Paginator for a solr response object. Can be handy
-    when you want to hand off a Paginator and/or Page to a template to
-    display results, and provide links to next page, etc.
+    Paginator for a Solr response object.
 
-    For example:
-    >>> from solr import Solr, SolrPaginator
-    >>>
-    >>> conn = Solr('http://localhost:8083/solr')
-    >>> response = conn.select('title:huckleberry')
-    >>> paginator = SolrPaginator(response)
-    >>> print(paginator.num_pages)
-    >>> page = paginator.get_page(5)
+    Example::
 
-    For more details see the Django Paginator documentation and solrpy
-    unittests.
-
-      http://docs.djangoproject.com/en/dev/topics/pagination/
-
+        >>> from solr import Solr, SolrPaginator
+        >>>
+        >>> conn = Solr('http://localhost:8083/solr')
+        >>> response = conn.select('title:huckleberry')
+        >>> paginator = SolrPaginator(response)
+        >>> print(paginator.num_pages)
+        >>> page = paginator.page(1)
     """
 
     def __init__(self, result: Response, default_page_size: int | str | None = None) -> None:
@@ -79,11 +77,11 @@ class SolrPaginator:
         return self.query(**new_params)
 
     def page(self, page_num: int = 1) -> SolrPage:
-        """Return the requested Page object"""
+        """Return the requested Page object."""
         try:
-            int(page_num)
+            page_num = int(page_num)
         except (TypeError, ValueError):
-            raise SolrException('PageNotAnInteger')
+            raise PageNotAnInteger('Page number must be an integer')
 
         if page_num not in self.page_range:
             raise EmptyPage('That page does not exist.')

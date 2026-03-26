@@ -102,6 +102,12 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.0.7
+
+- **Breaking**: `EmptyPage` now inherits `ValueError` (was `SolrException`)
+- New `PageNotAnInteger` exception (inherits `TypeError`)
+- Paginator module no longer depends on `SolrException`
+
 ### 1.0.6
 
 - URL validation: warns if URL path doesn't contain `/solr` (Solr 10.0+ preparation)

@@ -1,6 +1,18 @@
 Changelog
 =========
 
+1.0.7 (2026-03-27)
+-------------------
+
+**Breaking changes:**
+
+- ``EmptyPage`` no longer inherits from ``SolrException``; now subclasses
+  ``ValueError``.
+- New ``PageNotAnInteger`` exception (subclass of ``TypeError``) replaces
+  the previous ``SolrException('PageNotAnInteger')`` pattern.
+- Paginator module no longer depends on ``SolrException`` for flow control.
+
+
 1.0.6 (2026-03-27)
 -------------------
 
