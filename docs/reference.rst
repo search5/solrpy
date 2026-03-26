@@ -359,6 +359,21 @@ Response class
       Fetch the previous batch of results. Returns a new :class:`Response`,
       or ``None`` if this is the first batch.
 
+   **Spellcheck (Solr 1.4+):**
+
+   .. attribute:: Response.spellcheck
+
+      A :class:`SpellcheckResult` object if the response contains spellcheck
+      data, otherwise ``None``. Spellcheck data is returned when you include
+      ``spellcheck='true'`` in the query parameters.
+
+      Example::
+
+          resp = conn.select('misspeled query', spellcheck='true',
+                             spellcheck_collate='true')
+          if resp.spellcheck and not resp.spellcheck.correctly_spelled:
+              print('Did you mean:', resp.spellcheck.collation)
+
    **Iteration:**
 
    Response objects support ``len()`` and iteration::
@@ -367,6 +382,75 @@ Response class
        print(len(response))
        for doc in response:
            print(doc['id'])
+
+
+SpellcheckResult class (Solr 1.4+)
+------------------------------------
+
+.. class:: SpellcheckResult(raw)
+
+   Wrapper around the raw spellcheck response dict. Returned by
+   ``Response.spellcheck`` when the query includes ``spellcheck=true``.
+
+   :param raw: The raw spellcheck dict from the Solr response.
+
+   .. attribute:: SpellcheckResult.correctly_spelled
+
+      ``True`` if all query terms were spelled correctly.
+
+   .. attribute:: SpellcheckResult.collation
+
+      The corrected full query string suggested by Solr (collation), or
+      ``None`` if not present. Requires ``spellcheck.collate=true`` on the
+      request.
+
+   .. attribute:: SpellcheckResult.suggestions
+
+      List of per-word suggestion entries. Each entry is a dict that includes
+      an ``'original'`` key (the misspelled word) merged with the Solr info
+      dict (``'numFound'``, ``'startOffset'``, ``'endOffset'``,
+      ``'suggestion'`` list, etc.).
+
+      Example::
+
+          for entry in resp.spellcheck.suggestions:
+              print(entry['original'], '->', entry.get('suggestion', []))
+
+
+Suggest class (Solr 4.7+)
+---------------------------
+
+.. class:: Suggest(conn)
+
+   Query Solr's SuggestComponent via the ``/suggest`` handler.
+
+   The ``/suggest`` handler and at least one ``SuggestComponent`` must be
+   configured in ``solrconfig.xml``.
+
+   :param conn: A :class:`Solr` instance.
+
+   .. method:: __call__(q, dictionary=None, count=10, **params)
+
+      Return a flat list of suggestion dicts for the query term.
+
+      :param q: Partial query string to suggest for.
+      :param dictionary: Name of the suggester dictionary to use. If ``None``,
+          Solr uses the default suggester.
+      :param count: Maximum number of suggestions to return. Defaults to ``10``.
+      :param params: Extra parameters forwarded verbatim to ``/suggest``.
+      :returns: List of suggestion dicts. Each dict typically has ``'term'``,
+          ``'weight'``, and ``'payload'`` keys.
+      :raises SolrVersionError: If the server is older than Solr 4.7.
+
+      Example::
+
+          from solr import Solr, Suggest
+
+          conn = Solr('http://localhost:8983/solr/mycore')
+          suggest = Suggest(conn)
+          results = suggest('que', dictionary='mySuggester', count=5)
+          for s in results:
+              print(s['term'], s['weight'])
 
 
 Schema API (Solr 4.2+)

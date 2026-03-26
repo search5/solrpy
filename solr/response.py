@@ -11,6 +11,79 @@ class Results(list[Any]):
     pass
 
 
+class SpellcheckResult:
+    """Wrapper around a Solr spellcheck response component.
+
+    Provides convenient accessors for the collation string and per-word
+    suggestions returned by the SpellCheckComponent. Available in Solr 1.4+.
+
+    Activate spellchecking by adding ``spellcheck=true`` (and optionally
+    ``spellcheck_collate=true``) to a query. The result is then accessible
+    via ``response.spellcheck``.
+
+    Example::
+
+        resp = conn.select('misspeled query', spellcheck='true',
+                           spellcheck_collate='true',
+                           spellcheck_count='5')
+        if resp.spellcheck and not resp.spellcheck.correctly_spelled:
+            print('Did you mean:', resp.spellcheck.collation)
+            for entry in resp.spellcheck.suggestions:
+                print(entry['original'], '->', entry.get('suggestion', []))
+    """
+
+    def __init__(self, raw: dict[str, Any]) -> None:
+        self._raw = raw
+
+    @property
+    def correctly_spelled(self) -> bool:
+        """True if all query terms were spelled correctly."""
+        return bool(self._raw.get('correctlySpelled', True))
+
+    @property
+    def suggestions(self) -> list[dict[str, Any]]:
+        """List of per-word suggestion entries.
+
+        Each entry is a dict with at least an ``'original'`` key (the
+        misspelled word) merged with the info dict returned by Solr
+        (``'numFound'``, ``'startOffset'``, ``'endOffset'``,
+        ``'suggestion'``, etc.).
+        """
+        raw_list = self._raw.get('suggestions', [])
+        result: list[dict[str, Any]] = []
+        i = 0
+        while i < len(raw_list) - 1:
+            orig = raw_list[i]
+            info = raw_list[i + 1]
+            if (isinstance(orig, str) and orig != 'collation'
+                    and isinstance(info, dict)):
+                result.append({'original': orig, **info})
+                i += 2
+            else:
+                i += 1
+        return result
+
+    @property
+    def collation(self) -> str | None:
+        """The collation string (best-guess corrected full query), or None.
+
+        Checks both the top-level ``'collation'`` key (modern JSON responses)
+        and the inline ``'collation'`` marker inside the ``'suggestions'``
+        list (older Solr XML-derived responses).
+        """
+        if 'collation' in self._raw:
+            val = self._raw['collation']
+            return str(val) if val is not None else None
+        raw_list = self._raw.get('suggestions', [])
+        for i, item in enumerate(raw_list):
+            if item == 'collation' and i + 1 < len(raw_list):
+                return str(raw_list[i + 1])
+        return None
+
+    def __repr__(self) -> str:
+        return 'SpellcheckResult(%r)' % self._raw
+
+
 class Response:
     """A container class for query results.
 
@@ -26,6 +99,7 @@ class Response:
         self.results: Any = []
         self._query: Any = query
         self._params: dict[str, Any] = {}
+        self._spellcheck_raw: dict[str, Any] | None = None
 
     def _set_numFound(self, value: int | str) -> None:
         self._numFound = int(value)
@@ -59,6 +133,17 @@ class Response:
         del self._maxScore
 
     maxScore = property(_get_maxScore, _set_maxScore, _del_maxScore)
+
+    def _get_spellcheck(self) -> SpellcheckResult | None:
+        if self._spellcheck_raw is None:
+            return None
+        return SpellcheckResult(self._spellcheck_raw)
+
+    def _set_spellcheck(self, value: dict[str, Any] | None) -> None:
+        self._spellcheck_raw = value
+
+    spellcheck = property(_get_spellcheck, _set_spellcheck,
+                          doc="SpellcheckResult for this response, or None.")
 
     def __len__(self) -> int:
         return len(self.results)

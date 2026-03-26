@@ -321,6 +321,47 @@ For raw, unprocessed queries::
     xml = conn.select.raw(q='id:1', wt='xml', indent='on')
 
 
+Suggest (Solr 4.7+)
+--------------------
+
+Query Solr's SuggestComponent for auto-complete suggestions. The ``/suggest``
+handler and a ``SuggestComponent`` must be configured in ``solrconfig.xml``::
+
+    from solr import Suggest
+
+    suggest = Suggest(conn)
+    results = suggest('que', dictionary='mySuggester', count=5)
+    for s in results:
+        print(s['term'], s['weight'])
+
+Omit ``dictionary`` to use the Solr default suggester. Pass extra parameters
+as keyword arguments (forwarded verbatim to the ``/suggest`` handler)::
+
+    results = suggest('q', count=10, suggest_build='true')
+
+
+Spellcheck (Solr 1.4+)
+------------------------
+
+Activate the SpellCheckComponent by adding ``spellcheck=true`` to a query.
+The response exposes a ``SpellcheckResult`` via ``response.spellcheck``::
+
+    resp = conn.select(
+        'misspeled query',
+        spellcheck='true',
+        spellcheck_collate='true',
+        spellcheck_count='5',
+    )
+
+    if resp.spellcheck:
+        if not resp.spellcheck.correctly_spelled:
+            print('Did you mean:', resp.spellcheck.collation)
+        for entry in resp.spellcheck.suggestions:
+            print(entry['original'], '->', entry.get('suggestion', []))
+
+Works in both JSON and XML response modes.
+
+
 Schema API (Solr 4.2+)
 -----------------------
 

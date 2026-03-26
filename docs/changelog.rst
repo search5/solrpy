@@ -1,6 +1,21 @@
 Changelog
 =========
 
+1.5.0 (2026-03-27)
+-------------------
+
+**New features:**
+
+- **Suggest** (Solr 4.7+): New ``Suggest(conn)`` wrapper class in ``solr/suggest.py``.
+  Queries the ``/suggest`` handler and returns a flat list of suggestion dicts
+  (``'term'``, ``'weight'``, ``'payload'``). Supports ``dictionary`` and ``count``
+  arguments plus arbitrary extra parameters.
+- **SpellcheckResult** (Solr 1.4+): New ``SpellcheckResult`` class exposed as the
+  ``Response.spellcheck`` property. Provides ``.correctly_spelled``, ``.collation``,
+  and ``.suggestions`` accessors over the raw spellcheck response data.
+  Works in both JSON and XML response modes.
+
+
 1.4.2 (2026-03-27)
 -------------------
 

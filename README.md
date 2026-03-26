@@ -102,6 +102,30 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.5.0
+
+- **Suggest**: `Suggest(conn)` wrapper class for Solr's SuggestComponent (Solr 4.7+).
+  Returns a flat list of suggestion dicts from the `/suggest` handler.
+- **Spellcheck**: `Response.spellcheck` property returns a `SpellcheckResult` object
+  with `.collation` and `.suggestions` accessors. Works in both JSON and XML modes (Solr 1.4+).
+
+```python
+from solr import Solr, Suggest
+
+conn = Solr('http://localhost:8983/solr/mycore')
+
+# Suggest
+suggest = Suggest(conn)
+results = suggest('que', dictionary='mySuggester', count=5)
+for s in results:
+    print(s['term'], s['weight'])
+
+# Spellcheck
+resp = conn.select('misspeled query', spellcheck='true', spellcheck_collate='true')
+if resp.spellcheck and not resp.spellcheck.correctly_spelled:
+    print('Did you mean:', resp.spellcheck.collation)
+```
+
 ### 1.4.2
 
 - New `MoreLikeThis(conn)` wrapper class — no need to know `/mlt` path
