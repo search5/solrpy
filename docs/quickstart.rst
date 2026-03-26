@@ -27,6 +27,17 @@ The connected Solr version is auto-detected::
     print(conn.server_version)  # e.g. (9, 4, 1)
 
 
+Health check
+------------
+
+Check if the server is reachable::
+
+    if conn.ping():
+        print('Solr is up')
+    else:
+        print('Solr is unreachable')
+
+
 Adding documents
 ----------------
 
@@ -46,6 +57,24 @@ Add multiple documents at once::
         {'id': '3', 'title': 'Elasticsearch: The Definitive Guide'},
     ]
     conn.add_many(docs, commit=True)
+
+
+Auto-commit mode
+~~~~~~~~~~~~~~~~
+
+If you want all updates to commit automatically, use the ``always_commit``
+option::
+
+    conn = solr.Solr('http://localhost:8983/solr/mycore', always_commit=True)
+
+    # these will auto-commit without passing commit=True
+    conn.add({'id': '4', 'title': 'Auto-committed document'})
+    conn.delete(id='4')
+
+You can override on individual calls::
+
+    # suppress auto-commit for this one call
+    conn.add({'id': '5', 'title': 'Deferred'}, commit=False)
 
 
 Searching
@@ -159,6 +188,27 @@ Commit with optimization::
 Or call optimize directly::
 
     conn.optimize()
+
+
+Working with JSON responses
+----------------------------
+
+solrpy includes a JSON response parser for use with ``wt=json``. This is
+useful when working with Solr 7.0+, where JSON is the default response
+format::
+
+    import json
+    from solr.core import parse_json_response
+
+    raw = conn.select.raw(q='*:*', wt='json')
+    data = json.loads(raw)
+    response = parse_json_response(data, {'q': '*:*'}, conn.select)
+
+    for doc in response.results:
+        print(doc['id'])
+
+The returned ``Response`` object has the same API as XML-parsed responses
+(``results``, ``header``, ``numFound``, ``highlighting``, etc.).
 
 
 Using SearchHandler

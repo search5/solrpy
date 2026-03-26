@@ -47,7 +47,7 @@ Exceptions
 Solr class
 ----------
 
-.. class:: Solr(url, persistent=True, timeout=None, ssl_key=None, ssl_cert=None, http_user=None, http_pass=None, post_headers=None, max_retries=3, debug=False)
+.. class:: Solr(url, persistent=True, timeout=None, ssl_key=None, ssl_cert=None, http_user=None, http_pass=None, post_headers=None, max_retries=3, always_commit=False, debug=False)
 
    Connect to the Solr instance at *url*. If the Solr instance provides
    multiple cores, *url* should point to a specific core.
@@ -78,6 +78,10 @@ Solr class
         - Dictionary of additional headers to include in all requests.
       * - ``max_retries``
         - Maximum number of automatic retries on connection errors. Defaults to ``3``.
+      * - ``always_commit``
+        - If ``True``, all update methods (``add``, ``add_many``, ``delete``, etc.)
+          will automatically commit changes. Individual calls can override this by
+          passing ``commit=False``. Defaults to ``False``.
       * - ``debug``
         - If ``True``, log all requests and responses.
 
@@ -88,9 +92,30 @@ Solr class
       Tuple representing the detected Solr version, e.g. ``(9, 4, 1)``.
       Automatically populated during initialization.
 
+   .. attribute:: Solr.always_commit
+
+      Boolean indicating whether update methods auto-commit by default.
+
    .. attribute:: Solr.select
 
       A :class:`SearchHandler` instance bound to the ``/select`` endpoint.
+
+   **Health check:**
+
+   .. method:: Solr.ping()
+
+      Ping the Solr server to check if it is reachable.
+
+      Returns ``True`` if the server responds to ``/admin/ping``,
+      ``False`` otherwise. Tries both the core path and its parent path.
+
+      Works on all Solr versions (1.2+).
+
+      Example::
+
+          conn = solr.Solr('http://localhost:8983/solr/mycore')
+          if conn.ping():
+              print('Solr is up')
 
    **Search methods:**
 
@@ -124,8 +149,8 @@ Commit-control arguments
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 Several update methods support optional keyword arguments to control
-commits. These arguments are always optional; no commit is performed if
-they are not provided.
+commits. These arguments are always optional; when ``always_commit`` is
+``False`` (the default), no commit is performed unless explicitly requested.
 
 .. list-table::
    :widths: 20 80
@@ -134,7 +159,9 @@ they are not provided.
    * - Argument
      - Description
    * - ``commit``
-     - If ``True``, commit changes before returning.
+     - If ``True``, commit changes before returning. When ``always_commit``
+       is ``True`` on the connection, this defaults to ``True`` but can be
+       overridden with ``commit=False``.
    * - ``optimize``
      - If ``True``, optimize the index before returning (implies ``commit=True``).
    * - ``wait_flush``
@@ -262,3 +289,65 @@ Response class
        print(len(response))
        for doc in response:
            print(doc['id'])
+
+
+Response parsing
+----------------
+
+solrpy provides two response parsers:
+
+.. function:: solr.core.parse_query_response(data, params, query)
+
+   Parse an XML response from Solr (``wt=standard`` or ``wt=xml``).
+
+   :param data: A file-like object containing the XML response.
+   :param params: Dictionary of query parameters used for the request.
+   :param query: The :class:`SearchHandler` that issued the query (used for
+                 ``next_batch()`` / ``previous_batch()``).
+   :returns: A :class:`Response` instance, or ``None`` if the response is empty.
+
+   This is the default parser used by :class:`SearchHandler`.
+
+.. function:: solr.core.parse_json_response(data, params, query)
+
+   Parse a JSON response dict from Solr (``wt=json``).
+
+   :param data: A dictionary (already deserialized from JSON).
+   :param params: Dictionary of query parameters used for the request.
+   :param query: The :class:`SearchHandler` that issued the query.
+   :returns: A :class:`Response` instance.
+
+   Handles all standard Solr response fields: ``responseHeader``,
+   ``response`` (docs, numFound, start, maxScore), and any additional
+   top-level keys such as ``highlighting``, ``facet_counts``, ``stats``,
+   ``debug``, etc. Extra keys are attached directly as Response attributes.
+
+   Example usage with a raw JSON query::
+
+       import json
+       import solr
+       from solr.core import parse_json_response
+
+       conn = solr.Solr('http://localhost:8983/solr/mycore')
+       raw = conn.select.raw(q='*:*', wt='json')
+       data = json.loads(raw)
+       response = parse_json_response(data, {'q': '*:*'}, conn.select)
+
+
+Gzip compression
+----------------
+
+All requests include an ``Accept-Encoding: gzip`` header. When the Solr
+server returns a gzip-compressed response, it is transparently decompressed
+before parsing.
+
+This reduces network transfer size, especially for large result sets.
+No configuration is needed; gzip support is always enabled.
+
+.. function:: solr.core.read_response(response)
+
+   Read an HTTP response body, decompressing gzip if the
+   ``Content-Encoding`` header indicates compression.
+
+   :param response: An :class:`http.client.HTTPResponse` object.
+   :returns: Decoded string (UTF-8).
