@@ -1,6 +1,20 @@
 Changelog
 =========
 
+1.0.2 (2026-03-27)
+-------------------
+
+**Type safety:**
+
+- ``mypy --strict`` now passes with zero errors on the entire ``solr/`` package.
+- Added type annotations to all internal classes: ``ResponseContentHandler``,
+  ``Node``, ``Results``, ``UTC``.
+- Added type annotations to all ``@committing``-decorated methods (``add``,
+  ``add_many``, ``delete``, ``delete_many``, ``delete_query``).
+- Fixed ``endElement`` variable shadowing (``name`` → ``tag``) for type safety.
+- Removed unnecessary ``type: ignore`` comments.
+
+
 1.0.1 (2026-03-27)
 -------------------
 

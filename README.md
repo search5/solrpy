@@ -90,6 +90,12 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.0.2
+
+- `mypy --strict` passes with zero errors on `solr/` package
+- Added type hints to all internal classes (`ResponseContentHandler`, `Node`, `Results`, `UTC`)
+- Fixed `endElement` variable shadowing for type safety
+
 ### 1.0.1
 
 - Added type hints to all public methods in `solr/core.py` and `solr/paginator.py`

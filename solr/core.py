@@ -258,7 +258,7 @@ from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
@@ -530,7 +530,7 @@ class Solr:
     # Update interface.
 
     @committing
-    def delete(self, id=None, ids=None, queries=None):
+    def delete(self, id: Any = None, ids: list[Any] | None = None, queries: list[str] | None = None) -> str | None:
         """
         Delete documents by ids or queries.
 
@@ -547,7 +547,7 @@ class Solr:
         return self._delete(id=id, ids=ids, queries=queries)
 
     @committing
-    def delete_many(self, ids):
+    def delete_many(self, ids: list[Any]) -> str | None:
         """
         Delete documents using an iterable of ids.
 
@@ -557,7 +557,7 @@ class Solr:
         return self._delete(ids=ids)
 
     @committing
-    def delete_query(self, query):
+    def delete_query(self, query: str) -> str | None:
         """
         Delete all documents identified by a query.
 
@@ -567,7 +567,7 @@ class Solr:
         return self._delete(queries=[query])
 
     @committing
-    def add(self, doc):
+    def add(self, doc: dict[str, Any]) -> str:
         """
         Add a document to the Solr server.  Document fields
         should be specified as arguments to this function
@@ -585,7 +585,7 @@ class Solr:
         return ''.join(lst)
 
     @committing
-    def add_many(self, docs):
+    def add_many(self, docs: Iterable[dict[str, Any]]) -> str:
         """
         Add several documents to the Solr server.
 
@@ -746,7 +746,7 @@ class SolrConnection(Solr):
 
     # Backward compatible update interfaces.
 
-    def add(self, _commit: bool = False, **fields: Any) -> Any:  # type: ignore[override]
+    def add(self, _commit: bool = False, **fields: Any) -> Any:
         """
         Add or update a single document with field values given by
         keyword arguments.
@@ -764,7 +764,7 @@ class SolrConnection(Solr):
         """
         return Solr.add_many(self, [fields], commit=_commit)
 
-    def add_many(self, docs: Iterable[dict[str, Any]], _commit: bool = False) -> Any:  # type: ignore[override]
+    def add_many(self, docs: Iterable[dict[str, Any]], _commit: bool = False) -> Any:
         """
         Add or update multiple documents. with field values for each given
         by dictionaries in the sequence `docs`.
@@ -1084,11 +1084,11 @@ class ResponseContentHandler(ContentHandler):
     ContentHandler for the XML results of a /select call.
     (Versions 2.2 (and possibly 2.1))
     """
-    def __init__(self):
-        self.stack = [Node(None, {})]
-        self.in_tree = False
+    def __init__(self) -> None:
+        self.stack: list[Node] = [Node(None, {})]
+        self.in_tree: bool = False
 
-    def startElement(self, name, attrs):
+    def startElement(self, name: str, attrs: Any) -> None:
         if not self.in_tree:
             if name != 'response':
                 raise SolrException(
@@ -1104,98 +1104,91 @@ class ResponseContentHandler(ContentHandler):
         # Keep track of children
         self.stack[-2].children.append(element)
 
-    def characters (self, ch):
+    def characters(self, ch: str) -> None:
         self.stack[-1].chars.append(ch)
 
-    def endElement(self, name):
+    def endElement(self, name: str) -> None:
         node = self.stack.pop()
 
-        name = node.name
+        tag = node.name or name
         value = "".join(node.chars)
 
-        if name == 'int':
+        if tag == 'int':
             node.final = int(value.strip())
 
-        elif name == 'str':
+        elif tag == 'str':
             node.final = value
 
-        elif name == 'null':
+        elif tag == 'null':
             node.final = None
 
-        elif name == 'long':
+        elif tag == 'long':
             node.final = int(value.strip())
 
-        elif name == 'bool':
+        elif tag == 'bool':
             node.final = value.strip().lower().startswith('t')
 
-        elif name == 'date':
-             node.final = utc_from_string(value.strip())
+        elif tag == 'date':
+            node.final = utc_from_string(value.strip())
 
-        elif name in ('float','double', 'status','QTime'):
+        elif tag in ('float', 'double', 'status', 'QTime'):
             node.final = float(value.strip())
 
-        elif name == 'response':
+        elif tag == 'response':
             node.final = response = Response(self)
             for child in node.children:
-                name = child.attrs.get('name', child.name)
-                if name == 'responseHeader':
-                    name = 'header'
+                child_name = child.attrs.get('name', child.name)
+                if child_name == 'responseHeader':
+                    child_name = 'header'
                 elif child.name == 'result':
-                    name = 'results'
+                    child_name = 'results'
                     for attr_name in child.attrs.getNames():
-                        # We already know it is a response
                         if attr_name != "name":
                             setattr(response, attr_name, child.attrs.get(attr_name))
 
-                setattr(response, name, child.final)
+                setattr(response, child_name, child.final)
 
-        elif name in ('lst','doc'):
-            # Represent these with a dict
+        elif tag in ('lst', 'doc'):
             node.final = dict(
                     [(cnode.attrs['name'], cnode.final)
                         for cnode in node.children])
 
-        elif name in ('arr',):
+        elif tag in ('arr',):
             node.final = [cnode.final for cnode in node.children]
 
-        elif name == 'result':
+        elif tag == 'result':
             node.final = Results([cnode.final for cnode in node.children])
 
-
-        elif name in ('responseHeader',):
+        elif tag in ('responseHeader',):
             node.final = dict([(cnode.name, cnode.final)
                         for cnode in node.children])
         else:
-            raise SolrException("Unknown tag: %s" % name)
+            raise SolrException("Unknown tag: %s" % tag)
 
         for attr, val in node.attrs.items():
             if attr != 'name':
                 setattr(node.final, attr, val)
 
 
-class Results(list):
+class Results(list[Any]):
     """
     Convenience class containing <result> items
     """
     pass
 
 
-class Node(object):
+class Node:
     """
     A temporary object used in XML processing. Not seen by end user.
     """
-    def __init__(self, name, attrs):
-        """
-        Final will eventually be the "final" representation of
-        this node, whether an int, list, dict, etc.
-        """
-        self.chars = []
+    def __init__(self, name: str | None, attrs: Any) -> None:
+        self.chars: list[str] = []
         self.name = name
         self.attrs = attrs
-        self.final = None
-        self.children = []
+        self.final: Any = None
+        self.children: list[Node] = []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<%s val="%s" %s>' % (
             self.name,
             "".join(self.chars).strip(),
@@ -1233,13 +1226,13 @@ class UTC(datetime.tzinfo):
     """
     UTC timezone.
     """
-    def utcoffset(self, dt):
+    def utcoffset(self, dt: datetime.datetime | None) -> datetime.timedelta:
         return datetime.timedelta(0)
 
-    def tzname(self, dt):
+    def tzname(self, dt: datetime.datetime | None) -> str:
         return "UTC"
 
-    def dst(self, dt):
+    def dst(self, dt: datetime.datetime | None) -> datetime.timedelta:
         return datetime.timedelta(0)
 
 
