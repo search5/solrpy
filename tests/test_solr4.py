@@ -158,15 +158,16 @@ class TestRealtimeGet(unittest.TestCase):
 
 class TestMoreLikeThis(unittest.TestCase):
 
-    def test_mlt_handler_exists(self):
+    def test_mlt_explicit_creation(self):
         conn = solr.Solr(SOLR_HTTP, response_format='xml')
-        self.assertTrue(hasattr(conn, 'mlt'))
-        self.assertIsInstance(conn.mlt, solr.SearchHandler)
+        mlt = solr.SearchHandler(conn, '/mlt')
+        self.assertIsInstance(mlt, solr.SearchHandler)
+        self.assertTrue(mlt.selector.endswith('/mlt'))
         conn.close()
 
-    def test_mlt_handler_path(self):
+    def test_conn_has_no_mlt_attribute(self):
         conn = solr.Solr(SOLR_HTTP, response_format='xml')
-        self.assertTrue(conn.mlt.selector.endswith('/mlt'))
+        self.assertFalse(hasattr(conn, 'mlt'))
         conn.close()
 
 

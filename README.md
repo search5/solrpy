@@ -102,6 +102,12 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.4.1
+
+- **Breaking**: `conn.schema` and `conn.mlt` removed from auto-initialization
+- Use `SchemaAPI(conn)` and `SearchHandler(conn, '/mlt')` explicitly
+- Keeps `Solr` class lightweight; optional features created on demand
+
 ### 1.4.0
 
 - **Schema API**: `conn.schema.fields()`, `add_field()`, `replace_field()`, `delete_field()`, copy fields, dynamic fields, field types (Solr 4.2+)

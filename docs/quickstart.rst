@@ -204,9 +204,10 @@ Make changes visible without flushing to disk::
 MoreLikeThis (Solr 4.0+)
 --------------------------
 
-Find similar documents using the ``/mlt`` handler::
+Find similar documents by creating a handler for ``/mlt``::
 
-    response = conn.mlt('interesting text', fl='title,body')
+    mlt = solr.SearchHandler(conn, '/mlt')
+    response = mlt('interesting text', fl='title,body')
 
 
 JSON Facet API (Solr 5.0+)
@@ -321,26 +322,30 @@ For raw, unprocessed queries::
 Schema API (Solr 4.2+)
 -----------------------
 
-Manage schema fields, types, and copy rules programmatically::
+Create a ``SchemaAPI`` instance to manage schema programmatically::
+
+    from solr import SchemaAPI
+
+    schema = SchemaAPI(conn)
 
     # List fields
-    fields = conn.schema.fields()
+    fields = schema.fields()
 
     # Add a field
-    conn.schema.add_field('title', 'text_general', stored=True, indexed=True)
+    schema.add_field('title', 'text_general', stored=True, indexed=True)
 
     # Replace a field type
-    conn.schema.replace_field('title', 'string')
+    schema.replace_field('title', 'string')
 
     # Delete a field
-    conn.schema.delete_field('title')
+    schema.delete_field('title')
 
     # Copy fields
-    conn.schema.add_copy_field('title', 'title_str')
-    conn.schema.delete_copy_field('title', 'title_str')
+    schema.add_copy_field('title', 'title_str')
+    schema.delete_copy_field('title', 'title_str')
 
     # Full schema dump
-    schema = conn.schema.get_schema()
+    full = schema.get_schema()
 
 
 Closing the connection

@@ -187,11 +187,10 @@ Solr class
 
    **MoreLikeThis (Solr 4.0+):**
 
-   .. attribute:: Solr.mlt
+   Create a :class:`SearchHandler` for the ``/mlt`` endpoint::
 
-      A :class:`SearchHandler` bound to the ``/mlt`` endpoint. Usage::
-
-          response = conn.mlt('interesting text', fl='title,body')
+       mlt = solr.SearchHandler(conn, '/mlt')
+       response = mlt('interesting text', fl='title,body')
 
    **Delete methods:**
 
@@ -359,7 +358,15 @@ Schema API (Solr 4.2+)
 
 .. class:: SchemaAPI
 
-   Accessed via ``conn.schema``. All methods require Solr 4.2+.
+   Created explicitly by the user. All methods require Solr 4.2+.
+
+   Example::
+
+       from solr import Solr, SchemaAPI
+
+       conn = Solr('http://localhost:8983/solr/mycore')
+       schema = SchemaAPI(conn)
+       fields = schema.fields()
 
    **Full schema:**
 

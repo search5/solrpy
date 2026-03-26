@@ -1,6 +1,19 @@
 Changelog
 =========
 
+1.4.1 (2026-03-27)
+-------------------
+
+**Breaking changes:**
+
+- ``conn.schema`` auto-created attribute removed. Create explicitly:
+  ``schema = SchemaAPI(conn)``.
+- ``conn.mlt`` auto-created attribute removed. Create explicitly:
+  ``mlt = SearchHandler(conn, '/mlt')``.
+- ``Solr.__init__`` no longer initializes optional features. Only ``select``
+  remains as a built-in handler.
+
+
 1.4.0 (2026-03-27)
 -------------------
 

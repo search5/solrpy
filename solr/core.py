@@ -21,9 +21,8 @@ from .utils import (
 )
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
-from .schema import SchemaAPI
 
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -121,8 +120,6 @@ class Solr:
         self.always_commit = always_commit
         self.debug = debug
         self.select = SearchHandler(self, "/select")
-        self.mlt = SearchHandler(self, "/mlt")
-        self.schema = SchemaAPI(self)
         self.server_version = self._detect_version()
 
     def close(self) -> None:
