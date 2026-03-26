@@ -49,14 +49,14 @@ for hit in response.results:
     print(hit['title'])
 ```
 
-## JSON response mode
+## Response format
 
-By default, solrpy uses XML to communicate with Solr. For Solr 7.0+ where
-JSON is the native default, you can switch to JSON mode:
+Since v1.0.4, solrpy uses JSON (`wt=json`) by default, matching Solr 7.0+ behavior.
+
+For legacy XML mode:
 
 ```python
-s = solr.Solr('http://localhost:8983/solr/mycore', response_format='json')
-response = s.select('title:lucene')
+s = solr.Solr('http://localhost:8983/solr/mycore', response_format='xml')
 ```
 
 The `Response` object API is identical regardless of format.
@@ -101,6 +101,11 @@ poetry run pytest tests/
 ```
 
 ## Changelog
+
+### 1.0.4
+
+- **Breaking**: Default `response_format` changed from `'xml'` to `'json'`
+- Pass `response_format='xml'` explicitly for legacy XML behavior
 
 ### 1.0.3
 

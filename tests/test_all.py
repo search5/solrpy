@@ -55,6 +55,7 @@ class SolrConnectionTestCase(unittest.TestCase):
             conn.close()
 
     def new_connection(self, **kw):
+        kw.setdefault('response_format', 'xml')
         conn = self.connection_factory(SOLR_HTTP, **kw)
         self._connections.append(conn)
         return conn
@@ -2293,9 +2294,9 @@ class TestGzipResponse(unittest.TestCase):
 class TestResponseFormat(unittest.TestCase):
     """Test the response_format constructor option."""
 
-    def test_default_format_is_xml(self):
+    def test_default_format_is_json(self):
         conn = solr.Solr(SOLR_HTTP)
-        self.assertEqual(conn.response_format, 'xml')
+        self.assertEqual(conn.response_format, 'json')
         conn.close()
 
     def test_explicit_xml_format(self):

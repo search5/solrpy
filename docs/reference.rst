@@ -83,9 +83,9 @@ Solr class
           will automatically commit changes. Individual calls can override this by
           passing ``commit=False``. Defaults to ``False``.
       * - ``response_format``
-        - Response format for queries: ``'xml'`` (default) or ``'json'``.
+        - Response format for queries: ``'json'`` (default) or ``'xml'``.
           When ``'json'``, queries use ``wt=json`` and the JSON parser.
-          Recommended for Solr 7.0+ where JSON is the native default.
+          Use ``'xml'`` for legacy compatibility with older code.
       * - ``debug``
         - If ``True``, log all requests and responses.
 

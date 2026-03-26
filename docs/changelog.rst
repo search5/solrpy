@@ -1,6 +1,16 @@
 Changelog
 =========
 
+1.0.4 (2026-03-27)
+-------------------
+
+**Breaking changes:**
+
+- Default ``response_format`` changed from ``'xml'`` to ``'json'``.
+  Existing code that relies on XML-specific behavior should pass
+  ``response_format='xml'`` explicitly.
+
+
 1.0.3 (2026-03-27)
 -------------------
 

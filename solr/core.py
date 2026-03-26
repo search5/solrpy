@@ -21,7 +21,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
@@ -43,7 +43,7 @@ class Solr:
                  post_headers: dict[str, str] | None = None,
                  max_retries: int = 3,
                  always_commit: bool = False,
-                 response_format: str = 'xml',
+                 response_format: str = 'json',
                  debug: bool = False) -> None:
 
         self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]

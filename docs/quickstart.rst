@@ -190,24 +190,17 @@ Or call optimize directly::
     conn.optimize()
 
 
-Working with JSON responses
-----------------------------
+Response format
+---------------
 
-solrpy includes a JSON response parser for use with ``wt=json``. This is
-useful when working with Solr 7.0+, where JSON is the default response
-format::
+Since v1.0.4, solrpy uses JSON (``wt=json``) by default. This matches
+Solr 7.0+ where JSON is the native default format.
 
-    import json
-    from solr.core import parse_json_response
+If you need XML mode for legacy compatibility::
 
-    raw = conn.select.raw(q='*:*', wt='json')
-    data = json.loads(raw)
-    response = parse_json_response(data, {'q': '*:*'}, conn.select)
+    conn = solr.Solr('http://localhost:8983/solr/mycore', response_format='xml')
 
-    for doc in response.results:
-        print(doc['id'])
-
-The returned ``Response`` object has the same API as XML-parsed responses
+The ``Response`` object API is identical regardless of format
 (``results``, ``header``, ``numFound``, ``highlighting``, etc.).
 
 
