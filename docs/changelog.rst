@@ -1,6 +1,23 @@
 Changelog
 =========
 
+1.7.0 (2026-03-27)
+-------------------
+
+**New features (Solr 3.3+):**
+
+- **Grouping / Field Collapsing**: ``Response.grouped`` attribute returns a
+  :class:`GroupedResult` object when grouped results are present.
+- :class:`GroupedResult` supports subscript access (``resp.grouped['field']``),
+  iteration, ``in`` tests, and ``len()``.
+- :class:`GroupField` provides ``.matches``, ``.ngroups``, and ``.groups``
+  accessors.
+- :class:`Group` provides ``.groupValue`` and ``.doclist`` (a :class:`Results`
+  list with ``numFound`` and ``start``).
+- Works in both JSON and XML response modes. XML ``<result name="doclist">``
+  tags are wrapped into :class:`Results` with normalized integer attributes.
+
+
 1.6.0 (2026-03-27)
 -------------------
 

@@ -6,7 +6,7 @@ from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 
 from .exceptions import SolrException
-from .response import Response, Results
+from .response import Response, Results, GroupedResult
 from .utils import utc_from_string
 
 
@@ -30,6 +30,9 @@ def parse_json_response(data: dict[str, Any], params: dict[str, Any], query: Any
     for key, value in data.items():
         if key not in ('responseHeader', 'response'):
             setattr(response, key, value)
+
+    if hasattr(response, 'grouped') and isinstance(response.grouped, dict):
+        response.grouped = GroupedResult(response.grouped)
 
     return response
 
@@ -112,6 +115,9 @@ class ResponseContentHandler(ContentHandler):
                             setattr(response, attr_name, child.attrs.get(attr_name))
 
                 setattr(response, child_name, child.final)
+
+            if hasattr(response, 'grouped') and isinstance(response.grouped, dict):
+                response.grouped = GroupedResult(response.grouped)
 
         elif tag in ('lst', 'doc'):
             node.final = dict(

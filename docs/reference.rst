@@ -359,6 +359,21 @@ Response class
       Fetch the previous batch of results. Returns a new :class:`Response`,
       or ``None`` if this is the first batch.
 
+   **Grouping (Solr 3.3+):**
+
+   .. attribute:: Response.grouped
+
+      A :class:`GroupedResult` object when the response contains grouped
+      results, otherwise not present. Enable grouping with ``group='true'``
+      and ``group_field='field'``.
+
+      Example::
+
+          resp = conn.select('*:*', group='true', group_field='category',
+                             group_limit=5, group_ngroups='true')
+          for group in resp.grouped['category'].groups:
+              print(group.groupValue, len(group.doclist))
+
    **Spellcheck (Solr 1.4+):**
 
    .. attribute:: Response.spellcheck
@@ -516,6 +531,49 @@ Suggest class (Solr 4.7+)
           results = suggest('que', dictionary='mySuggester', count=5)
           for s in results:
               print(s['term'], s['weight'])
+
+
+Grouping classes (Solr 3.3+)
+-----------------------------
+
+.. class:: GroupedResult(raw)
+
+   Wrapper around a Solr grouped response. Supports subscript access
+   by field name, iteration, ``in``, and ``len()``.
+
+   .. method:: __getitem__(field)
+
+      Return a :class:`GroupField` for the given field name.
+
+.. class:: GroupField(raw)
+
+   Grouped results for a single field.
+
+   .. attribute:: matches
+
+      Total number of documents matching the query across all groups.
+
+   .. attribute:: ngroups
+
+      Number of distinct groups, or ``None`` if ``group.ngroups`` was not
+      requested.
+
+   .. attribute:: groups
+
+      List of :class:`Group` objects.
+
+.. class:: Group(raw)
+
+   A single group.
+
+   .. attribute:: groupValue
+
+      The field value that defines this group, or ``None``.
+
+   .. attribute:: doclist
+
+      A :class:`Results` list of matching documents, with ``numFound``
+      and ``start`` attributes.
 
 
 Schema API (Solr 4.2+)

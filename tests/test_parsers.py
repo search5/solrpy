@@ -25,25 +25,38 @@ class TestNamedResultTag(unittest.TestCase):
         self.assertEqual(len(resp.results), 1)
 
     def test_named_result_uses_name_attribute(self):
+        """Grouped XML responses are parsed into GroupedResult/GroupField/Group objects."""
         xml = '''<response>
           <lst name="responseHeader"><int name="status">0</int></lst>
           <result name="response" numFound="0" start="0"/>
           <lst name="grouped">
             <lst name="category">
               <int name="matches">42</int>
-              <result name="doclist" numFound="2" start="0">
-                <doc><str name="id">a</str></doc>
-                <doc><str name="id">b</str></doc>
-              </result>
+              <int name="ngroups">1</int>
+              <arr name="groups">
+                <lst>
+                  <str name="groupValue">electronics</str>
+                  <result name="doclist" numFound="2" start="0">
+                    <doc><str name="id">a</str></doc>
+                    <doc><str name="id">b</str></doc>
+                  </result>
+                </lst>
+              </arr>
             </lst>
           </lst>
         </response>'''
+        from solr.response import GroupedResult, GroupField, Group
         resp = self._parse(xml)
-        grouped = resp.grouped
-        self.assertIn('category', grouped)
-        cat = grouped['category']
-        self.assertIn('doclist', cat)
-        self.assertEqual(len(cat['doclist']), 2)
+        self.assertIsInstance(resp.grouped, GroupedResult)
+        self.assertIn('category', resp.grouped)
+        cat = resp.grouped['category']
+        self.assertIsInstance(cat, GroupField)
+        self.assertEqual(cat.matches, 42)
+        self.assertEqual(cat.ngroups, 1)
+        groups = cat.groups
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0].groupValue, 'electronics')
+        self.assertEqual(len(groups[0].doclist), 2)
 
     def test_response_named_result_still_maps_to_results(self):
         """<result name="response"> should still be accessible as .results."""

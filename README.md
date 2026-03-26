@@ -102,6 +102,12 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.7.0
+
+- **Grouping / Field Collapsing**: `resp.grouped['field'].groups` for grouped results (Solr 3.3+)
+- `GroupedResult`, `GroupField`, `Group` classes with `groupValue`, `doclist`, `matches`, `ngroups`
+- Works in both JSON and XML modes
+
 ### 1.6.0
 
 - **Extract**: `Extract(conn)` wrapper class for Solr Cell (Apache Tika) via `/update/extract` (Solr 1.4+).

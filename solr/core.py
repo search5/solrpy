@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -474,6 +474,12 @@ class SearchHandler:
                 from .exceptions import SolrVersionError
                 raise SolrVersionError("json_facet", (5, 0), self.conn.server_version)
             params['json.facet'] = json.dumps(json_facet)
+
+        group_param = params.get('group')
+        if group_param is not None and str(group_param).lower() in ('true', '1', 'yes'):
+            if self.conn.server_version < (3, 3):
+                from .exceptions import SolrVersionError
+                raise SolrVersionError("group", (3, 3), self.conn.server_version)
 
         if highlight:
             params['hl'] = 'true'

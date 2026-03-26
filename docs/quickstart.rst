@@ -253,6 +253,23 @@ Or use the convenience generator::
    The ``sort`` clause must include the uniqueKey field (usually ``id``).
 
 
+Grouping / Field Collapsing (Solr 3.3+)
+-----------------------------------------
+
+Group results by a field value::
+
+    resp = conn.select('*:*', group='true', group_field='category',
+                       group_limit=5, group_ngroups='true')
+
+    for group in resp.grouped['category'].groups:
+        print(group.groupValue, ':', len(group.doclist), 'docs')
+        for doc in group.doclist:
+            print('  ', doc['id'])
+
+    print('Total matches:', resp.grouped['category'].matches)
+    print('Distinct groups:', resp.grouped['category'].ngroups)
+
+
 Deleting documents
 ------------------
 

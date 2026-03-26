@@ -11,6 +11,126 @@ class Results(list[Any]):
     pass
 
 
+class Group:
+    """A single group within a Solr grouped response.
+
+    Each group corresponds to one distinct value of the grouped field and
+    contains the matching documents for that value.
+
+    Attributes are accessed via :attr:`groupValue` and :attr:`doclist`.
+    """
+
+    def __init__(self, raw: dict[str, Any]) -> None:
+        self._raw = raw
+
+    @property
+    def groupValue(self) -> Any:
+        """The field value that defines this group, or ``None`` for the null group."""
+        return self._raw.get('groupValue')
+
+    @property
+    def doclist(self) -> Results:
+        """The matching documents in this group as a :class:`Results` list.
+
+        ``doclist.numFound`` gives the total match count for this group;
+        ``doclist.start`` gives the offset.
+        """
+        dl = self._raw.get('doclist', {})
+        if isinstance(dl, Results):
+            nf = getattr(dl, 'numFound', None)
+            if nf is not None:
+                try:
+                    setattr(dl, 'numFound', int(nf))
+                except (TypeError, ValueError):
+                    setattr(dl, 'numFound', 0)
+            st = getattr(dl, 'start', None)
+            if st is not None:
+                try:
+                    setattr(dl, 'start', int(st))
+                except (TypeError, ValueError):
+                    setattr(dl, 'start', 0)
+            return dl
+        r = Results(dl.get('docs', []))
+        setattr(r, 'numFound', int(dl.get('numFound', 0)))
+        setattr(r, 'start', int(dl.get('start', 0)))
+        return r
+
+    def __repr__(self) -> str:
+        return 'Group(groupValue=%r, numDocs=%d)' % (
+            self.groupValue, len(self.doclist))
+
+
+class GroupField:
+    """The grouped results for a single field (or function/query).
+
+    Returned as a value of :class:`GroupedResult` when subscripted by field
+    name::
+
+        resp.grouped['category'].matches   # total matches
+        resp.grouped['category'].ngroups   # distinct group count (if requested)
+        resp.grouped['category'].groups    # list of Group objects
+    """
+
+    def __init__(self, raw: dict[str, Any]) -> None:
+        self._raw = raw
+
+    @property
+    def matches(self) -> int:
+        """Total number of documents that match the query across all groups."""
+        return int(self._raw.get('matches', 0))
+
+    @property
+    def ngroups(self) -> int | None:
+        """Number of distinct groups, or ``None`` if ``group.ngroups`` was not requested."""
+        val = self._raw.get('ngroups')
+        return int(val) if val is not None else None
+
+    @property
+    def groups(self) -> list[Group]:
+        """List of :class:`Group` objects for this field."""
+        return [Group(g) for g in self._raw.get('groups', [])]
+
+    def __repr__(self) -> str:
+        return 'GroupField(matches=%d, ngroups=%r, groups=%d)' % (
+            self.matches, self.ngroups, len(self.groups))
+
+
+class GroupedResult:
+    """Wrapper around a Solr grouped response component (Solr 3.3+).
+
+    Provides access to grouped results returned by the GroupingComponent.
+    Activate grouping by passing ``group=True`` and ``group_field='field'``
+    to a query.  The result is then accessible via ``response.grouped``.
+
+    Example::
+
+        resp = conn.select('*:*', group=True, group_field='category',
+                           group_limit=5, group_ngroups=True)
+        for group in resp.grouped['category'].groups:
+            print(group.groupValue, len(group.doclist))
+
+    Supports ``in`` tests, iteration over field names, and ``len()``.
+    """
+
+    def __init__(self, raw: dict[str, Any]) -> None:
+        self._raw = raw
+
+    def __getitem__(self, field: str) -> GroupField:
+        return GroupField(self._raw[field])
+
+    def __iter__(self) -> Any:
+        return iter(self._raw)
+
+    def __contains__(self, field: object) -> bool:
+        return field in self._raw
+
+    def __len__(self) -> int:
+        return len(self._raw)
+
+    def __repr__(self) -> str:
+        return 'GroupedResult(%r)' % list(self._raw.keys())
+
+
 class SpellcheckResult:
     """Wrapper around a Solr spellcheck response component.
 

@@ -95,6 +95,8 @@ supports them.
      - Minimum Solr
    * - Basic query and indexing
      - 1.2
+   * - Grouping (``resp.grouped``)
+     - 3.3
    * - Atomic Update (``atomic_update``)
      - 4.0
    * - Soft Commit (``commit(soft_commit=True)``)
