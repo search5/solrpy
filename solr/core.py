@@ -239,48 +239,25 @@ Enter a raw query, without processing the returned HTML contents.
     >>> print c.raw_query(q='id:[* TO *]', wt='python', rows='10')
 
 """
-import sys
+import re
+import json
 import socket
-import codecs
 import datetime
 import logging
 import base64
-try:
-    import http.client as httplib
-    import urllib.parse as urlparse
-    import urllib.parse as urllib
-    from io import StringIO
-except ImportError:
-    import httplib
-    import urlparse
-    import urllib
-    from StringIO import StringIO
+import http.client as httplib
+import urllib.parse as urlparse
+import urllib.parse as urllib
+from io import StringIO
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
 
-try:
-    unicode
-except NameError:
-    unicode = str
+__version__ = "0.9.10"
 
-try:
-    basestring
-except NameError:
-    basestring = str
-
-try:
-    long
-except NameError:
-    long = int
-
-__version__ = "0.9.8"
-
-__all__ = ['SolrException', 'Solr', 'SolrConnection',
+__all__ = ['SolrException', 'SolrVersionError', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
-
-_python_version = sys.version_info[:2]
 
 # ===================================================================
 # Exceptions
@@ -315,6 +292,35 @@ class SolrException(Exception):
 
     def __str__(self):
         return 'HTTP code=%s, reason=%s' % (self.httpcode, self.reason)
+
+
+class SolrVersionError(Exception):
+    """Raised when a feature requires a higher Solr version than connected."""
+
+    def __init__(self, feature, required, actual):
+        self.feature = feature
+        self.required = required
+        self.actual = actual
+
+    def __str__(self):
+        req = ".".join(str(v) for v in self.required)
+        act = ".".join(str(v) for v in self.actual)
+        return "%s requires Solr %s+, but connected to Solr %s" % (
+            self.feature, req, act)
+
+
+def requires_version(*min_version):
+    """Decorator that raises SolrVersionError if server_version < min_version."""
+    def decorator(function):
+        def wrapper(self, *args, **kw):
+            if self.server_version < min_version:
+                raise SolrVersionError(
+                    function.__name__, min_version, self.server_version)
+            return function(self, *args, **kw)
+        wrapper.__doc__ = function.__doc__
+        wrapper.__name__ = function.__name__
+        return wrapper
+    return decorator
 
 
 # Decorator (used below)
@@ -411,7 +417,7 @@ class Solr:
 
         kwargs = {}
 
-        if self.timeout and _python_version >= (2, 6):
+        if self.timeout:
             kwargs['timeout'] = self.timeout
 
         if self.scheme == 'https':
@@ -421,17 +427,6 @@ class Solr:
             self.conn = httplib.HTTPConnection(self.host, **kwargs)
 
         self.response_version = 2.2
-        # Deprecated: encoder and decoder will be removed in a future version.
-        self.encoder = codecs.getencoder('utf-8')
-        self.decoder = codecs.getdecoder('utf-8')
-
-        # Set timeout, if applicable.
-        if self.timeout and _python_version < (2, 6):
-            self.conn.connect()
-            if self.scheme == 'http':
-                self.conn.sock.settimeout(self.timeout)
-            elif self.scheme == 'https':
-                self.conn.sock.sock.settimeout(self.timeout)
 
         self.xmlheaders = {'Content-Type': 'text/xml; charset=utf-8'}
         self.xmlheaders.update(post_headers)
@@ -454,10 +449,54 @@ class Solr:
 
         self.debug = debug
         self.select = SearchHandler(self, "/select")
+        self.server_version = self._detect_version()
 
     def close(self):
         """Close the underlying HTTP(S) connection."""
         self.conn.close()
+
+    def _get(self, path):
+        """Issue a GET request and return the response object."""
+        _headers = self.auth_headers.copy()
+        self.conn.request('GET', path, None, _headers)
+        return check_response_status(self.conn.getresponse())
+
+    def _detect_version(self):
+        """Detect the Solr server version. Returns a tuple, e.g. (9, 4, 1).
+
+        Tries JSON API first (Solr 4+), falls back to XML (Solr 3.x),
+        and returns (1, 2, 0) with a warning if both fail.
+        """
+        # Candidate admin paths: the configured path itself, then its parent.
+        # e.g. /solr/core0 → try /solr/core0/admin/... and /solr/admin/...
+        base_paths = [self.path]
+        parent = self.path.rsplit('/', 1)[0]
+        if parent and parent != self.path:
+            base_paths.append(parent)
+
+        # Solr 4+: JSON system info
+        for base in base_paths:
+            try:
+                rsp = self._get(base + '/admin/info/system?wt=json')
+                data = json.loads(rsp.read().decode('utf-8'))
+                ver_str = data['lucene']['solr-spec-version']
+                return tuple(int(x) for x in ver_str.split('.')[:3])
+            except Exception:
+                pass
+
+        # Solr 3.x: XML fallback
+        for base in base_paths:
+            try:
+                rsp = self._get(base + '/admin/info/system?wt=xml')
+                raw = rsp.read().decode('utf-8')
+                m = re.search(r'solr-spec-version[^>]*>([0-9.]+)', raw)
+                if m:
+                    return tuple(int(x) for x in m.group(1).split('.')[:3])
+            except Exception:
+                pass
+
+        logging.warning("solrpy: could not detect Solr version, assuming 1.2.0")
+        return (1, 2, 0)
 
 
     # Update interface.
@@ -541,7 +580,8 @@ class Solr:
         the like-name `commit-control arguments`_.
 
         """
-        return self._commit("commit", wait_flush, wait_searcher)
+        verb = "optimize" if _optimize else "commit"
+        return self._commit(verb, wait_flush, wait_searcher)
 
     def optimize(self, wait_flush=True, wait_searcher=True):
         """
@@ -570,9 +610,7 @@ class Solr:
         selector = '%s/update%s' % (self.path, qs_from_items(query))
         try:
             rsp = self._post(selector, request, self.xmlheaders)
-            data = rsp.read()
-            if isinstance(data, bytes):
-                data = data.decode('utf-8')
+            data = rsp.read().decode('utf-8')
         finally:
             if not self.persistent:
                 self.close()
@@ -614,7 +652,7 @@ class Solr:
 
                 lst.append('<field name=%s>%s</field>' % (
                     (quoteattr(field),
-                    escape(unicode(value)))))
+                    escape(str(value)))))
         lst.append('</doc>')
 
     def _delete(self, id=None, ids=None, queries=None):
@@ -627,9 +665,9 @@ class Solr:
             ids.insert(0, id)
         lst = []
         for id in ids:
-            lst.append(u'<id>%s</id>\n' % escape(unicode(id)))
+            lst.append(u'<id>%s</id>\n' % escape(str(id)))
         for query in (queries or ()):
-            lst.append(u'<query>%s</query>\n' % escape(unicode(query)))
+            lst.append(u'<query>%s</query>\n' % escape(str(query)))
         if lst:
             lst.insert(0, u'<delete>\n')
             lst.append(u'</delete>')
@@ -646,11 +684,6 @@ class Solr:
         self.reconnects += 1
         self.close()
         self.conn.connect()
-        if self.timeout and _python_version < (2, 6):
-            if self.scheme == 'http':
-                self.conn.sock.settimeout(self.timeout)
-            elif self.scheme == 'https':
-                self.conn.sock.sock.settimeout(self.timeout)
 
     def _post(self, url, body, headers):
         _headers = self.auth_headers.copy()
@@ -777,13 +810,13 @@ class SearchHandler(object):
         if highlight:
             params['hl'] = 'true'
             if not isinstance(highlight, (bool, int, float)):
-                if not isinstance(highlight, basestring):
+                if not isinstance(highlight, str):
                     highlight = ",".join(highlight)
                 params['hl_fl'] = highlight
             else:
                 if not fields:
                     raise ValueError("highlight is True and no fields were given")
-                elif isinstance(fields, basestring):
+                elif isinstance(fields, str):
                     params['hl_fl'] = [fields]
                 else:
                     params['hl_fl'] = ",".join(fields)
@@ -792,7 +825,7 @@ class SearchHandler(object):
             params['q'] = q
 
         if fields:
-            if not isinstance(fields, basestring):
+            if not isinstance(fields, str):
                 fields = ",".join(fields)
         if not fields:
             fields = '*'
@@ -800,7 +833,7 @@ class SearchHandler(object):
         if sort:
             if not sort_order or sort_order not in ("asc", "desc"):
                 raise ValueError("sort_order must be 'asc' or 'desc'")
-            if isinstance(sort, basestring):
+            if isinstance(sort, str):
                 sort = [ f.strip() for f in sort.split(",") ]
             sorting = []
             for e in sort:
@@ -843,9 +876,7 @@ class SearchHandler(object):
 
         try:
             rsp = conn._post(self.selector, request, conn.form_headers)
-            data = rsp.read()
-            if isinstance(data, bytes):
-                data = data.decode('utf-8')
+            data = rsp.read().decode('utf-8')
             if conn.debug:
                 logging.info("solrpy got response: %s" % data)
         finally:
@@ -856,8 +887,6 @@ class SearchHandler(object):
 
 
 def strify(s):
-    if isinstance(s, bytes):
-        return s.decode('utf-8')
     return str(s)
 
 # ===================================================================
@@ -885,7 +914,7 @@ class Response(object):
         self._params = {}
 
     def _set_numFound(self, value):
-        self._numFound = long(value)
+        self._numFound = int(value)
 
     def _get_numFound(self):
         return self._numFound
@@ -896,7 +925,7 @@ class Response(object):
     numFound = property(_get_numFound, _set_numFound, _del_numFound)
 
     def _set_start(self, value):
-        self._start = long(value)
+        self._start = int(value)
 
     def _get_start(self):
         return self._start
@@ -1031,7 +1060,7 @@ class ResponseContentHandler(ContentHandler):
             node.final = None
 
         elif name == 'long':
-            node.final = long(value.strip())
+            node.final = int(value.strip())
 
         elif name == 'bool':
             node.final = value.strip().lower().startswith('t')
@@ -1186,7 +1215,7 @@ def qs_from_items(query):
         sep = '?'
         for k, v in query.items():
             k = urllib.quote(k)
-            if isinstance(v, basestring):
+            if isinstance(v, str):
                 v = [v]
             for s in v:
                 qs += "%s%s=%s" % (sep, k, urllib.quote_plus(s))

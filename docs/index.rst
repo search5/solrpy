@@ -1,20 +1,27 @@
-.. solrpy documentation master file, created by
-   sphinx-quickstart on Mon Jun 28 14:34:18 2010.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+solrpy Documentation
+====================
 
-Solr API for Python
-===================
+**solrpy** is a Python client for `Apache Solr <https://solr.apache.org/>`_,
+an enterprise search server built on top of
+`Apache Lucene <https://lucene.apache.org/>`_.
 
-``solrpy`` is a Python client for Solr_, an enterprise search server
-built on top of Lucene_.  ``solrpy`` allows you to add documents to a
-Solr instance, and then to perform queries and gather search results
-from Solr using Python.
+solrpy allows you to add documents to a Solr instance, perform queries, and
+gather search results from Solr using Python.
+
+Key features:
+
+- Supports **Solr 1.2 through 10.x**
+- **Automatic version detection** with runtime feature gating
+- Requires **Python 3.10+**
 
 .. toctree::
+   :maxdepth: 2
+   :caption: Contents
 
-   overview.rst
-   reference.rst
+   quickstart
+   reference
+   version_detection
+   changelog
 
 
 Indices and tables
@@ -22,7 +29,3 @@ Indices and tables
 
 * :ref:`genindex`
 * :ref:`search`
-
-
-.. _Solr:  http://lucene.apache.org/solr/
-.. _Lucene:  http://lucene.apache.org/java/docs/

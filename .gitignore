@@ -1,2 +1,5 @@
 *.pyc
 solrpy.egg-info
+CLAUDE.md
+futures.md
+todo.md
