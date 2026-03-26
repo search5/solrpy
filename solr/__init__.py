@@ -8,4 +8,5 @@ from .utils import read_response, check_response_status
 from .schema import SchemaAPI
 from .mlt import MoreLikeThis
 from .suggest import Suggest
+from .extract import Extract
 from .response import SpellcheckResult

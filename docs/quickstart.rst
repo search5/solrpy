@@ -321,6 +321,38 @@ For raw, unprocessed queries::
     xml = conn.select.raw(q='id:1', wt='xml', indent='on')
 
 
+Solr Extract / Rich Documents (Solr 1.4+)
+------------------------------------------
+
+Index rich documents (PDF, Word, HTML, etc.) using Solr Cell (Apache Tika).
+The ``/update/extract`` handler must be configured in ``solrconfig.xml``::
+
+    from solr import Extract
+
+    extract = Extract(conn)
+
+    # Index a PDF with literal field values; use underscore for dot notation
+    with open('report.pdf', 'rb') as f:
+        extract(f, content_type='application/pdf',
+                literal_id='report1',
+                literal_title='Annual Report',
+                commit=True)
+
+    # Extract text and metadata without indexing
+    with open('report.pdf', 'rb') as f:
+        text, metadata = extract.extract_only(f, content_type='application/pdf')
+    print(text[:200])
+    print(metadata.get('Content-Type'))
+
+    # Open a file by path — MIME type is guessed from the extension
+    extract.from_path('document.docx', literal_id='doc1', commit=True)
+    text, metadata = extract.extract_from_path('notes.txt')
+
+Use ``commit=True`` to commit after indexing, or call ``conn.commit()`` later.
+Field names with underscores are preserved: ``literal_my_field='v'`` →
+``literal.my_field=v``.
+
+
 Suggest (Solr 4.7+)
 --------------------
 

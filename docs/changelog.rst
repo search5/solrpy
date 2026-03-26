@@ -1,6 +1,28 @@
 Changelog
 =========
 
+1.6.0 (2026-03-27)
+-------------------
+
+**New features (Solr 1.4+):**
+
+- **Extract** class in ``solr/extract.py``: indexes rich documents (PDF, Word,
+  HTML, etc.) via Solr Cell (Apache Tika) using the ``/update/extract``
+  handler.
+- ``Extract.__call__(file_obj, content_type, commit, **params)``: POST binary
+  file content to ``/update/extract``. First underscore in each keyword
+  argument is replaced with a dot (``literal_id`` → ``literal.id``); field
+  names that contain underscores are preserved (``literal_my_field`` →
+  ``literal.my_field``).
+- ``Extract.extract_only(file_obj, content_type, **params)``: extract text and
+  metadata without indexing. Returns ``(text, metadata)`` tuple.
+- ``Extract.from_path(file_path, **params)``: open a file by path and index it;
+  MIME type guessed via :mod:`mimetypes`.
+- ``Extract.extract_from_path(file_path, **params)``: open a file by path and
+  extract without indexing.
+- ``Extract`` exported from top-level ``solr`` package.
+
+
 1.5.0 (2026-03-27)
 -------------------
 

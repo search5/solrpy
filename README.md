@@ -102,6 +102,33 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.6.0
+
+- **Extract**: `Extract(conn)` wrapper class for Solr Cell (Apache Tika) via `/update/extract` (Solr 1.4+).
+  Index rich documents (PDF, Word, HTML, …) with optional literal field values.
+  `extract_only()` extracts text and metadata without indexing.
+  `from_path()` / `extract_from_path()` open files by filesystem path, MIME type guessed automatically.
+
+```python
+from solr import Solr, Extract
+
+conn = Solr('http://localhost:8983/solr/mycore')
+extract = Extract(conn)
+
+# Index a PDF with metadata
+with open('report.pdf', 'rb') as f:
+    extract(f, content_type='application/pdf',
+            literal_id='report1', literal_title='Annual Report',
+            commit=True)
+
+# Extract text only (no indexing)
+text, metadata = extract.extract_from_path('report.pdf')
+print(text[:200])
+
+# Index from path (MIME type auto-detected)
+extract.from_path('document.docx', literal_id='doc1', commit=True)
+```
+
 ### 1.5.0
 
 - **Suggest**: `Suggest(conn)` wrapper class for Solr's SuggestComponent (Solr 4.7+).

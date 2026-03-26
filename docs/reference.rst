@@ -417,6 +417,71 @@ SpellcheckResult class (Solr 1.4+)
               print(entry['original'], '->', entry.get('suggestion', []))
 
 
+Extract class (Solr 1.4+)
+--------------------------
+
+.. class:: Extract(conn)
+
+   Index or extract rich documents via Solr Cell (Apache Tika) using the
+   ``/update/extract`` handler. The handler must be configured in
+   ``solrconfig.xml``.
+
+   :param conn: A :class:`Solr` instance.
+
+   .. method:: __call__(file_obj, content_type='application/octet-stream', commit=False, **params)
+
+      Index a rich document.
+
+      :param file_obj: Binary file-like object (opened in ``'rb'`` mode).
+      :param content_type: MIME type of the document. Defaults to
+          ``'application/octet-stream'``.
+      :param commit: Commit to the index immediately. Defaults to ``False``.
+      :param params: Additional Solr parameters. The **first** underscore in
+          each key is replaced with a dot: ``literal_id='x'`` →
+          ``literal.id=x``. Field names with underscores are preserved:
+          ``literal_my_field='v'`` → ``literal.my_field=v``.
+      :returns: Parsed JSON response dict (contains ``responseHeader``).
+      :raises SolrVersionError: If the server is older than Solr 1.4.
+
+      Example::
+
+          from solr import Solr, Extract
+
+          conn = Solr('http://localhost:8983/solr/mycore')
+          ext = Extract(conn)
+
+          with open('report.pdf', 'rb') as f:
+              ext(f, content_type='application/pdf',
+                  literal_id='report1', literal_title='Annual Report',
+                  commit=True)
+
+   .. method:: extract_only(file_obj, content_type='application/octet-stream', **params)
+
+      Extract text and metadata without indexing.
+
+      Calls ``/update/extract`` with ``extractOnly=true``.
+
+      :returns: ``(text, metadata)`` tuple. *text* is the extracted plain
+          text; *metadata* is a dict of Tika metadata (e.g.
+          ``'Content-Type'``, ``'Author'``, ``'title'``).
+
+   .. method:: from_path(file_path, **params)
+
+      Index a document from a filesystem path. MIME type is guessed from
+      the file extension via :mod:`mimetypes`; falls back to
+      ``'application/octet-stream'``.
+
+      :param file_path: Path to the file.
+      :param params: Forwarded to :meth:`__call__` (``commit``,
+          ``literal_*``, etc.).
+
+   .. method:: extract_from_path(file_path, **params)
+
+      Extract text and metadata from a file path without indexing.
+
+      :returns: ``(text, metadata)`` tuple (same as :meth:`extract_only`).
+
+
 Suggest class (Solr 4.7+)
 ---------------------------
 
