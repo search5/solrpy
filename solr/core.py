@@ -239,6 +239,8 @@ Enter a raw query, without processing the returned HTML contents.
     >>> print c.raw_query(q='id:[* TO *]', wt='python', rows='10')
 
 """
+from __future__ import annotations
+
 import re
 import json
 import gzip
@@ -250,12 +252,13 @@ import http.client as httplib
 import urllib.parse as urlparse
 import urllib.parse as urllib
 from io import StringIO
+from typing import Any, Callable, Iterable, IO
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from xml.sax.saxutils import escape, quoteattr
 from xml.dom.minidom import parseString
 
-__version__ = "0.9.11"
+__version__ = "1.0.1"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr', 'SolrConnection',
            'Response', 'SearchHandler']
@@ -269,51 +272,51 @@ class SolrException(Exception):
     Detailed information is provided in attributes of the exception object.
     """
 
-    httpcode = 400
+    httpcode: int | str | None = 400
     """HTTP response code from Solr."""
 
-    reason = None
+    reason: str | None = None
     """Error message from the HTTP response sent by Solr."""
 
-    body = None
+    body: str | bytes | None = None
     """Response body returned by Solr.
 
     This can contain much more information about the error, including
     tracebacks from the Java runtime.
     """
 
-    def __init__(self, httpcode=None, reason=None, body=None):
+    def __init__(self, httpcode: int | str | None = None, reason: str | None = None, body: str | bytes | None = None) -> None:
         self.httpcode = httpcode
         self.reason = reason
         self.body = body
 
-    def __repr__(self):
-        return 'HTTP code=%s, Reason=%s, body=%s' % (
+    def __repr__(self) -> str:
+        return 'HTTP code=%s, Reason=%s, body=%s' % (  # type: ignore[str-bytes-safe]
                     self.httpcode, self.reason, self.body)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return 'HTTP code=%s, reason=%s' % (self.httpcode, self.reason)
 
 
 class SolrVersionError(Exception):
     """Raised when a feature requires a higher Solr version than connected."""
 
-    def __init__(self, feature, required, actual):
+    def __init__(self, feature: str, required: tuple[int, ...], actual: tuple[int, ...]) -> None:
         self.feature = feature
         self.required = required
         self.actual = actual
 
-    def __str__(self):
+    def __str__(self) -> str:
         req = ".".join(str(v) for v in self.required)
         act = ".".join(str(v) for v in self.actual)
         return "%s requires Solr %s+, but connected to Solr %s" % (
             self.feature, req, act)
 
 
-def requires_version(*min_version):
+def requires_version(*min_version: int) -> Callable[..., Any]:
     """Decorator that raises SolrVersionError if server_version < min_version."""
-    def decorator(function):
-        def wrapper(self, *args, **kw):
+    def decorator(function: Callable[..., Any]) -> Callable[..., Any]:
+        def wrapper(self: Solr, *args: Any, **kw: Any) -> Any:
             if self.server_version < min_version:
                 raise SolrVersionError(
                     function.__name__, min_version, self.server_version)
@@ -326,9 +329,9 @@ def requires_version(*min_version):
 
 # Decorator (used below)
 
-def committing(function=None):
+def committing(function: Callable[..., Any]) -> Callable[..., Any]:
 
-    def wrapper(self, *args, **kw):
+    def wrapper(self: Solr, *args: Any, **kw: Any) -> Any:
         default_commit = getattr(self, 'always_commit', False)
         commit = kw.pop("commit", default_commit)
         optimize = kw.pop("optimize", False)
@@ -368,17 +371,17 @@ def committing(function=None):
 
 class Solr:
 
-    def __init__(self, url,
-                 persistent=True,
-                 timeout=None,
-                 ssl_key=None,
-                 ssl_cert=None,
-                 http_user=None,
-                 http_pass=None,
-                 post_headers={},
-                 max_retries=3,
-                 always_commit=False,
-                 debug=False):
+    def __init__(self, url: str,
+                 persistent: bool = True,
+                 timeout: float | None = None,
+                 ssl_key: str | None = None,
+                 ssl_cert: str | None = None,
+                 http_user: str | None = None,
+                 http_pass: str | None = None,
+                 post_headers: dict[str, str] | None = None,
+                 max_retries: int = 3,
+                 always_commit: bool = False,
+                 debug: bool = False) -> None:
 
         """
             url -- URI pointing to the Solr instance. Examples:
@@ -418,20 +421,21 @@ class Solr:
 
         assert self.max_retries >= 0
 
-        kwargs = {}
-
-        if self.timeout:
-            kwargs['timeout'] = self.timeout
-
+        self.conn: httplib.HTTPConnection | httplib.HTTPSConnection
         if self.scheme == 'https':
-            self.conn = httplib.HTTPSConnection(self.host,
-                   key_file=ssl_key, cert_file=ssl_cert, **kwargs)
+            self.conn = httplib.HTTPSConnection(
+                self.host, key_file=ssl_key, cert_file=ssl_cert,
+                timeout=self.timeout)
         else:
-            self.conn = httplib.HTTPConnection(self.host, **kwargs)
+            self.conn = httplib.HTTPConnection(
+                self.host, timeout=self.timeout)
 
         self.response_version = 2.2
 
-        self.xmlheaders = {
+        if post_headers is None:
+            post_headers = {}
+
+        self.xmlheaders: dict[str, str] = {
             'Content-Type': 'text/xml; charset=utf-8',
             'Accept-Encoding': 'gzip',
         }
@@ -439,7 +443,7 @@ class Solr:
         if not self.persistent:
             self.xmlheaders['Connection'] = 'close'
 
-        self.form_headers = {
+        self.form_headers: dict[str, str] = {
             'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
             'Accept-Encoding': 'gzip',
         }
@@ -460,11 +464,11 @@ class Solr:
         self.select = SearchHandler(self, "/select")
         self.server_version = self._detect_version()
 
-    def close(self):
+    def close(self) -> None:
         """Close the underlying HTTP(S) connection."""
         self.conn.close()
 
-    def ping(self):
+    def ping(self) -> bool:
         """Ping the Solr server. Returns True if reachable, False otherwise."""
         base_paths = [self.path]
         parent = self.path.rsplit('/', 1)[0]
@@ -479,13 +483,13 @@ class Solr:
                 pass
         return False
 
-    def _get(self, path):
+    def _get(self, path: str) -> httplib.HTTPResponse:
         """Issue a GET request and return the response object."""
         _headers = self.auth_headers.copy()
         self.conn.request('GET', path, None, _headers)
         return check_response_status(self.conn.getresponse())
 
-    def _detect_version(self):
+    def _detect_version(self) -> tuple[int, ...]:
         """Detect the Solr server version. Returns a tuple, e.g. (9, 4, 1).
 
         Tries JSON API first (Solr 4+), falls back to XML (Solr 3.x),
@@ -596,7 +600,7 @@ class Solr:
         lst.append(u'</add>')
         return ''.join(lst)
 
-    def commit(self, wait_flush=True, wait_searcher=True, _optimize=False):
+    def commit(self, wait_flush: bool = True, wait_searcher: bool = True, _optimize: bool = False) -> str:
         """
         Issue a commit command to the Solr server.
 
@@ -607,7 +611,7 @@ class Solr:
         verb = "optimize" if _optimize else "commit"
         return self._commit(verb, wait_flush, wait_searcher)
 
-    def optimize(self, wait_flush=True, wait_searcher=True):
+    def optimize(self, wait_flush: bool = True, wait_searcher: bool = True) -> str:
         """
         Issue an optimize command to the Solr server.
 
@@ -617,7 +621,7 @@ class Solr:
         """
         return self._commit("optimize", wait_flush, wait_searcher)
 
-    def _commit(self, verb, wait_flush, wait_searcher):
+    def _commit(self, verb: str, wait_flush: bool, wait_searcher: bool) -> str:
         if not wait_searcher:  #just handle deviations from the default
             if not wait_flush:
                 options = 'waitFlush="false" waitSearcher="false"'
@@ -630,8 +634,8 @@ class Solr:
 
     # Helper methods.
 
-    def _update(self, request, query=None):
-        selector = '%s/update%s' % (self.path, qs_from_items(query))
+    def _update(self, request: str, query: dict[str, str] | None = None) -> str:
+        selector = '%s/update%s' % (self.path, qs_from_items(query))  # type: ignore[arg-type]
         try:
             rsp = self._post(selector, request, self.xmlheaders)
             data = read_response(rsp)
@@ -644,21 +648,23 @@ class Solr:
         starts = data.startswith
         if starts('<result status="') and not starts('<result status="0"'):
             parsed = parseString(data)
-            status = parsed.documentElement.getAttribute('status')
+            doc_elem = parsed.documentElement
+            status = doc_elem.getAttribute('status')  # type: ignore[union-attr]
             if status != "0":
-                reason = parsed.documentElement.firstChild.nodeValue
+                first_child = doc_elem.firstChild  # type: ignore[union-attr]
+                reason = first_child.nodeValue if first_child else None
                 raise SolrException(rsp.status, reason)
         return data
 
-    def __add(self, lst, fields):
+    def __add(self, lst: list[str], fields: dict[str, Any]) -> None:
         lst.append(u'<doc>')
         for field, value in fields.items():
             # Handle multi-valued fields if values
             # is passed in as a list/tuple
             if not isinstance(value, (list, tuple, set)):
-                values = [value]
+                values: list[Any] = [value]
             else:
-                values = value
+                values = list(value)
 
             for value in values:
                 # ignore values that are not defined
@@ -679,7 +685,7 @@ class Solr:
                     escape(str(value)))))
         lst.append('</doc>')
 
-    def _delete(self, id=None, ids=None, queries=None):
+    def _delete(self, id: Any = None, ids: list[Any] | None = None, queries: list[str] | None = None) -> str | None:
         """
         Delete a specific document by id.
         """
@@ -696,20 +702,21 @@ class Solr:
             lst.insert(0, u'<delete>\n')
             lst.append(u'</delete>')
             return ''.join(lst)
+        return None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             '<%s (url=%s, persistent=%s, post_headers=%s, reconnects=%s)>'
             % (self.__class__.__name__,
                self.url, self.persistent,
                self.xmlheaders, self.reconnects))
 
-    def _reconnect(self):
+    def _reconnect(self) -> None:
         self.reconnects += 1
         self.close()
         self.conn.connect()
 
-    def _post(self, url, body, headers):
+    def _post(self, url: str, body: str, headers: dict[str, str]) -> httplib.HTTPResponse:  # type: ignore[return]
         _headers = self.auth_headers.copy()
         _headers.update(headers)
         attempts = self.max_retries + 1
@@ -739,7 +746,7 @@ class SolrConnection(Solr):
 
     # Backward compatible update interfaces.
 
-    def add(self, _commit=False, **fields):
+    def add(self, _commit: bool = False, **fields: Any) -> Any:  # type: ignore[override]
         """
         Add or update a single document with field values given by
         keyword arguments.
@@ -757,7 +764,7 @@ class SolrConnection(Solr):
         """
         return Solr.add_many(self, [fields], commit=_commit)
 
-    def add_many(self, docs, _commit=False):
+    def add_many(self, docs: Iterable[dict[str, Any]], _commit: bool = False) -> Any:  # type: ignore[override]
         """
         Add or update multiple documents. with field values for each given
         by dictionaries in the sequence `docs`.
@@ -779,22 +786,24 @@ class SolrConnection(Solr):
 
     # Backward compatible query interfaces.
 
-    def query(self, *args, **params):
+    def query(self, *args: Any, **params: Any) -> Response | None:
         return self.select(*args, **params)
 
-    def raw_query(self, **params):
+    def raw_query(self, **params: Any) -> str:
         return self.select.raw(**params)
 
 
-class SearchHandler(object):
+class SearchHandler:
 
-    def __init__(self, conn, relpath="/select", arg_separator="_"):
+    def __init__(self, conn: Solr, relpath: str = "/select", arg_separator: str = "_") -> None:
         self.conn = conn
         self.selector = conn.path + relpath
         self.arg_separator = arg_separator
 
-    def __call__(self, q=None, fields=None, highlight=None,
-                 score=True, sort=None, sort_order="asc", **params):
+    def __call__(self, q: str | None = None, fields: str | Iterable[str] | None = None,
+                 highlight: bool | str | Iterable[str] | None = None,
+                 score: bool = True, sort: str | Iterable[str] | None = None,
+                 sort_order: str = "asc", **params: Any) -> Response | None:
         """
         q is the query string.
 
@@ -848,37 +857,41 @@ class SearchHandler(object):
         if q is not None:
             params['q'] = q
 
+        fl: str
         if fields:
-            if not isinstance(fields, str):
-                fields = ",".join(fields)
-        if not fields:
-            fields = '*'
+            if isinstance(fields, str):
+                fl = fields
+            else:
+                fl = ",".join(fields)
+        else:
+            fl = '*'
 
         if sort:
             if not sort_order or sort_order not in ("asc", "desc"):
                 raise ValueError("sort_order must be 'asc' or 'desc'")
             if isinstance(sort, str):
-                sort = [ f.strip() for f in sort.split(",") ]
+                sort_list = [f.strip() for f in sort.split(",")]
+            else:
+                sort_list = list(sort)
             sorting = []
-            for e in sort:
+            for e in sort_list:
                 if not (e.endswith("asc") or e.endswith("desc")):
                     sorting.append("%s %s" % (e, sort_order))
                 else:
                     sorting.append(e)
-            sort = ",".join(sorting)
-            params['sort'] = sort
+            params['sort'] = ",".join(sorting)
 
-        if score and not 'score' in fields.replace(',',' ').split():
-            fields += ',score'
+        if score and 'score' not in fl.replace(',', ' ').split():
+            fl += ',score'
 
-        params['fl'] = fields
+        params['fl'] = fl
         params['version'] = self.conn.response_version
         params['wt'] = 'standard'
 
         xml = self.raw(**params)
-        return parse_query_response(StringIO(xml),  params, self)
+        return parse_query_response(StringIO(xml), params, self)  # type: ignore[no-any-return]
 
-    def raw(self, **params):
+    def raw(self, **params: Any) -> str:
         """
         Issue a query against a SOLR server.
 
@@ -910,15 +923,15 @@ class SearchHandler(object):
         return data
 
 
-def strify(s):
+def strify(s: Any) -> str:
     return str(s)
 
 # ===================================================================
 # Response objects
 # ===================================================================
-class Response(object):
+class Response:
     """
-    A container class for a
+    A container class for query results.
 
     A Response object will have the following properties:
 
@@ -927,62 +940,58 @@ class Response(object):
           results -- a list of matching documents. Each list item will
               be a dict.
     """
-    def __init__(self, query):
-        # These are set in ResponseContentHandler.endElement()
-        self.header = {}
-        self.results = []
+    def __init__(self, query: Any) -> None:
+        self.header: dict[str, Any] = {}
+        self.results: Any = []
+        self._query: Any = query
+        self._params: dict[str, Any] = {}
 
-        # These are set by parse_query_response().
-        # Used only if .next_batch()/previous_batch() is called
-        self._query = query
-        self._params = {}
-
-    def _set_numFound(self, value):
+    def _set_numFound(self, value: int | str) -> None:
         self._numFound = int(value)
 
-    def _get_numFound(self):
+    def _get_numFound(self) -> int:
         return self._numFound
 
-    def _del_numFound(self):
+    def _del_numFound(self) -> None:
         del self._numFound
 
     numFound = property(_get_numFound, _set_numFound, _del_numFound)
 
-    def _set_start(self, value):
+    def _set_start(self, value: int | str) -> None:
         self._start = int(value)
 
-    def _get_start(self):
+    def _get_start(self) -> int:
         return self._start
 
-    def _del_start(self):
+    def _del_start(self) -> None:
         del self._start
 
     start = property(_get_start, _set_start, _del_start)
 
-    def _set_maxScore(self, value):
+    def _set_maxScore(self, value: float | str) -> None:
         self._maxScore = float(value)
 
-    def _get_maxScore(self):
+    def _get_maxScore(self) -> float:
         return self._maxScore
 
-    def _del_maxScore(self):
+    def _del_maxScore(self) -> None:
         del self._maxScore
 
     maxScore = property(_get_maxScore, _set_maxScore, _del_maxScore)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Return the number of matching documents contained in this set.
         """
         return len(self.results)
 
-    def __iter__(self):
+    def __iter__(self) -> Any:
         """
         Return an iterator of matching documents.
         """
         return iter(self.results)
 
-    def next_batch(self):
+    def next_batch(self) -> Any:
         """
         Load the next set of matches.
 
@@ -999,7 +1008,7 @@ class Response(object):
         q = params.pop('q', '')
         return self._query(q, **params)
 
-    def previous_batch(self):
+    def previous_batch(self) -> Any:
         """
         Return the previous set of matches
         """
@@ -1023,7 +1032,7 @@ class Response(object):
 # ===================================================================
 # JSON Parsing support
 # ===================================================================
-def parse_json_response(data, params, query):
+def parse_json_response(data: dict[str, Any], params: dict[str, Any], query: Any) -> Response:
     """
     Parse a JSON response dict from Solr into a Response object.
     """
@@ -1053,7 +1062,7 @@ def parse_json_response(data, params, query):
 # ===================================================================
 # XML Parsing support
 # ===================================================================
-def parse_query_response(data, params, query):
+def parse_query_response(data: IO[str], params: dict[str, Any], query: Any) -> Any:
     """
     Parse the XML results of a /select call.
     """
@@ -1197,7 +1206,7 @@ class Node(object):
 # ===================================================================
 # Misc utils
 # ===================================================================
-def check_response_status(response):
+def check_response_status(response: httplib.HTTPResponse) -> httplib.HTTPResponse:
     if response.status != 200:
         ex = SolrException(response.status, response.reason)
         try:
@@ -1208,7 +1217,7 @@ def check_response_status(response):
     return response
 
 
-def read_response(response):
+def read_response(response: httplib.HTTPResponse) -> str:
     """Read an HTTP response body, decompressing gzip if needed."""
     data = response.read()
     if response.getheader('Content-Encoding', '') == 'gzip':
@@ -1236,19 +1245,19 @@ class UTC(datetime.tzinfo):
 
 utc = UTC()
 
-def utc_to_string(value):
+def utc_to_string(value: datetime.datetime) -> str:
     """
     Convert datetimes to the subset of ISO 8601 that Solr expects.
     """
     if value.tzinfo is None:
         value = value.replace(tzinfo=utc)
-    value = value.astimezone(utc).isoformat()
-    if '+' in value:
-        value = value.split('+')[0]
-    value += 'Z'
-    return value
+    result = value.astimezone(utc).isoformat()
+    if '+' in result:
+        result = result.split('+')[0]
+    result += 'Z'
+    return result
 
-def utc_from_string(value):
+def utc_from_string(value: str) -> datetime.datetime:
     """
     Parse a string representing an ISO 8601 date.
     Note: this doesn't process the entire ISO 8601 standard,
@@ -1269,7 +1278,7 @@ def utc_from_string(value):
     except ValueError:
         raise ValueError ("'%s' is not a valid ISO 8601 Solr date" % value)
 
-def qs_from_items(query):
+def qs_from_items(query: dict[str, str | list[str]] | None) -> str:
     # This deals with lists of values since multiple filter queries can
     # be used for a single request.
     qs = ''

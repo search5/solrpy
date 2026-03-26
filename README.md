@@ -90,6 +90,13 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.0.1
+
+- Added type hints to all public methods in `solr/core.py` and `solr/paginator.py`
+- Added `solr/py.typed` marker file for PEP 561 compatibility
+- Added `mypy` to dev dependencies
+- mypy passes with zero errors on `solr/` package
+
 ### 0.9.11
 
 - Added JSON response parser (`parse_json_response`)

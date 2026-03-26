@@ -1,6 +1,23 @@
 Changelog
 =========
 
+1.0.1 (2026-03-27)
+-------------------
+
+**New features:**
+
+- Added type annotations to all public methods across ``solr/core.py``
+  and ``solr/paginator.py``.
+- Added ``solr/py.typed`` marker file for PEP 561 type checker discovery.
+- Added ``mypy`` to dev dependencies; ``mypy solr/`` passes with zero errors.
+
+**Internal:**
+
+- Replaced mutable default ``post_headers={}`` with ``None`` to avoid
+  shared mutable state.
+- Fixed ``paginator.py`` ``try/except`` import with direct relative import.
+
+
 0.9.11 (2026-03-26)
 --------------------
 
