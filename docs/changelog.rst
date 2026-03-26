@@ -1,6 +1,16 @@
 Changelog
 =========
 
+1.0.6 (2026-03-27)
+-------------------
+
+**New features:**
+
+- ``Solr`` constructor now validates the URL path. A ``UserWarning`` is issued
+  if the path does not contain ``/solr``, preparing for Solr 10.0+ which
+  requires the URL to end with ``/solr``.
+
+
 1.0.5 (2026-03-27)
 -------------------
 

@@ -5,6 +5,7 @@ import json
 import socket
 import datetime
 import logging
+import warnings
 import base64
 import http.client as httplib
 import urllib.parse as urlparse
@@ -21,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -50,6 +51,19 @@ class Solr:
         self.url = url
 
         assert self.scheme in ('http', 'https')
+
+        # Validate URL path contains /solr
+        path_parts = self.path.rstrip('/').split('/')
+        if 'solr' not in path_parts:
+            warnings.warn(
+                "solrpy: URL '%s' does not contain '/solr' in its path. "
+                "Expected format: http://host:port/solr or "
+                "http://host:port/solr/<core>. "
+                "Solr 10.0+ requires the URL to end with '/solr'."
+                % url,
+                UserWarning,
+                stacklevel=2,
+            )
 
         self.persistent = persistent
         self.reconnects = 0

@@ -61,7 +61,8 @@ Solr class
       * - Parameter
         - Description
       * - ``url``
-        - URI pointing to the Solr instance (e.g. ``http://localhost:8983/solr/mycore``)
+        - URI pointing to the Solr instance (e.g. ``http://localhost:8983/solr/mycore``).
+          A ``UserWarning`` is issued if the path does not contain ``/solr``.
       * - ``persistent``
         - Keep a persistent HTTP connection open. Defaults to ``True``.
       * - ``timeout``

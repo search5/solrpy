@@ -26,6 +26,11 @@ The connected Solr version is auto-detected::
 
     print(conn.server_version)  # e.g. (9, 4, 1)
 
+.. note::
+
+   If the URL does not contain ``/solr`` in its path, a ``UserWarning``
+   is issued. Solr 10.0+ requires the URL to end with ``/solr``.
+
 
 Health check
 ------------

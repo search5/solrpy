@@ -102,6 +102,10 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.0.6
+
+- URL validation: warns if URL path doesn't contain `/solr` (Solr 10.0+ preparation)
+
 ### 1.0.5
 
 - **Breaking**: Removed `SolrConnection` class. Use `Solr` instead

@@ -2155,5 +2155,59 @@ class TestResponseFormat(unittest.TestCase):
         conn.close()
 
 
+# ===================================================================
+# 1.0.6 tests — URL validation
+# ===================================================================
+
+class TestURLValidation(unittest.TestCase):
+    """Solr constructor should warn on suspicious URLs."""
+
+    def test_valid_url_no_warning(self):
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            conn = solr.Solr(SOLR_HTTP, response_format='xml')
+            solr_warnings = [x for x in w if 'solrpy' in str(x.message)]
+            self.assertEqual(len(solr_warnings), 0)
+            conn.close()
+
+    def test_url_ending_with_solr_no_warning(self):
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            conn = solr.Solr('http://localhost:8983/solr', response_format='xml')
+            solr_warnings = [x for x in w if 'solrpy' in str(x.message)]
+            self.assertEqual(len(solr_warnings), 0)
+            conn.close()
+
+    def test_suspicious_url_warns(self):
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            conn = solr.Solr('http://localhost:8983/search', response_format='xml')
+            solr_warnings = [x for x in w if 'solrpy' in str(x.message)]
+            self.assertEqual(len(solr_warnings), 1)
+            self.assertIn('/solr', str(solr_warnings[0].message))
+            conn.close()
+
+    def test_root_url_warns(self):
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            conn = solr.Solr('http://localhost:8983/', response_format='xml')
+            solr_warnings = [x for x in w if 'solrpy' in str(x.message)]
+            self.assertEqual(len(solr_warnings), 1)
+            conn.close()
+
+    def test_url_with_solr_in_path_no_warning(self):
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            conn = solr.Solr('http://localhost:8983/solr/mycore', response_format='xml')
+            solr_warnings = [x for x in w if 'solrpy' in str(x.message)]
+            self.assertEqual(len(solr_warnings), 0)
+            conn.close()
+
+
 if __name__ == "__main__":
     unittest.main()
