@@ -21,9 +21,9 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.0.4"
+__version__ = "1.0.5"
 
-__all__ = ['SolrException', 'SolrVersionError', 'Solr', 'SolrConnection',
+__all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
 
 
@@ -305,22 +305,6 @@ class Solr:
                 attempts -= 1
                 if attempts <= 0:
                     raise
-
-
-class SolrConnection(Solr):
-    """Represents a Solr connection (legacy compatibility class)."""
-
-    def add(self, _commit: bool = False, **fields: Any) -> Any:
-        return Solr.add_many(self, [fields], commit=_commit)
-
-    def add_many(self, docs: Iterable[dict[str, Any]], _commit: bool = False) -> Any:
-        return Solr.add_many(self, docs, commit=_commit)
-
-    def query(self, *args: Any, **params: Any) -> Response | None:
-        return self.select(*args, **params)
-
-    def raw_query(self, **params: Any) -> str:
-        return self.select.raw(**params)
 
 
 class SearchHandler:

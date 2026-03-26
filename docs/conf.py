@@ -9,8 +9,8 @@ project = 'solrpy'
 copyright = '2010-2026, solrpy developers'
 author = 'solrpy developers'
 
-version = '1.0.4'
-release = '1.0.4'
+version = '1.0.5'
+release = '1.0.5'
 
 # -- General configuration ---------------------------------------------------
 

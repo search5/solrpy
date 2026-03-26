@@ -226,21 +226,6 @@ For raw, unprocessed queries::
     xml = conn.select.raw(q='id:1', wt='xml', indent='on')
 
 
-Legacy SolrConnection
----------------------
-
-The ``SolrConnection`` class provides backward compatibility with older
-applications. New code should use ``Solr`` instead.
-
-==================== ==============================
-SolrConnection       Solr equivalent
-==================== ==============================
-``conn.add(**doc)``  ``conn.add(doc)``
-``conn.query(q)``    ``conn.select(q)``
-``conn.raw_query()`` ``conn.select.raw()``
-==================== ==============================
-
-
 Closing the connection
 ----------------------
 

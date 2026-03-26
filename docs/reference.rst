@@ -180,29 +180,6 @@ Methods that support commit-control arguments: ``add``, ``add_many``,
 ``delete``, ``delete_many``, ``delete_query``.
 
 
-SolrConnection class (legacy)
------------------------------
-
-.. class:: SolrConnection(url)
-
-   Backward-compatible connection class. New applications should use
-   :class:`Solr` instead.
-
-   Inherits all methods from :class:`Solr`, but these methods have
-   different signatures:
-
-   .. automethod:: solr.SolrConnection.add
-   .. automethod:: solr.SolrConnection.add_many
-
-   .. method:: SolrConnection.query(q, fields=None, highlight=None, score=True, sort=None, sort_order="asc", **params)
-
-      Delegates to ``self.select(...)``.
-
-   .. method:: SolrConnection.raw_query(**params)
-
-      Delegates to ``self.select.raw(...)``.
-
-
 SearchHandler class
 -------------------
 

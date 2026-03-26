@@ -102,6 +102,11 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.0.5
+
+- **Breaking**: Removed `SolrConnection` class. Use `Solr` instead
+- Migration: `add(**fields)` → `add(dict)`, `query()` → `select()`, `raw_query()` → `select.raw()`
+
 ### 1.0.4
 
 - **Breaking**: Default `response_format` changed from `'xml'` to `'json'`

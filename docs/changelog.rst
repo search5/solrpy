@@ -1,6 +1,17 @@
 Changelog
 =========
 
+1.0.5 (2026-03-27)
+-------------------
+
+**Breaking changes:**
+
+- Removed ``SolrConnection`` class. Use ``Solr`` instead.
+- Migration: ``SolrConnection.add(**fields)`` → ``Solr.add(fields)``,
+  ``SolrConnection.query()`` → ``Solr.select()``,
+  ``SolrConnection.raw_query()`` → ``Solr.select.raw()``.
+
+
 1.0.4 (2026-03-27)
 -------------------
 

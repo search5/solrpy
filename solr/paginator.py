@@ -18,10 +18,10 @@ class SolrPaginator:
     display results, and provide links to next page, etc.
 
     For example:
-    >>> from solr import SolrConnection, SolrPaginator
+    >>> from solr import Solr, SolrPaginator
     >>>
-    >>> conn = SolrConnection('http://localhost:8083/solr')
-    >>> response = conn.query('title:huckleberry')
+    >>> conn = Solr('http://localhost:8083/solr')
+    >>> response = conn.select('title:huckleberry')
     >>> paginator = SolrPaginator(response)
     >>> print(paginator.num_pages)
     >>> page = paginator.get_page(5)
