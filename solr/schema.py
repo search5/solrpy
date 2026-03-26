@@ -49,13 +49,11 @@ class SchemaAPI:
         self._check_version()
         payload = json.dumps({operation: body})
         path = '%s/schema' % self._conn.path
-        from .utils import check_response_status, read_response
+        from .utils import read_response
         headers = {
             'Content-Type': 'application/json; charset=utf-8',
         }
-        headers.update(self._conn.auth_headers)
-        self._conn.conn.request('POST', path, payload.encode('utf-8'), headers)
-        rsp = check_response_status(self._conn.conn.getresponse())
+        rsp = self._conn._post(path, payload, headers)
         result: dict[str, Any] = json.loads(read_response(rsp))
         return result
 

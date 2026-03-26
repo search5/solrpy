@@ -7,7 +7,7 @@ import urllib.parse as urllib
 from typing import Any, IO, TYPE_CHECKING
 
 from .exceptions import SolrVersionError
-from .utils import check_response_status, read_response
+from .utils import read_response
 
 if TYPE_CHECKING:
     from .core import Solr
@@ -94,10 +94,7 @@ class Extract:
 
         body = file_obj.read()
         headers: dict[str, str] = {'Content-Type': content_type}
-        headers.update(self._conn.auth_headers)
-
-        self._conn.conn.request('POST', path, body, headers)
-        rsp = check_response_status(self._conn.conn.getresponse())
+        rsp = self._conn._post(path, body, headers)
         result: dict[str, Any] = json.loads(read_response(rsp))
         return result
 

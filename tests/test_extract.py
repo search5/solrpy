@@ -2,11 +2,10 @@
 
 import io
 import json
-import mimetypes
 import os
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import solr
 from solr.extract import Extract
@@ -22,13 +21,13 @@ def _make_conn(version: tuple[int, ...] = (9, 0, 0)) -> solr.Solr:
     return conn  # type: ignore[return-value]
 
 
-def _mock_response(payload: dict) -> MagicMock:
+def _mock_post(conn: solr.Solr, payload: dict) -> MagicMock:
+    """Attach a _post mock that returns the given JSON payload."""
     rsp = MagicMock()
-    rsp.status = 200
-    rsp.reason = 'OK'
     rsp.getheader.return_value = ''
     rsp.read.return_value = json.dumps(payload).encode('utf-8')
-    return rsp
+    conn._post = MagicMock(return_value=rsp)  # type: ignore[attr-defined]
+    return conn._post  # type: ignore[attr-defined]
 
 
 class TestExtractVersionGuard(unittest.TestCase):
@@ -41,16 +40,14 @@ class TestExtractVersionGuard(unittest.TestCase):
 
     def test_passes_on_solr_1_4(self) -> None:
         conn = _make_conn((1, 4, 0))
-        conn.conn = MagicMock()
-        conn.conn.getresponse.return_value = _mock_response({'responseHeader': {'status': 0}})
+        _mock_post(conn, {'responseHeader': {'status': 0}})
         ext = Extract(conn)
         result = ext(io.BytesIO(b'hello'))
         self.assertIn('responseHeader', result)
 
     def test_passes_on_modern_solr(self) -> None:
         conn = _make_conn((9, 0, 0))
-        conn.conn = MagicMock()
-        conn.conn.getresponse.return_value = _mock_response({'responseHeader': {'status': 0}})
+        _mock_post(conn, {'responseHeader': {'status': 0}})
         ext = Extract(conn)
         result = ext(io.BytesIO(b'hello'))
         self.assertIn('responseHeader', result)
@@ -60,23 +57,17 @@ class TestExtractQueryParams(unittest.TestCase):
 
     def setUp(self) -> None:
         self.conn = _make_conn()
-        self.conn.conn = MagicMock()
-        self.conn.conn.getresponse.return_value = _mock_response(
-            {'responseHeader': {'status': 0}}
-        )
+        self.post_mock = _mock_post(self.conn, {'responseHeader': {'status': 0}})
         self.ext = Extract(self.conn)
 
     def _called_path(self) -> str:
-        args = self.conn.conn.request.call_args[0]
-        return args[1]
+        return self.post_mock.call_args[0][0]
 
     def _called_body(self) -> bytes:
-        args = self.conn.conn.request.call_args[0]
-        return args[2]
+        return self.post_mock.call_args[0][1]
 
     def _called_headers(self) -> dict:
-        args = self.conn.conn.request.call_args[0]
-        return args[3]
+        return self.post_mock.call_args[0][2]
 
     def test_wt_json_always_sent(self) -> None:
         self.ext(io.BytesIO(b'data'))
@@ -101,8 +92,7 @@ class TestExtractQueryParams(unittest.TestCase):
 
     def test_extract_path_correct(self) -> None:
         self.ext(io.BytesIO(b'data'))
-        path = self._called_path()
-        self.assertIn('/update/extract', path)
+        self.assertIn('/update/extract', self._called_path())
 
     def test_file_content_sent_as_body(self) -> None:
         content = b'binary file content'
@@ -118,25 +108,26 @@ class TestExtractQueryParams(unittest.TestCase):
         self.assertEqual(self._called_headers()['Content-Type'],
                          'application/octet-stream')
 
+    def test_uses_post_method(self) -> None:
+        self.ext(io.BytesIO(b'data'))
+        self.post_mock.assert_called_once()
+
 
 class TestExtractOnly(unittest.TestCase):
 
     def setUp(self) -> None:
         self.conn = _make_conn()
-        self.conn.conn = MagicMock()
         self.ext = Extract(self.conn)
 
-    def _set_response(self, payload: dict) -> None:
-        self.conn.conn.getresponse.return_value = _mock_response(payload)
-
     def test_extract_only_sets_param(self) -> None:
-        self._set_response({'responseHeader': {'status': 0}, '': '', '_': {}})
+        post_mock = _mock_post(self.conn,
+                               {'responseHeader': {'status': 0}, '': '', '_': {}})
         self.ext.extract_only(io.BytesIO(b'data'))
-        path = self.conn.conn.request.call_args[0][1]
+        path = post_mock.call_args[0][0]
         self.assertIn('extractOnly=true', path)
 
     def test_returns_text_and_metadata(self) -> None:
-        self._set_response({
+        _mock_post(self.conn, {
             'responseHeader': {'status': 0},
             '': 'extracted text',
             '_': {'Content-Type': ['application/pdf']},
@@ -146,7 +137,7 @@ class TestExtractOnly(unittest.TestCase):
         self.assertEqual(metadata['Content-Type'], ['application/pdf'])
 
     def test_returns_empty_text_when_absent(self) -> None:
-        self._set_response({'responseHeader': {'status': 0}})
+        _mock_post(self.conn, {'responseHeader': {'status': 0}})
         text, metadata = self.ext.extract_only(io.BytesIO(b'data'))
         self.assertEqual(text, '')
         self.assertEqual(metadata, {})
@@ -156,10 +147,7 @@ class TestExtractFromPath(unittest.TestCase):
 
     def setUp(self) -> None:
         self.conn = _make_conn()
-        self.conn.conn = MagicMock()
-        self.conn.conn.getresponse.return_value = _mock_response(
-            {'responseHeader': {'status': 0}}
-        )
+        self.post_mock = _mock_post(self.conn, {'responseHeader': {'status': 0}})
         self.ext = Extract(self.conn)
 
     def test_from_path_reads_file(self) -> None:
@@ -169,7 +157,7 @@ class TestExtractFromPath(unittest.TestCase):
             tmp_path = f.name
         try:
             self.ext.from_path(tmp_path)
-            body = self.conn.conn.request.call_args[0][2]
+            body = self.post_mock.call_args[0][1]
             self.assertEqual(body, content)
         finally:
             os.unlink(tmp_path)
@@ -180,7 +168,7 @@ class TestExtractFromPath(unittest.TestCase):
             tmp_path = f.name
         try:
             self.ext.from_path(tmp_path)
-            headers = self.conn.conn.request.call_args[0][3]
+            headers = self.post_mock.call_args[0][2]
             self.assertEqual(headers['Content-Type'], 'application/pdf')
         finally:
             os.unlink(tmp_path)
@@ -191,21 +179,20 @@ class TestExtractFromPath(unittest.TestCase):
             tmp_path = f.name
         try:
             self.ext.from_path(tmp_path)
-            headers = self.conn.conn.request.call_args[0][3]
+            headers = self.post_mock.call_args[0][2]
             self.assertEqual(headers['Content-Type'], 'application/octet-stream')
         finally:
             os.unlink(tmp_path)
 
     def test_extract_from_path_sets_extract_only(self) -> None:
-        self.conn.conn.getresponse.return_value = _mock_response(
-            {'responseHeader': {'status': 0}, '': 'text', '_': {}}
-        )
+        _mock_post(self.conn,
+                   {'responseHeader': {'status': 0}, '': 'text', '_': {}})
         with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as f:
             f.write(b'hello world')
             tmp_path = f.name
         try:
-            text, _ = self.ext.extract_from_path(tmp_path)
-            path = self.conn.conn.request.call_args[0][1]
+            self.ext.extract_from_path(tmp_path)
+            path = self.conn._post.call_args[0][0]  # type: ignore[attr-defined]
             self.assertIn('extractOnly=true', path)
         finally:
             os.unlink(tmp_path)

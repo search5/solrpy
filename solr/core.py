@@ -423,18 +423,19 @@ class Solr:
         self.close()
         self.conn.connect()
 
-    def _post(self, url: str, body: str, headers: dict[str, str], timeout: float | None = None) -> httplib.HTTPResponse:  # type: ignore[return]
+    def _post(self, url: str, body: str | bytes, headers: dict[str, str], timeout: float | None = None) -> httplib.HTTPResponse:  # type: ignore[return]
         import time
         _logger = logging.getLogger('solr')
         _headers = self.auth_headers.copy()
         _headers.update(headers)
+        raw_body: bytes = body if isinstance(body, bytes) else body.encode('UTF-8')
         attempts = self.max_retries + 1
         retry_num = 0
         while attempts > 0:
             try:
                 if timeout is not None and self.conn.sock is not None:
                     self.conn.sock.settimeout(timeout)
-                self.conn.request('POST', url, body.encode('UTF-8'), _headers)
+                self.conn.request('POST', url, raw_body, _headers)
                 resp = check_response_status(self.conn.getresponse())
                 if timeout is not None and self.conn.sock is not None:
                     self.conn.sock.settimeout(self.timeout)
