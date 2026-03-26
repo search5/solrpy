@@ -102,6 +102,10 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.0.9
+
+- Per-request timeout override: `conn.select('*:*', timeout=5)`
+
 ### 1.0.8
 
 - Exponential backoff on connection retries with configurable `retry_delay`

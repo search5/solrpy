@@ -117,6 +117,7 @@ def committing(function: Callable[..., Any]) -> Callable[..., Any]:
         default_commit = getattr(self, 'always_commit', False)
         commit = kw.pop("commit", default_commit)
         optimize = kw.pop("optimize", False)
+        timeout = kw.pop("timeout", None)
         query: dict[str, str] = {}
         if commit or optimize:
             if optimize:
@@ -138,7 +139,7 @@ def committing(function: Callable[..., Any]) -> Callable[..., Any]:
                 "wait_searcher cannot be specified without commit or optimize")
         content = function(self, *args, **kw)
         if content:
-            return self._update(content, query)
+            return self._update(content, query, timeout=timeout)
 
     wrapper.__doc__ = function.__doc__
     wrapper.__name__ = function.__name__

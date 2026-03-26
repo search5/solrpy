@@ -184,6 +184,10 @@ If ``wait_flush`` or ``wait_searcher`` are specified without ``commit`` or
 Methods that support commit-control arguments: ``add``, ``add_many``,
 ``delete``, ``delete_many``, ``delete_query``.
 
+All update methods and ``SearchHandler`` calls also accept a ``timeout``
+keyword argument to override the connection-level timeout for that
+individual request.
+
 
 SearchHandler class
 -------------------
@@ -214,6 +218,7 @@ SearchHandler class
    :param sort: Fields to sort by. String or iterable.
    :param sort_order: Default sort direction (``'asc'`` or ``'desc'``).
    :param params: Additional Solr parameters (use underscores for dots).
+   :param timeout: Per-request timeout in seconds (overrides connection-level timeout).
    :returns: A :class:`Response` instance.
    :raises ValueError: If ``highlight=True`` but no fields are specified,
                         or if ``sort_order`` is invalid.

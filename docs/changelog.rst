@@ -1,6 +1,17 @@
 Changelog
 =========
 
+1.0.9 (2026-03-27)
+-------------------
+
+**New features:**
+
+- Per-request timeout override via ``timeout`` keyword argument.
+  Applies to ``select()``, ``select.raw()``, ``add()``, ``add_many()``,
+  ``delete()``, ``delete_many()``, ``delete_query()``, and ``commit()``.
+  The connection-level timeout is restored after each request.
+
+
 1.0.8 (2026-03-27)
 -------------------
 

@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.0.8"
+__version__ = "1.0.9"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -232,10 +232,10 @@ class Solr:
 
     # Helper methods.
 
-    def _update(self, request: str, query: dict[str, str] | None = None) -> str:
+    def _update(self, request: str, query: dict[str, str] | None = None, timeout: float | None = None) -> str:
         selector = '%s/update%s' % (self.path, qs_from_items(query))  # type: ignore[arg-type]
         try:
-            rsp = self._post(selector, request, self.xmlheaders)
+            rsp = self._post(selector, request, self.xmlheaders, timeout=timeout)
             data = read_response(rsp)
         finally:
             if not self.persistent:
@@ -306,7 +306,7 @@ class Solr:
         self.close()
         self.conn.connect()
 
-    def _post(self, url: str, body: str, headers: dict[str, str]) -> httplib.HTTPResponse:  # type: ignore[return]
+    def _post(self, url: str, body: str, headers: dict[str, str], timeout: float | None = None) -> httplib.HTTPResponse:  # type: ignore[return]
         import time
         _logger = logging.getLogger('solr')
         _headers = self.auth_headers.copy()
@@ -315,8 +315,13 @@ class Solr:
         retry_num = 0
         while attempts > 0:
             try:
+                if timeout is not None and self.conn.sock is not None:
+                    self.conn.sock.settimeout(timeout)
                 self.conn.request('POST', url, body.encode('UTF-8'), _headers)
-                return check_response_status(self.conn.getresponse())
+                resp = check_response_status(self.conn.getresponse())
+                if timeout is not None and self.conn.sock is not None:
+                    self.conn.sock.settimeout(self.timeout)
+                return resp
             except (socket.error,
                     httplib.ImproperConnectionState,
                     httplib.BadStatusLine):
@@ -390,18 +395,21 @@ class SearchHandler:
 
         params['fl'] = fl
 
+        timeout = params.pop('timeout', None)
+
         if self.conn.response_format == 'json':
             params['wt'] = 'json'
-            raw = self.raw(**params)
+            raw = self.raw(timeout=timeout, **params)
             data = json.loads(raw)
             return parse_json_response(data, params, self)
         else:
             params['version'] = self.conn.response_version
             params['wt'] = 'standard'
-            xml = self.raw(**params)
+            xml = self.raw(timeout=timeout, **params)
             return parse_query_response(StringIO(xml), params, self)  # type: ignore[no-any-return]
 
     def raw(self, **params: Any) -> str:
+        timeout = params.pop('timeout', None)
         query = []
         for key, value in params.items():
             key = key.replace(self.arg_separator, '.')
@@ -415,7 +423,7 @@ class SearchHandler:
             logging.info("solrpy request: %s" % request)
 
         try:
-            rsp = conn._post(self.selector, request, conn.form_headers)
+            rsp = conn._post(self.selector, request, conn.form_headers, timeout=timeout)
             data = read_response(rsp)
             if conn.debug:
                 logging.info("solrpy got response: %s" % data)

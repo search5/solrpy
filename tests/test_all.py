@@ -1165,7 +1165,7 @@ class TestSearchHandler(SolrConnectionTestCase):
         # method to capture information about the request, and suppress
         # sending it to the server.
 
-        def post(selector, body, headers):
+        def post(selector, body, headers, **kw):
             self.request_selector = selector
             self.request_body = body
             return EmptyResponse()
@@ -1782,9 +1782,9 @@ class TestCommitOptimize(unittest.TestCase):
         conn = solr.Solr(SOLR_HTTP)
         sent = {}
         original_update = conn._update
-        def capture_update(xstr, query=None):
+        def capture_update(xstr, query=None, **kw):
             sent['xml'] = xstr
-            return original_update(xstr, query)
+            return original_update(xstr, query, **kw)
         conn._update = capture_update
         conn.commit(_optimize=True)
         self.assertIn('<optimize', sent['xml'])
@@ -1794,9 +1794,9 @@ class TestCommitOptimize(unittest.TestCase):
         conn = solr.Solr(SOLR_HTTP)
         sent = {}
         original_update = conn._update
-        def capture_update(xstr, query=None):
+        def capture_update(xstr, query=None, **kw):
             sent['xml'] = xstr
-            return original_update(xstr, query)
+            return original_update(xstr, query, **kw)
         conn._update = capture_update
         conn.commit()
         self.assertIn('<commit', sent['xml'])
@@ -2039,9 +2039,9 @@ class TestAlwaysCommit(unittest.TestCase):
         conn = solr.Solr(SOLR_HTTP, always_commit=True)
         sent = {}
         original_update = conn._update
-        def capture_update(content, query=None):
+        def capture_update(content, query=None, **kw):
             sent['query'] = query
-            return original_update(content, query)
+            return original_update(content, query, **kw)
         conn._update = capture_update
         conn.add({'id': 'always_commit_test', 'data': 'test'})
         self.assertIn('commit', sent.get('query', {}))
@@ -2052,9 +2052,9 @@ class TestAlwaysCommit(unittest.TestCase):
         conn = solr.Solr(SOLR_HTTP, always_commit=True)
         sent = {}
         original_update = conn._update
-        def capture_update(content, query=None):
+        def capture_update(content, query=None, **kw):
             sent['query'] = query
-            return original_update(content, query)
+            return original_update(content, query, **kw)
         conn._update = capture_update
         conn.add({'id': 'always_commit_test2', 'data': 'test'}, commit=False)
         self.assertEqual(sent.get('query', {}), {})
@@ -2307,6 +2307,49 @@ class TestRetryBackoff(unittest.TestCase):
 
         # retry_delay=0.05, 2 retries: 0.05 + 0.10 = 0.15s minimum
         self.assertGreaterEqual(elapsed, 0.1)
+        conn.close()
+
+
+# ===================================================================
+# 1.0.9 tests — per-request timeout
+# ===================================================================
+
+class TestPerRequestTimeout(unittest.TestCase):
+
+    def test_select_with_timeout(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        conn.add({'id': 'timeout_test', 'data': 'hello'}, commit=True)
+        resp = conn.select('id:timeout_test', timeout=10)
+        self.assertEqual(resp.numFound, 1)
+        conn.delete(id='timeout_test', commit=True)
+        conn.close()
+
+    def test_select_raw_with_timeout(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        raw = conn.select.raw(q='*:*', wt='xml', timeout=10)
+        self.assertIn('<response>', raw)
+        conn.close()
+
+    def test_timeout_restores_after_request(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml', timeout=30)
+        conn.select('*:*', timeout=5)
+        self.assertEqual(conn.timeout, 30)
+        conn.close()
+
+    def test_add_with_timeout(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        conn.add({'id': 'timeout_add', 'data': 'x'}, commit=True, timeout=10)
+        resp = conn.select('id:timeout_add')
+        self.assertEqual(resp.numFound, 1)
+        conn.delete(id='timeout_add', commit=True)
+        conn.close()
+
+    def test_delete_with_timeout(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        conn.add({'id': 'timeout_del', 'data': 'x'}, commit=True)
+        conn.delete(id='timeout_del', commit=True, timeout=10)
+        resp = conn.select('id:timeout_del')
+        self.assertEqual(resp.numFound, 0)
         conn.close()
 
 
