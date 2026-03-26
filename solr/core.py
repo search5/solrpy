@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -43,6 +43,7 @@ class Solr:
                  http_pass: str | None = None,
                  post_headers: dict[str, str] | None = None,
                  max_retries: int = 3,
+                 retry_delay: float = 0.1,
                  always_commit: bool = False,
                  response_format: str = 'json',
                  debug: bool = False) -> None:
@@ -71,6 +72,7 @@ class Solr:
         self.ssl_key = ssl_key
         self.ssl_cert = ssl_cert
         self.max_retries = int(max_retries)
+        self.retry_delay = retry_delay
 
         assert self.max_retries >= 0
 
@@ -305,9 +307,12 @@ class Solr:
         self.conn.connect()
 
     def _post(self, url: str, body: str, headers: dict[str, str]) -> httplib.HTTPResponse:  # type: ignore[return]
+        import time
+        _logger = logging.getLogger('solr')
         _headers = self.auth_headers.copy()
         _headers.update(headers)
         attempts = self.max_retries + 1
+        retry_num = 0
         while attempts > 0:
             try:
                 self.conn.request('POST', url, body.encode('UTF-8'), _headers)
@@ -319,6 +324,13 @@ class Solr:
                 attempts -= 1
                 if attempts <= 0:
                     raise
+                retry_num += 1
+                delay = self.retry_delay * (2 ** (retry_num - 1))
+                _logger.warning(
+                    "Retry %d/%d for %s (delay=%.2fs)",
+                    retry_num, self.max_retries, url, delay,
+                )
+                time.sleep(delay)
 
 
 class SearchHandler:

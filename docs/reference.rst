@@ -79,6 +79,10 @@ Solr class
         - Dictionary of additional headers to include in all requests.
       * - ``max_retries``
         - Maximum number of automatic retries on connection errors. Defaults to ``3``.
+      * - ``retry_delay``
+        - Base delay in seconds between retries. Uses exponential backoff:
+          first retry waits ``retry_delay``, second waits ``retry_delay * 2``,
+          etc. Defaults to ``0.1``. Each retry is logged at WARNING level.
       * - ``always_commit``
         - If ``True``, all update methods (``add``, ``add_many``, ``delete``, etc.)
           will automatically commit changes. Individual calls can override this by

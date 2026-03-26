@@ -102,6 +102,11 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.0.8
+
+- Exponential backoff on connection retries with configurable `retry_delay`
+- Each retry logged at WARNING level
+
 ### 1.0.7
 
 - **Breaking**: `EmptyPage` now inherits `ValueError` (was `SolrException`)

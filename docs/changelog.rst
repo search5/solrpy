@@ -1,6 +1,17 @@
 Changelog
 =========
 
+1.0.8 (2026-03-27)
+-------------------
+
+**New features:**
+
+- Exponential backoff on connection retries. Base delay configurable via
+  ``retry_delay`` constructor parameter (default ``0.1`` seconds).
+  First retry waits ``retry_delay``, second waits ``retry_delay * 2``, etc.
+- Each retry attempt is logged at WARNING level to the ``solr`` logger.
+
+
 1.0.7 (2026-03-27)
 -------------------
 

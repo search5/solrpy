@@ -2251,5 +2251,64 @@ class TestPaginatorExceptions(unittest.TestCase):
         conn.close()
 
 
+# ===================================================================
+# 1.0.8 tests — retry improvements
+# ===================================================================
+
+class TestRetryBackoff(unittest.TestCase):
+    """Test exponential backoff and retry_delay."""
+
+    def test_default_retry_delay(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml')
+        self.assertEqual(conn.retry_delay, 0.1)
+        conn.close()
+
+    def test_custom_retry_delay(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml', retry_delay=0.5)
+        self.assertEqual(conn.retry_delay, 0.5)
+        conn.close()
+
+    def test_retry_logs_warning(self):
+        conn = solr.Solr(SOLR_HTTP, response_format='xml', max_retries=1, retry_delay=0.01)
+        call_count = [0]
+        original_request = conn.conn.request
+
+        def failing_request(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                raise socket.error("fake connection error")
+            return original_request(*args, **kwargs)
+
+        conn.conn.request = failing_request  # type: ignore
+
+        with self.assertLogs('solr', level='WARNING') as cm:
+            conn._post('/solr/core0/update', '<commit/>', conn.xmlheaders)
+        self.assertTrue(any('Retry' in msg for msg in cm.output))
+        conn.close()
+
+    def test_backoff_increases_delay(self):
+        """Verify that retry uses exponential backoff (delay doubles)."""
+        import time
+        conn = solr.Solr(SOLR_HTTP, response_format='xml', max_retries=2, retry_delay=0.05)
+        call_count = [0]
+        original_request = conn.conn.request
+
+        def failing_request(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 2:
+                raise socket.error("fake connection error")
+            return original_request(*args, **kwargs)
+
+        conn.conn.request = failing_request  # type: ignore
+
+        start = time.monotonic()
+        conn._post('/solr/core0/update', '<commit/>', conn.xmlheaders)
+        elapsed = time.monotonic() - start
+
+        # retry_delay=0.05, 2 retries: 0.05 + 0.10 = 0.15s minimum
+        self.assertGreaterEqual(elapsed, 0.1)
+        conn.close()
+
+
 if __name__ == "__main__":
     unittest.main()
