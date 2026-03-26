@@ -5,3 +5,4 @@ from .exceptions import SolrException, SolrVersionError
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 from .utils import read_response, check_response_status
+from .schema import SchemaAPI

@@ -102,6 +102,10 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.4.0
+
+- **Schema API**: `conn.schema.fields()`, `add_field()`, `replace_field()`, `delete_field()`, copy fields, dynamic fields, field types (Solr 4.2+)
+
 ### 1.3.0
 
 - **JSON Facet API**: `json_facet` parameter for advanced faceting (Solr 5.0+)

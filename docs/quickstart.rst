@@ -318,6 +318,31 @@ For raw, unprocessed queries::
     xml = conn.select.raw(q='id:1', wt='xml', indent='on')
 
 
+Schema API (Solr 4.2+)
+-----------------------
+
+Manage schema fields, types, and copy rules programmatically::
+
+    # List fields
+    fields = conn.schema.fields()
+
+    # Add a field
+    conn.schema.add_field('title', 'text_general', stored=True, indexed=True)
+
+    # Replace a field type
+    conn.schema.replace_field('title', 'string')
+
+    # Delete a field
+    conn.schema.delete_field('title')
+
+    # Copy fields
+    conn.schema.add_copy_field('title', 'title_str')
+    conn.schema.delete_copy_field('title', 'title_str')
+
+    # Full schema dump
+    schema = conn.schema.get_schema()
+
+
 Closing the connection
 ----------------------
 

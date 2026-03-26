@@ -103,6 +103,8 @@ supports them.
      - 4.0
    * - MoreLikeThis (``mlt``)
      - 4.0
+   * - Schema API (``conn.schema``)
+     - 4.2
    * - Cursor Pagination (``cursor_next()``, ``iter_cursor()``)
      - 4.7
    * - JSON Facet API (``json_facet`` parameter)

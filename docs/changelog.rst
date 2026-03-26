@@ -1,6 +1,21 @@
 Changelog
 =========
 
+1.4.0 (2026-03-27)
+-------------------
+
+**New features (Solr 4.2+):**
+
+- **Schema API** via ``conn.schema``:
+  - ``get_schema()`` — full schema dump
+  - ``fields()`` / ``add_field()`` / ``replace_field()`` / ``delete_field()``
+  - ``dynamic_fields()`` / ``add_dynamic_field()`` / ``delete_dynamic_field()``
+  - ``field_types()`` / ``add_field_type()`` / ``replace_field_type()`` / ``delete_field_type()``
+  - ``copy_fields()`` / ``add_copy_field()`` / ``delete_copy_field()``
+  - Version-gated to Solr 4.2+
+- New ``solr/schema.py`` module (separated per CLAUDE.md guidelines)
+
+
 1.3.0 (2026-03-27)
 -------------------
 

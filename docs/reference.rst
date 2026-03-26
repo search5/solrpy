@@ -354,6 +354,59 @@ Response class
            print(doc['id'])
 
 
+Schema API (Solr 4.2+)
+-----------------------
+
+.. class:: SchemaAPI
+
+   Accessed via ``conn.schema``. All methods require Solr 4.2+.
+
+   **Full schema:**
+
+   .. method:: SchemaAPI.get_schema()
+
+      Return the full schema definition as a dict.
+
+   **Field operations:**
+
+   .. method:: SchemaAPI.fields()
+
+      List all fields. Returns a list of field definition dicts.
+
+   .. method:: SchemaAPI.add_field(name, field_type, **opts)
+
+      Add a new field. Example::
+
+          conn.schema.add_field('title', 'text_general', stored=True, indexed=True)
+
+   .. method:: SchemaAPI.replace_field(name, field_type, **opts)
+
+      Replace an existing field definition.
+
+   .. method:: SchemaAPI.delete_field(name)
+
+      Delete a field by name.
+
+   **Dynamic field operations:**
+
+   .. method:: SchemaAPI.dynamic_fields()
+   .. method:: SchemaAPI.add_dynamic_field(name, field_type, **opts)
+   .. method:: SchemaAPI.delete_dynamic_field(name)
+
+   **Field type operations:**
+
+   .. method:: SchemaAPI.field_types()
+   .. method:: SchemaAPI.add_field_type(**definition)
+   .. method:: SchemaAPI.replace_field_type(**definition)
+   .. method:: SchemaAPI.delete_field_type(name)
+
+   **Copy field operations:**
+
+   .. method:: SchemaAPI.copy_fields()
+   .. method:: SchemaAPI.add_copy_field(source, dest, max_chars=None)
+   .. method:: SchemaAPI.delete_copy_field(source, dest)
+
+
 Paginator
 ---------
 
