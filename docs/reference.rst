@@ -658,6 +658,71 @@ SolrCloud (Solr 4.0+)
    .. method:: close()
 
 
+Query builders
+--------------
+
+.. class:: Field(name, alias=None)
+
+   Structured field expression for the ``fl`` parameter.
+
+   .. classmethod:: func(name, \*args)
+
+      Function field, e.g. ``Field.func('sum', 'price', 'tax')`` → ``sum(price,tax)``.
+
+   .. classmethod:: transformer(name, \*\*params)
+
+      Document transformer, e.g. ``Field.transformer('explain')`` → ``[explain]``.
+
+   .. classmethod:: score()
+
+      Score pseudo-field → ``score``.
+
+.. class:: Sort(field, direction='asc')
+
+   Structured sort clause.
+
+   .. classmethod:: func(expr, direction='asc')
+
+      Function sort, e.g. ``Sort.func('geodist()', 'asc')``.
+
+.. class:: Facet
+
+   Builder for traditional Solr facet parameters.
+
+   .. classmethod:: field(name, \*\*opts)
+
+      Field facet with per-field options (mincount, limit, sort, etc.).
+
+   .. classmethod:: range(name, start, end, gap, \*\*opts)
+
+      Range facet.
+
+   .. classmethod:: query(name, q)
+
+      Query facet.
+
+   .. classmethod:: pivot(\*fields, mincount=None)
+
+      Pivot facet.
+
+   .. method:: to_params()
+
+      Convert to Solr query parameter dict.
+
+All builders coexist with raw string parameters::
+
+    # Raw strings (always works)
+    conn.select('*:*', fl='id,title', sort='price desc',
+                facet='true', facet_field='category')
+
+    # Builder objects (optional)
+    conn.select('*:*',
+        fields=[Field('id'), Field('title')],
+        sort=[Sort('price', 'desc')],
+        facets=[Facet.field('category')],
+    )
+
+
 Schema API (Solr 4.2+)
 -----------------------
 

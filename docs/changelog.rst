@@ -1,6 +1,26 @@
 Changelog
 =========
 
+1.10.1 (2026-03-27)
+--------------------
+
+**New features:**
+
+- **``Field`` builder** (``solr/field.py``): Structured field list expressions
+  for the ``fl`` parameter. Supports aliases (``Field('price', alias='p')``),
+  functions (``Field.func('sum', 'price', 'tax')``), document transformers
+  (``Field.transformer('explain')``), and score (``Field.score()``).
+- **``Sort`` builder** (``solr/sort.py``): Structured sort clauses.
+  ``Sort('price', 'desc')``, ``Sort.func('geodist()', 'asc')``.
+- **``Facet`` builder** (``solr/facet.py``): Structured traditional facets.
+  ``Facet.field('category', mincount=1)``, ``Facet.range('price', 0, 100, 10)``,
+  ``Facet.query('cheap', 'price:[0 TO 50]')``, ``Facet.pivot('cat', 'author')``.
+- **``facets=`` parameter** on ``SearchHandler.__call__``: accepts list of
+  ``Facet`` objects, auto-merges params.
+- All builders coexist with raw string parameters — **fully backward compatible**.
+- ``Field``, ``Sort``, ``Facet`` exported from top-level ``solr`` package.
+
+
 1.10.0 (2026-03-27)
 --------------------
 

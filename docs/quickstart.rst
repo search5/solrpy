@@ -297,6 +297,35 @@ Solr 10.0+ accuracy tuning::
                    ef_search_scale_factor=2.0)
 
 
+Query builders (Field, Sort, Facet)
+------------------------------------
+
+Use builder objects for structured query parameters, or keep using raw strings::
+
+    from solr import Field, Sort, Facet
+
+    response = conn.select('*:*',
+        fields=[
+            Field('id'),
+            Field('price', alias='price_usd'),
+            Field.func('sum', 'price', 'tax'),
+            Field.score(),
+        ],
+        sort=[Sort('price', 'desc'), Sort('id', 'asc')],
+        facets=[
+            Facet.field('category', mincount=1, limit=10),
+            Facet.range('price', start=0, end=100, gap=10),
+        ],
+    )
+
+Raw strings still work — builders are an optional alternative::
+
+    # This is equivalent and will always be supported
+    conn.select('*:*', fl='id,price_usd:price,sum(price,tax),score',
+                sort='price desc,id asc',
+                facet='true', facet_field='category')
+
+
 Deleting documents
 ------------------
 

@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.10.0"
+__version__ = "1.10.1"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -525,6 +525,7 @@ class SearchHandler:
                  score: bool = True, sort: str | Iterable[str] | None = None,
                  sort_order: str = "asc",
                  json_facet: dict[str, Any] | None = None,
+                 facets: list[Any] | None = None,
                  **params: Any) -> Response | None:
         """Execute a search query against Solr.
 
@@ -538,6 +539,19 @@ class SearchHandler:
                 from .exceptions import SolrVersionError
                 raise SolrVersionError("json_facet", (5, 0), self.conn.server_version)
             params['json.facet'] = json.dumps(json_facet)
+
+        if facets is not None:
+            for facet_obj in facets:
+                for k, v in facet_obj.to_params().items():
+                    if k in params and k in ('facet.field', 'facet.range',
+                                              'facet.query', 'facet.pivot'):
+                        existing = params[k]
+                        if isinstance(existing, list):
+                            existing.append(v)
+                        else:
+                            params[k] = [existing, v]
+                    else:
+                        params[k] = v
 
         group_param = params.get('group')
         if group_param is not None and str(group_param).lower() in ('true', '1', 'yes'):
@@ -567,7 +581,7 @@ class SearchHandler:
             if isinstance(fields, str):
                 fl = fields
             else:
-                fl = ",".join(fields)
+                fl = ",".join(str(f) for f in fields)
         else:
             fl = '*'
 
@@ -577,7 +591,7 @@ class SearchHandler:
             if isinstance(sort, str):
                 sort_list = [f.strip() for f in sort.split(",")]
             else:
-                sort_list = list(sort)
+                sort_list = [str(s) for s in sort]
             sorting = []
             for e in sort_list:
                 if not (e.endswith("asc") or e.endswith("desc")):

@@ -13,6 +13,9 @@ from .extract import Extract
 from .response import SpellcheckResult
 from .response import GroupedResult, GroupField, Group
 from .knn import KNN
+from .field import Field
+from .sort import Sort
+from .facet import Facet
 from .cloud import SolrCloud
 try:
     from .zookeeper import SolrZooKeeper

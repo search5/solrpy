@@ -102,6 +102,13 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.10.1
+
+- **Field builder**: `Field('price', alias='p')`, `Field.func('sum', 'price', 'tax')`, `Field.transformer('explain')`
+- **Sort builder**: `Sort('price', 'desc')`, `Sort.func('geodist()', 'asc')`
+- **Facet builder**: `Facet.field('category')`, `Facet.range('price', 0, 100, 10)`, `Facet.query()`, `Facet.pivot()`
+- Fully backward compatible — raw strings still work
+
 ### 1.10.0
 
 - **SolrCloud**: `SolrCloud(zk, collection)` with ZooKeeper or `SolrCloud.from_urls(urls, collection)` HTTP-only
