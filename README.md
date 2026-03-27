@@ -102,11 +102,16 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.9.1
+
+- **KNN API overhaul**: `search()`, `similarity()`, `hybrid()`, `rerank()` methods
+- Full `{!knn}` parameters: `early_termination`, `seed_query`, `pre_filter`, etc.
+- `{!vectorSimilarity}` threshold search (Solr 9.6+)
+- Hybrid (lexical OR vector) and re-ranking patterns
+
 ### 1.9.0
 
 - **KNN / Dense Vector Search**: `KNN(conn)` for `{!knn}` queries (Solr 9.0+)
-- `efSearchScaleFactor` support (Solr 10.0+)
-- `build_query()` for query string generation without execution
 
 ### 1.8.1
 

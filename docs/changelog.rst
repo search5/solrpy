@@ -1,6 +1,25 @@
 Changelog
 =========
 
+1.9.1 (2026-03-27)
+-------------------
+
+**KNN API overhaul:**
+
+- **``KNN.search()``**: Full ``{!knn}`` parameter support — ``early_termination``,
+  ``saturation_threshold``, ``patience``, ``seed_query``, ``pre_filter``,
+  ``include_tags``, ``exclude_tags``, ``ef_search_scale_factor``.
+- **``KNN.similarity()``**: ``{!vectorSimilarity}`` threshold-based matching
+  with ``min_return``, ``min_traverse``, and ``pre_filter`` (Solr 9.6+).
+- **``KNN.hybrid()``**: Lexical OR vector combined search.
+- **``KNN.rerank()``**: Re-rank lexical results by vector similarity.
+- **``build_knn_query()``**, **``build_similarity_query()``**,
+  **``build_hybrid_query()``**, **``build_rerank_params()``**: Query string
+  builders for custom use cases.
+- ``build_query()`` retained as alias for backward compatibility.
+- Live integration tests against Solr 9.4 with ``DenseVectorField``.
+
+
 1.9.0 (2026-03-27)
 -------------------
 
