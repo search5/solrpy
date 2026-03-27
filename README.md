@@ -102,6 +102,11 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 2.0.6
+
+- **Async Pydantic models**: `await conn.select('*:*', model=MyDoc)` returns typed results
+- `model=` parameter on `AsyncSolr.select()` — same as sync `SearchHandler`
+
 ### 2.0.5
 
 - **Async Streaming Expressions**: `async for doc in await conn.stream(expr):`

@@ -218,7 +218,12 @@ class AsyncSolr:
         return rsp.text
 
     async def select(self, q: str | None = None, **params: Any) -> Response | None:
-        """Async search query."""
+        """Async search query.
+
+        :param model: Optional Pydantic model class. When provided,
+            ``response.results`` will contain model instances instead of dicts.
+        """
+        model = params.pop('model', None)
         if q is not None:
             params['q'] = q
         if 'fl' not in params:
@@ -232,7 +237,10 @@ class AsyncSolr:
             self.path + '/select', request, self.form_headers,
             timeout=params.pop('timeout', None) if 'timeout' in params else None)
         data = json.loads(rsp.text)
-        return parse_json_response(data, params, self)
+        resp = parse_json_response(data, params, self)
+        if model is not None and resp is not None:
+            resp.results = resp.as_models(model)
+        return resp
 
     async def add(self, doc: dict[str, Any], **kwargs: Any) -> Any:
         """Async add a document."""

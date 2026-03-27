@@ -1,6 +1,18 @@
 Changelog
 =========
 
+2.0.6 (2026-03-27)
+-------------------
+
+**New features:**
+
+- **Async Pydantic models**: ``model=`` parameter on ``AsyncSolr.select()``.
+  ``await conn.select('*:*', model=MyDoc)`` returns ``Response`` with
+  ``results`` as a list of Pydantic model instances.
+- ``AsyncSolr.get()`` and ``AsyncSolr.stream()`` already supported ``model=``
+  since earlier versions; this completes async Pydantic coverage.
+
+
 2.0.5 (2026-03-27)
 -------------------
 
