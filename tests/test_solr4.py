@@ -95,20 +95,34 @@ class TestAtomicUpdate(unittest.TestCase):
         with self.assertRaises(solr.core.SolrVersionError):
             conn.atomic_update({'id': '1', 'data': {'set': 'x'}})
 
-    def test_xml_generation(self):
+    def test_json_payload_generation(self):
+        """On Solr 4.0+, atomic_update sends JSON with modifier dicts."""
         conn = solr.Solr.__new__(solr.Solr)
         conn.server_version = (9, 0, 0)
         conn.path = '/solr'
         conn.persistent = False
         conn.always_commit = False
         sent = {}
-        conn._update = lambda xml, query=None, **kw: sent.update({'xml': xml})
+        conn._json_update = lambda body, query=None, **kw: sent.update({'body': body})
         conn.atomic_update({'id': 'doc1', 'title': {'set': 'New'}, 'count': {'inc': 1}})
-        xml = sent['xml']
-        self.assertIn('<add>', xml)
-        self.assertIn('update="set"', xml)
-        self.assertIn('update="inc"', xml)
-        self.assertIn('null="true"' if False else 'New', xml)
+        body = sent['body']
+        self.assertIsInstance(body, list)
+        self.assertEqual(body[0]['id'], 'doc1')
+        self.assertEqual(body[0]['title'], {'set': 'New'})
+        self.assertEqual(body[0]['count'], {'inc': 1})
+
+    def test_atomic_null_json(self):
+        """atomic_update with None sends null in JSON."""
+        conn = solr.Solr.__new__(solr.Solr)
+        conn.server_version = (9, 0, 0)
+        conn.path = '/solr'
+        conn.persistent = False
+        conn.always_commit = False
+        sent = {}
+        conn._json_update = lambda body, query=None, **kw: sent.update({'body': body})
+        conn.atomic_update({'id': 'doc1', 'old_field': {'set': None}})
+        body = sent['body']
+        self.assertIsNone(body[0]['old_field']['set'])
 
 
 

@@ -27,7 +27,7 @@ from typing import Any, Iterable, Iterator
 from .exceptions import SolrException, SolrVersionError
 from .utils import (
     UTC, utc_to_string, qs_from_items, strify,
-    committing, requires_version,
+    committing, requires_version, serialize_value, solr_json_default,
 )
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
@@ -196,11 +196,25 @@ class AsyncSolr:
                 time.sleep(delay)
         raise RuntimeError("Unreachable")
 
+    @property
+    def _use_json_updates(self) -> bool:
+        """Use JSON update path when Solr 4.0+ is detected."""
+        return self.server_version >= (4, 0)
+
     async def _update(self, request: str, query: dict[str, str] | None = None,
                       timeout: float | None = None) -> str:
         """Send an update XML request."""
         selector = '%s/update%s' % (self.path, qs_from_items(query))  # type: ignore[arg-type]
         rsp = await self._post(selector, request, self.xmlheaders, timeout=timeout)
+        return rsp.text
+
+    async def _json_update(self, body: Any, query: dict[str, str] | None = None,
+                           timeout: float | None = None) -> str:
+        """Send a JSON update request."""
+        selector = '%s/update%s' % (self.path, qs_from_items(query))  # type: ignore[arg-type]
+        payload = json.dumps(body, default=solr_json_default)
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        rsp = await self._post(selector, payload, headers, timeout=timeout)
         return rsp.text
 
     async def select(self, q: str | None = None, **params: Any) -> Response | None:
@@ -222,48 +236,58 @@ class AsyncSolr:
 
     async def add(self, doc: dict[str, Any], **kwargs: Any) -> Any:
         """Async add a document."""
-        from xml.sax.saxutils import escape, quoteattr
         commit = kwargs.pop('commit', self.always_commit)
         timeout = kwargs.pop('timeout', None)
-        lst = ['<add><doc>']
-        for field, value in doc.items():
-            if value is None:
-                continue
-            if isinstance(value, (list, tuple, set)):
-                for v in value:
-                    lst.append('<field name=%s>%s</field>' % (quoteattr(field), escape(str(v))))
-            else:
-                lst.append('<field name=%s>%s</field>' % (quoteattr(field), escape(str(value))))
-        lst.append('</doc></add>')
-        xml = ''.join(lst)
         query: dict[str, str] = {}
         if commit:
             query['commit'] = 'true'
-        return await self._update(xml, query, timeout=timeout)
+        if self._use_json_updates:
+            body = [{k: v for k, v in doc.items() if v is not None}]
+            return await self._json_update(body, query, timeout=timeout)
+        from xml.sax.saxutils import escape, quoteattr
+        lst = ['<add><doc>']
+        for field, value in doc.items():
+            if not isinstance(value, (list, tuple, set)):
+                values: list[Any] = [value]
+            else:
+                values = list(value)
+            for v in values:
+                serialized = serialize_value(v)
+                if serialized is None:
+                    continue
+                lst.append('<field name=%s>%s</field>' % (
+                    quoteattr(field), escape(serialized)))
+        lst.append('</doc></add>')
+        return await self._update(''.join(lst), query, timeout=timeout)
 
     async def add_many(self, docs: Iterable[dict[str, Any]], **kwargs: Any) -> Any:
         """Async add multiple documents."""
-        from xml.sax.saxutils import escape, quoteattr
         commit = kwargs.pop('commit', self.always_commit)
         timeout = kwargs.pop('timeout', None)
+        query: dict[str, str] = {}
+        if commit:
+            query['commit'] = 'true'
+        if self._use_json_updates:
+            body = [{k: v for k, v in d.items() if v is not None} for d in docs]
+            return await self._json_update(body, query, timeout=timeout)
+        from xml.sax.saxutils import escape, quoteattr
         lst = ['<add>']
         for doc in docs:
             lst.append('<doc>')
             for field, value in doc.items():
-                if value is None:
-                    continue
-                if isinstance(value, (list, tuple, set)):
-                    for v in value:
-                        lst.append('<field name=%s>%s</field>' % (quoteattr(field), escape(str(v))))
+                if not isinstance(value, (list, tuple, set)):
+                    values = [value]
                 else:
-                    lst.append('<field name=%s>%s</field>' % (quoteattr(field), escape(str(value))))
+                    values = list(value)
+                for v in values:
+                    serialized = serialize_value(v)
+                    if serialized is None:
+                        continue
+                    lst.append('<field name=%s>%s</field>' % (
+                        quoteattr(field), escape(serialized)))
             lst.append('</doc>')
         lst.append('</add>')
-        xml = ''.join(lst)
-        query: dict[str, str] = {}
-        if commit:
-            query['commit'] = 'true'
-        return await self._update(xml, query, timeout=timeout)
+        return await self._update(''.join(lst), query, timeout=timeout)
 
     async def delete(self, id: Any = None, **kwargs: Any) -> Any:
         """Async delete by id."""

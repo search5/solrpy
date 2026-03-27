@@ -42,6 +42,46 @@ def utc_to_string(value: datetime.datetime) -> str:
     return result
 
 
+def solr_json_default(obj: Any) -> Any:
+    """Custom JSON encoder for Solr update payloads.
+
+    Handles ``datetime.datetime``, ``datetime.date``, ``set``, ``tuple``.
+    ``bool``, ``int``, ``float``, ``str``, ``list``, ``dict`` are
+    handled natively by :func:`json.dumps`.
+    """
+    if isinstance(obj, datetime.datetime):
+        return utc_to_string(obj)
+    if isinstance(obj, datetime.date):
+        return utc_to_string(
+            datetime.datetime.combine(obj, datetime.time(tzinfo=utc)))
+    if isinstance(obj, (set, tuple)):
+        return list(obj)
+    raise TypeError("Object of type %s is not JSON serializable" % type(obj).__name__)
+
+
+def serialize_value(value: Any) -> str | None:
+    """Convert a Python value to a Solr-compatible string.
+
+    Handles ``datetime.datetime``, ``datetime.date``, ``bool``, and
+    ``None``.  All other types are converted via ``str()``.
+
+    This is the single source of truth for type serialization, used by
+    ``Solr.add()``, ``Solr.atomic_update()``, ``AsyncSolr.add()``, etc.
+
+    :returns: Serialized string, or ``None`` if *value* is ``None``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime.datetime):
+        return utc_to_string(value)
+    if isinstance(value, datetime.date):
+        return utc_to_string(
+            datetime.datetime.combine(value, datetime.time(tzinfo=utc)))
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    return str(value)
+
+
 def utc_from_string(value: str) -> datetime.datetime:
     """Parse a string representing an ISO 8601 date from Solr.
 
@@ -147,8 +187,12 @@ def committing(function: Callable[..., Any]) -> Callable[..., Any]:
             raise TypeError(
                 "wait_searcher cannot be specified without commit or optimize")
         content = function(self, *args, **kw)
-        if content:
-            return self._update(content, query, timeout=timeout)
+        if content is None:
+            return None
+        # JSON update path: content is a list/dict, not a string
+        if isinstance(content, (list, dict)):
+            return self._json_update(content, query, timeout=timeout)
+        return self._update(content, query, timeout=timeout)
 
     wrapper.__doc__ = function.__doc__
     wrapper.__name__ = function.__name__

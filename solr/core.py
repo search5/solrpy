@@ -16,7 +16,7 @@ from xml.sax.saxutils import escape, quoteattr
 from .exceptions import SolrException, SolrVersionError
 from .utils import (
     UTC, utc_to_string, utc_from_string, qs_from_items, strify,
-    committing, requires_version,
+    committing, requires_version, serialize_value, solr_json_default,
 )
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
@@ -241,16 +241,20 @@ class Solr:
         return self._delete(queries=[query])
 
     @committing
-    def add(self, doc: dict[str, Any]) -> str:
+    def add(self, doc: dict[str, Any]) -> Any:
         """Add a document to the Solr server."""
+        if self._use_json_updates:
+            return [self.__doc_for_json(doc)]
         lst = ['<add>']
         self.__add(lst, doc)
         lst.append('</add>')
         return ''.join(lst)
 
     @committing
-    def add_many(self, docs: Iterable[dict[str, Any]]) -> str:
+    def add_many(self, docs: Iterable[dict[str, Any]]) -> Any:
         """Add several documents to the Solr server."""
+        if self._use_json_updates:
+            return [self.__doc_for_json(d) for d in docs]
         lst = ['<add>']
         for doc in docs:
             self.__add(lst, doc)
@@ -259,7 +263,7 @@ class Solr:
 
     @committing
     @requires_version(4, 0)
-    def atomic_update(self, doc: dict[str, Any]) -> str:
+    def atomic_update(self, doc: dict[str, Any]) -> Any:
         """Atomic (partial) update of a single document.
 
         Field values can be plain values (full replace) or dicts with a
@@ -275,6 +279,8 @@ class Solr:
                 'old_field': {'set': None},
             }, commit=True)
         """
+        if self._use_json_updates:
+            return [doc]
         lst = ['<add>']
         self.__atomic_update(lst, doc)
         lst.append('</add>')
@@ -282,8 +288,10 @@ class Solr:
 
     @committing
     @requires_version(4, 0)
-    def atomic_update_many(self, docs: Iterable[dict[str, Any]]) -> str:
+    def atomic_update_many(self, docs: Iterable[dict[str, Any]]) -> Any:
         """Atomic (partial) update of multiple documents."""
+        if self._use_json_updates:
+            return list(docs)
         lst = ['<add>']
         for doc in docs:
             self.__atomic_update(lst, doc)
@@ -299,16 +307,19 @@ class Solr:
                 continue
             if isinstance(value, dict):
                 modifier, mod_value = next(iter(value.items()))
-                if mod_value is None:
+                serialized = serialize_value(mod_value)
+                if serialized is None:
                     lst.append('<field name=%s update=%s null="true"/>' % (
                         quoteattr(field), quoteattr(modifier)))
                 else:
                     lst.append('<field name=%s update=%s>%s</field>' % (
                         quoteattr(field), quoteattr(modifier),
-                        escape(str(mod_value))))
+                        escape(serialized)))
             else:
-                lst.append('<field name=%s>%s</field>' % (
-                    quoteattr(field), escape(str(value))))
+                serialized = serialize_value(value)
+                if serialized is not None:
+                    lst.append('<field name=%s>%s</field>' % (
+                        quoteattr(field), escape(serialized)))
         lst.append('</doc>')
 
     @requires_version(4, 0)
@@ -431,6 +442,24 @@ class Solr:
 
     # Helper methods.
 
+    @property
+    def _use_json_updates(self) -> bool:
+        """Use JSON update path when Solr 4.0+ is detected."""
+        return self.server_version >= (4, 0)
+
+    def _json_update(self, body: Any, query: dict[str, str] | None = None,
+                     timeout: float | None = None) -> str:
+        """Send a JSON update request to Solr and return the response body."""
+        selector = '%s/update%s' % (self.path, qs_from_items(query))  # type: ignore[arg-type]
+        payload = json.dumps(body, default=solr_json_default)
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        try:
+            rsp = self._post(selector, payload, headers, timeout=timeout)
+            return rsp.text
+        finally:
+            if not self.persistent:
+                self.close()
+
     def _update(self, request: str, query: dict[str, str] | None = None, timeout: float | None = None) -> str:
         """Send an update XML request to Solr and return the response body."""
         selector = '%s/update%s' % (self.path, qs_from_items(query))  # type: ignore[arg-type]
@@ -453,6 +482,15 @@ class Solr:
                 raise SolrException(rsp.status_code, reason)
         return data
 
+    def __doc_for_json(self, fields: dict[str, Any]) -> dict[str, Any]:
+        """Build a JSON-ready document dict, omitting None values."""
+        result: dict[str, Any] = {}
+        for field, value in fields.items():
+            if value is None:
+                continue
+            result[field] = value
+        return result
+
     def __add(self, lst: list[str], fields: dict[str, Any]) -> None:
         """Append ``<doc>`` XML for a single document to *lst*."""
         lst.append('<doc>')
@@ -463,20 +501,11 @@ class Solr:
                 values = list(value)
 
             for value in values:
-                if value is None:
+                serialized = serialize_value(value)
+                if serialized is None:
                     continue
-                if isinstance(value, datetime.datetime):
-                    value = utc_to_string(value)
-                elif isinstance(value, datetime.date):
-                    value = datetime.datetime.combine(
-                        value, datetime.time(tzinfo=UTC()))
-                    value = utc_to_string(value)
-                elif isinstance(value, bool):
-                    value = value and 'true' or 'false'
-
                 lst.append('<field name=%s>%s</field>' % (
-                    (quoteattr(field),
-                    escape(str(value)))))
+                    quoteattr(field), escape(serialized)))
         lst.append('</doc>')
 
     def _delete(self, id: Any = None, ids: list[Any] | None = None, queries: list[str] | None = None) -> str | None:

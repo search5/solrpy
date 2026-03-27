@@ -537,7 +537,8 @@ class TestCommitControlAdd(RequestTracking):
         self.assertEqual(
             self.selector(),
             "/update?commit=true&waitFlush=false&waitSearcher=false")
-        self.assertTrue(b"<add>" in self.postbody())
+        body = self.postbody()
+        self.assertTrue(b"<add>" in body or b"[{" in body)
 
     def test_add_nosearcher(self):
         doc = get_rand_userdoc()
@@ -545,7 +546,8 @@ class TestCommitControlAdd(RequestTracking):
         self.assertEqual(
             self.selector(),
             "/update?commit=true&waitSearcher=false")
-        self.assertTrue(b"<add>" in self.postbody())
+        body = self.postbody()
+        self.assertTrue(b"<add>" in body or b"[{" in body)
 
     def test_add_waitflush_without_commit(self):
         doc = get_rand_userdoc()
@@ -561,7 +563,8 @@ class TestCommitControlAdd(RequestTracking):
         self.assertEqual(
             self.selector(),
             "/update?commit=true&waitFlush=false&waitSearcher=false")
-        self.assertTrue(b"<add>" in self.postbody())
+        body = self.postbody()
+        self.assertTrue(b"<add>" in body or b"[{" in body)
 
     def test_add_many_commit_nosearcher(self):
         documents = [get_rand_userdoc() for i in range(3)]
@@ -569,7 +572,8 @@ class TestCommitControlAdd(RequestTracking):
         self.assertEqual(
             self.selector(),
             "/update?commit=true&waitSearcher=false")
-        self.assertTrue(b"<add>" in self.postbody())
+        body = self.postbody()
+        self.assertTrue(b"<add>" in body or b"[{" in body)
 
 
 
@@ -692,10 +696,15 @@ class TestAlwaysCommit(unittest.TestCase):
         conn = solr.Solr(SOLR_HTTP, always_commit=True)
         sent = {}
         original_update = conn._update
+        original_json_update = conn._json_update
         def capture_update(content, query=None, **kw):
             sent['query'] = query
             return original_update(content, query, **kw)
-        conn._update = capture_update
+        def capture_json_update(body, query=None, **kw):
+            sent['query'] = query
+            return original_json_update(body, query, **kw)
+        conn._update = capture_update  # type: ignore
+        conn._json_update = capture_json_update  # type: ignore
         conn.add({'id': 'always_commit_test', 'data': 'test'})
         self.assertIn('commit', sent.get('query', {}))
         conn.delete(id='always_commit_test', commit=True)
@@ -705,10 +714,15 @@ class TestAlwaysCommit(unittest.TestCase):
         conn = solr.Solr(SOLR_HTTP, always_commit=True)
         sent = {}
         original_update = conn._update
+        original_json_update = conn._json_update
         def capture_update(content, query=None, **kw):
             sent['query'] = query
             return original_update(content, query, **kw)
-        conn._update = capture_update
+        def capture_json_update(body, query=None, **kw):
+            sent['query'] = query
+            return original_json_update(body, query, **kw)
+        conn._update = capture_update  # type: ignore
+        conn._json_update = capture_json_update  # type: ignore
         conn.add({'id': 'always_commit_test2', 'data': 'test'}, commit=False)
         self.assertEqual(sent.get('query', {}), {})
         conn.delete(id='always_commit_test2', commit=True)
