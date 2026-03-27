@@ -266,9 +266,11 @@ class Response:
                           doc="SpellcheckResult for this response, or None.")
 
     def __len__(self) -> int:
+        """Return the number of matching documents contained in this set."""
         return len(self.results)
 
     def __iter__(self) -> Any:
+        """Return an iterator of matching documents."""
         return iter(self.results)
 
     def next_batch(self) -> Any:

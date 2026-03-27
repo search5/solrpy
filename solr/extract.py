@@ -7,7 +7,7 @@ import urllib.parse as urllib
 from typing import Any, IO, TYPE_CHECKING
 
 from .exceptions import SolrVersionError
-from .utils import read_response
+from .transport import SolrTransport
 
 if TYPE_CHECKING:
     from .core import Solr
@@ -16,10 +16,6 @@ if TYPE_CHECKING:
 class Extract:
     """Index or extract rich documents via Solr's ExtractingRequestHandler (Solr 1.4+).
 
-    Solr Cell integrates Apache Tika to extract text and metadata from rich
-    documents (PDF, Word, HTML, etc.) and index them into Solr. The
-    ``/update/extract`` handler must be configured in ``solrconfig.xml``.
-
     Example::
 
         from solr import Solr, Extract
@@ -27,32 +23,23 @@ class Extract:
         conn = Solr('http://localhost:8983/solr/mycore')
         extract = Extract(conn)
 
-        # Index a document with literal field values
         with open('report.pdf', 'rb') as f:
             extract(f, content_type='application/pdf',
-                    literal_id='report1', literal_title='Annual Report',
-                    commit=True)
+                    literal_id='report1', commit=True)
 
-        # Extract text and metadata without indexing
-        with open('report.pdf', 'rb') as f:
-            text, metadata = extract.extract_only(f, content_type='application/pdf')
-        print(text[:200])
-        print(metadata.get('Content-Type'))
-
-        # Convenience helpers that open the file by path
-        extract.from_path('report.pdf', literal_id='report1', commit=True)
         text, metadata = extract.extract_from_path('report.pdf')
     """
 
     _MIN_VERSION = (1, 4)
 
     def __init__(self, conn: Solr) -> None:
-        self._conn = conn
+        self._transport = SolrTransport(conn)
 
     def _check_version(self) -> None:
-        if self._conn.server_version < self._MIN_VERSION:
+        """Raise SolrVersionError if server is too old."""
+        if self._transport.server_version < self._MIN_VERSION:
             raise SolrVersionError("extract", self._MIN_VERSION,
-                                   self._conn.server_version)
+                                   self._transport.server_version)
 
     def __call__(self, file_obj: IO[bytes],
                  content_type: str = 'application/octet-stream',
@@ -90,12 +77,10 @@ class Extract:
             query_parts.append((solr_key, str(value)))
 
         qs = urllib.urlencode(query_parts)
-        path = '%s/update/extract?%s' % (self._conn.path, qs)
-
         body = file_obj.read()
         headers: dict[str, str] = {'Content-Type': content_type}
-        rsp = self._conn._post(path, body, headers)
-        result: dict[str, Any] = json.loads(read_response(rsp))
+        raw = self._transport.post_raw('/update/extract?' + qs, body, headers)
+        result: dict[str, Any] = json.loads(raw)
         return result
 
     def extract_only(self, file_obj: IO[bytes],

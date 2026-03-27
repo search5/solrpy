@@ -1,6 +1,20 @@
 Changelog
 =========
 
+1.8.1 (2026-03-27)
+-------------------
+
+**Internal refactoring:**
+
+- New ``SolrTransport`` class in ``solr/transport.py``: thin abstraction over
+  Solr's HTTP communication (``get_json``, ``post_json``, ``post_raw``).
+- ``SchemaAPI``, ``Suggest``, ``Extract`` now use ``SolrTransport`` instead of
+  calling ``Solr._get()`` / ``Solr._post()`` directly.
+- Eliminates coupling to internal HTTP methods; reduces migration cost for
+  the httpx switch planned in 2.0.0.
+- No public API changes.
+
+
 1.8.0 (2026-03-27)
 -------------------
 

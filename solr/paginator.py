@@ -53,10 +53,12 @@ class SolrPaginator:
 
     @property
     def count(self) -> int:
+        """Total number of matching documents."""
         return int(self.result.numFound)
 
     @property
     def num_pages(self) -> int:
+        """Total number of pages."""
         if self.count == 0:
             return 0
         return int(math.ceil(float(self.count) / float(self.page_size)))
@@ -101,25 +103,33 @@ class SolrPage:
 
     @property
     def object_list(self) -> Results | list[dict[str, Any]]:
+        """List of documents on this page."""
         return self.result
 
     def has_next(self) -> bool:
+        """Return True if there is a next page."""
         return self.number < self.paginator.num_pages
 
     def has_previous(self) -> bool:
+        """Return True if there is a previous page."""
         return self.number > 1
 
     def has_other_pages(self) -> bool:
+        """Return True if there are other pages."""
         return self.paginator.num_pages > 1
 
     def start_index(self) -> int:
+        """Return the 0-based start index of this page."""
         return (self.number - 1) * self.paginator.page_size
 
     def end_index(self) -> int:
+        """Return the 0-based end index of this page."""
         return self.start_index() + len(self.result) - 1
 
     def next_page_number(self) -> int:
+        """Return the next page number."""
         return self.number + 1
 
     def previous_page_number(self) -> int:
+        """Return the previous page number."""
         return self.number - 1

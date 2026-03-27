@@ -61,6 +61,7 @@ class ResponseContentHandler(ContentHandler):
         self.in_tree: bool = False
 
     def startElement(self, name: str, attrs: Any) -> None:
+        """Handle an opening XML tag."""
         if not self.in_tree:
             if name != 'response':
                 raise SolrException(
@@ -73,9 +74,11 @@ class ResponseContentHandler(ContentHandler):
         self.stack[-2].children.append(element)
 
     def characters(self, ch: str) -> None:
+        """Accumulate character data."""
         self.stack[-1].chars.append(ch)
 
     def endElement(self, name: str) -> None:
+        """Handle a closing XML tag and build the final value."""
         node = self.stack.pop()
 
         tag = node.name or name
@@ -145,6 +148,8 @@ class Node:
     """A temporary object used in XML processing. Not seen by end user."""
 
     def __init__(self, name: str | None, attrs: Any) -> None:
+        """*final* will eventually be the "final" representation of
+        this node, whether an int, list, dict, etc."""
         self.chars: list[str] = []
         self.name = name
         self.attrs = attrs

@@ -1,11 +1,11 @@
 """Suggest handler wrapper for Solr 4.7+."""
 from __future__ import annotations
 
-import json
 import urllib.parse as urllib
 from typing import Any, TYPE_CHECKING
 
 from .exceptions import SolrVersionError
+from .transport import SolrTransport
 
 if TYPE_CHECKING:
     from .core import Solr
@@ -35,12 +35,13 @@ class Suggest:
     _MIN_VERSION = (4, 7)
 
     def __init__(self, conn: Solr) -> None:
-        self._conn = conn
+        self._transport = SolrTransport(conn)
 
     def _check_version(self) -> None:
-        if self._conn.server_version < self._MIN_VERSION:
+        """Raise SolrVersionError if server is too old."""
+        if self._transport.server_version < self._MIN_VERSION:
             raise SolrVersionError("suggest", self._MIN_VERSION,
-                                   self._conn.server_version)
+                                   self._transport.server_version)
 
     def __call__(self, q: str, dictionary: str | None = None,
                  count: int = 10, **params: Any) -> list[dict[str, Any]]:
@@ -74,9 +75,7 @@ class Suggest:
         query_params.update({k: str(v) for k, v in params.items()})
 
         qs = urllib.urlencode(query_params)
-        path = '%s/suggest?%s' % (self._conn.path, qs)
-        rsp = self._conn._get(path)
-        data: dict[str, Any] = json.loads(rsp.read().decode('utf-8'))
+        data = self._transport.get_json('/suggest?' + qs)
         return self._extract_suggestions(data)
 
     def _extract_suggestions(self, data: dict[str, Any]) -> list[dict[str, Any]]:

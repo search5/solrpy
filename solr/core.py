@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -33,6 +33,13 @@ __all__ = ['SolrException', 'SolrVersionError', 'Solr',
 # ===================================================================
 
 class Solr:
+    """A connection to a Solr server.
+
+    Provides CRUD operations, commit/optimize, version detection,
+    and the ``select`` search handler.  Optional features (Schema API,
+    MoreLikeThis, Suggest, Extract, etc.) are created externally via
+    companion classes that accept a ``Solr`` instance.
+    """
 
     def __init__(self, url: str,
                  persistent: bool = True,
@@ -49,6 +56,27 @@ class Solr:
                  auth_token: str | None = None,
                  auth: Any = None,
                  debug: bool = False) -> None:
+        """
+        Connect to the Solr instance at *url*.
+
+        :param url: URI pointing to the Solr instance, e.g.
+            ``http://localhost:8983/solr`` or
+            ``http://localhost:8983/solr/mycore``.
+        :param persistent: Keep a persistent HTTP connection open.
+        :param timeout: Timeout in seconds for server responses.
+        :param ssl_key: PEM key file for SSL client authentication.
+        :param ssl_cert: PEM certificate file for SSL client authentication.
+        :param http_user: Username for HTTP Basic authentication.
+        :param http_pass: Password for HTTP Basic authentication.
+        :param post_headers: Extra headers included in all requests.
+        :param max_retries: Max automatic retries on connection errors.
+        :param retry_delay: Base delay in seconds between retries (exponential backoff).
+        :param always_commit: Auto-commit on every update method call.
+        :param response_format: ``'json'`` (default) or ``'xml'``.
+        :param auth_token: Bearer token string for authentication.
+        :param auth: Callable returning a ``dict[str, str]`` of auth headers per request.
+        :param debug: Log all requests and responses.
+        """
 
         self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]
         self.url = url
@@ -260,6 +288,7 @@ class Solr:
         return ''.join(lst)
 
     def __atomic_update(self, lst: list[str], fields: dict[str, Any]) -> None:
+        """Append ``<doc>`` XML with atomic-update modifiers to *lst*."""
         lst.append('<doc>')
         for field, value in fields.items():
             if field == 'id':
@@ -353,6 +382,7 @@ class Solr:
         return self._commit("optimize", wait_flush, wait_searcher)
 
     def _commit(self, verb: str, wait_flush: bool, wait_searcher: bool) -> str:
+        """Build and send a commit/optimize XML command."""
         if not wait_searcher:
             if not wait_flush:
                 options = 'waitFlush="false" waitSearcher="false"'
@@ -366,6 +396,7 @@ class Solr:
     # Helper methods.
 
     def _update(self, request: str, query: dict[str, str] | None = None, timeout: float | None = None) -> str:
+        """Send an update XML request to Solr and return the response body."""
         selector = '%s/update%s' % (self.path, qs_from_items(query))  # type: ignore[arg-type]
         try:
             rsp = self._post(selector, request, self.xmlheaders, timeout=timeout)
@@ -387,6 +418,7 @@ class Solr:
         return data
 
     def __add(self, lst: list[str], fields: dict[str, Any]) -> None:
+        """Append ``<doc>`` XML for a single document to *lst*."""
         lst.append('<doc>')
         for field, value in fields.items():
             if not isinstance(value, (list, tuple, set)):
@@ -412,6 +444,7 @@ class Solr:
         lst.append('</doc>')
 
     def _delete(self, id: Any = None, ids: list[Any] | None = None, queries: list[str] | None = None) -> str | None:
+        """Build a ``<delete>`` XML fragment from ids and/or queries."""
         if not ids:
             ids = []
         if id is not None:
@@ -435,11 +468,13 @@ class Solr:
                self.xmlheaders, self.reconnects))
 
     def _reconnect(self) -> None:
+        """Close and re-establish the HTTP connection."""
         self.reconnects += 1
         self.close()
         self.conn.connect()
 
     def _post(self, url: str, body: str | bytes, headers: dict[str, str], timeout: float | None = None) -> httplib.HTTPResponse:  # type: ignore[return]
+        """POST data to Solr with retry and exponential backoff."""
         import time
         _logger = logging.getLogger('solr')
         _headers = self._get_auth_headers()
@@ -473,6 +508,12 @@ class Solr:
 
 
 class SearchHandler:
+    """Provides access to a named Solr search handler.
+
+    The ``select`` attribute on :class:`Solr` instances is a ``SearchHandler``
+    bound to ``/select``.  Additional handlers can be created for custom
+    endpoints.
+    """
 
     def __init__(self, conn: Solr, relpath: str = "/select", arg_separator: str = "_") -> None:
         self.conn = conn
@@ -485,6 +526,13 @@ class SearchHandler:
                  sort_order: str = "asc",
                  json_facet: dict[str, Any] | None = None,
                  **params: Any) -> Response | None:
+        """Execute a search query against Solr.
+
+        Optional parameters can be passed in using underscore notation
+        for dotted Solr parameter names (e.g., ``hl_simple_post``).
+
+        Returns a :class:`Response` instance.
+        """
         if json_facet is not None:
             if self.conn.server_version < (5, 0):
                 from .exceptions import SolrVersionError
@@ -557,6 +605,7 @@ class SearchHandler:
             return parse_query_response(StringIO(xml), params, self)  # type: ignore[no-any-return]
 
     def raw(self, **params: Any) -> str:
+        """Issue a raw query. No pre/post-processing on parameters or response."""
         timeout = params.pop('timeout', None)
         query = []
         for key, value in params.items():

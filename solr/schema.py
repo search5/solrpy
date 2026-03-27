@@ -5,10 +5,10 @@ field type, dynamic field, and copy field operations.
 """
 from __future__ import annotations
 
-import json
 from typing import Any, TYPE_CHECKING
 
 from .exceptions import SolrVersionError
+from .transport import SolrTransport
 
 if TYPE_CHECKING:
     from .core import Solr
@@ -17,45 +17,38 @@ if TYPE_CHECKING:
 class SchemaAPI:
     """Client for Solr's Schema API.
 
-    Accessed via ``conn.schema`` on a :class:`~solr.core.Solr` instance.
-    All methods require Solr 4.2+.
+    Created explicitly by the user. All methods require Solr 4.2+.
 
     Example::
 
+        from solr import Solr, SchemaAPI
+
         conn = Solr('http://localhost:8983/solr/mycore')
-        fields = conn.schema.fields()
-        conn.schema.add_field('title', 'text_general', stored=True)
+        schema = SchemaAPI(conn)
+        fields = schema.fields()
+        schema.add_field('title', 'text_general', stored=True)
     """
 
     _MIN_VERSION = (4, 2)
 
     def __init__(self, conn: Solr) -> None:
-        self._conn = conn
+        self._transport = SolrTransport(conn)
 
     def _check_version(self) -> None:
-        if self._conn.server_version < self._MIN_VERSION:
+        """Raise SolrVersionError if server is too old."""
+        if self._transport.server_version < self._MIN_VERSION:
             raise SolrVersionError("schema", self._MIN_VERSION,
-                                   self._conn.server_version)
+                                   self._transport.server_version)
 
     def _get_json(self, endpoint: str) -> Any:
         """GET a schema endpoint and return parsed JSON."""
         self._check_version()
-        path = '%s/schema%s' % (self._conn.path, endpoint)
-        rsp = self._conn._get(path + '?wt=json')
-        return json.loads(rsp.read().decode('utf-8'))
+        return self._transport.get_json('/schema' + endpoint)
 
     def _modify(self, operation: str, body: dict[str, Any]) -> dict[str, Any]:
         """POST a schema modification command."""
         self._check_version()
-        payload = json.dumps({operation: body})
-        path = '%s/schema' % self._conn.path
-        from .utils import read_response
-        headers = {
-            'Content-Type': 'application/json; charset=utf-8',
-        }
-        rsp = self._conn._post(path, payload, headers)
-        result: dict[str, Any] = json.loads(read_response(rsp))
-        return result
+        return self._transport.post_json('/schema', {operation: body})
 
     # -- Full schema --
 

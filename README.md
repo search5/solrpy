@@ -102,6 +102,11 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.8.1
+
+- **HTTP transport abstraction**: `SolrTransport` decouples companion classes from internal `_get`/`_post`
+- SchemaAPI, Suggest, Extract now use `SolrTransport` — prepares for httpx in 2.0.0
+
 ### 1.8.0
 
 - **Bearer token auth**: `Solr(url, auth_token='...')`

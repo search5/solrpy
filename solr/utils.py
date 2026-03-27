@@ -16,12 +16,15 @@ class UTC(datetime.tzinfo):
     """UTC timezone."""
 
     def utcoffset(self, dt: datetime.datetime | None) -> datetime.timedelta:
+        """Return UTC offset (zero)."""
         return datetime.timedelta(0)
 
     def tzname(self, dt: datetime.datetime | None) -> str:
+        """Return timezone name."""
         return "UTC"
 
     def dst(self, dt: datetime.datetime | None) -> datetime.timedelta:
+        """Return DST offset (zero)."""
         return datetime.timedelta(0)
 
 
@@ -40,7 +43,11 @@ def utc_to_string(value: datetime.datetime) -> str:
 
 
 def utc_from_string(value: str) -> datetime.datetime:
-    """Parse a string representing an ISO 8601 date from Solr."""
+    """Parse a string representing an ISO 8601 date from Solr.
+
+    Note: this doesn't process the entire ISO 8601 standard,
+    only the specific format Solr promises to generate.
+    """
     try:
         if not value.endswith('Z') and value[10] == 'T':
             raise ValueError(value)
@@ -73,10 +80,12 @@ def qs_from_items(query: dict[str, str | list[str]] | None) -> str:
 
 
 def strify(s: Any) -> str:
+    """Convert any value to a string for URL encoding."""
     return str(s)
 
 
 def check_response_status(response: httplib.HTTPResponse) -> httplib.HTTPResponse:
+    """Raise SolrException if the HTTP response status is not 200."""
     if response.status != 200:
         ex = SolrException(response.status, response.reason)
         try:
