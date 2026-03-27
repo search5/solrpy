@@ -1,6 +1,20 @@
 Changelog
 =========
 
+2.0.2 (2026-03-27)
+-------------------
+
+**New features:**
+
+- **``AsyncSolr``** class in ``solr/async_solr.py``: full async client built
+  on ``httpx.AsyncClient``. Same API as ``Solr`` but with ``async``/``await``.
+- ``async with AsyncSolr(url) as conn:`` context manager.
+- Async methods: ``await conn.select()``, ``await conn.add()``,
+  ``await conn.delete()``, ``await conn.commit()``, ``await conn.get()``.
+- **``AsyncTransport``** in ``solr/transport.py``: async version of
+  ``SolrTransport`` for companion classes.
+
+
 2.0.1 (2026-03-27)
 -------------------
 

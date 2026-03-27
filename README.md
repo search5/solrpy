@@ -102,6 +102,12 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 2.0.2
+
+- **AsyncSolr**: `async with AsyncSolr(url) as conn: await conn.select('*:*')`
+- **AsyncTransport** for async companion classes
+- Full async: select, add, add_many, delete, commit, get
+
 ### 2.0.1
 
 - **Breaking**: `http.client` replaced with `httpx.Client`
