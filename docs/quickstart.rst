@@ -270,6 +270,33 @@ Group results by a field value::
     print('Distinct groups:', resp.grouped['category'].ngroups)
 
 
+KNN / Dense Vector Search (Solr 9.0+)
+---------------------------------------
+
+Search by vector similarity using Solr's ``DenseVectorField``::
+
+    from solr import KNN
+
+    knn = KNN(conn)
+    response = knn(
+        [0.1, 0.2, 0.3, 0.4, 0.5],
+        field='embedding',
+        top_k=10,
+    )
+    for doc in response.results:
+        print(doc['id'], doc.get('score'))
+
+With filter queries::
+
+    response = knn([0.1, 0.2, 0.3], field='embedding', top_k=10,
+                   filters='category:books')
+
+Solr 10.0+ accuracy tuning::
+
+    response = knn([0.1, 0.2], field='embedding', top_k=10,
+                   ef_search_scale_factor=2.0)
+
+
 Deleting documents
 ------------------
 

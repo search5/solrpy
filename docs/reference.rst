@@ -583,6 +583,48 @@ Grouping classes (Solr 3.3+)
       and ``start`` attributes.
 
 
+KNN / Dense Vector Search (Solr 9.0+)
+---------------------------------------
+
+.. class:: KNN(conn)
+
+   Dense Vector / KNN Search using Solr's ``{!knn}`` query parser.
+   Created explicitly by the user.
+
+   :param conn: A :class:`Solr` instance.
+
+   .. method:: __call__(vector, field, top_k, filters=None, ef_search_scale_factor=None, **params)
+
+      Execute a KNN search query.
+
+      :param vector: Dense vector as a sequence of floats.
+      :param field: Name of the ``DenseVectorField`` to search.
+      :param top_k: Number of nearest neighbors to retrieve.
+      :param filters: Optional filter query (``fq`` parameter).
+      :param ef_search_scale_factor: Solr 10.0+ parameter to tune search
+          accuracy independently from result count.
+      :returns: A :class:`Response` instance.
+      :raises SolrVersionError: If connected Solr is older than 9.0.
+
+   .. method:: build_query(vector, field, top_k, ef_search_scale_factor=None)
+
+      Build a ``{!knn}`` query string without executing it.
+
+   Example::
+
+       from solr import Solr, KNN
+
+       conn = Solr('http://localhost:8983/solr/mycore')
+       knn = KNN(conn)
+       response = knn([0.1, 0.2, 0.3, ...], field='embedding', top_k=10)
+       for doc in response.results:
+           print(doc['id'], doc.get('score'))
+
+       # Solr 10.0+: tune search accuracy
+       response = knn([0.1, 0.2], field='embedding', top_k=10,
+                      ef_search_scale_factor=2.0)
+
+
 Schema API (Solr 4.2+)
 -----------------------
 

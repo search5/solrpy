@@ -1,6 +1,20 @@
 Changelog
 =========
 
+1.9.0 (2026-03-27)
+-------------------
+
+**New features (Solr 9.0+):**
+
+- **KNN / Dense Vector Search**: New ``KNN(conn)`` class in ``solr/knn.py``.
+  Builds ``{!knn f=<field> topK=<k>}[v1,v2,...]`` queries and executes them
+  via the ``/select`` handler.
+- ``KNN.__call__(vector, field, top_k, filters, ...)`` — execute a KNN search.
+- ``KNN.build_query(...)`` — build query string without executing.
+- ``efSearchScaleFactor`` support for Solr 10.0+ (version-gated).
+- All methods version-gated to Solr 9.0+.
+
+
 1.8.1 (2026-03-27)
 -------------------
 

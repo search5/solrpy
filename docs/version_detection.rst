@@ -111,5 +111,7 @@ supports them.
      - 4.7
    * - JSON Facet API (``json_facet`` parameter)
      - 5.0
-   * - Dense Vector Search (KNN)
+   * - Dense Vector Search (``KNN(conn)``)
      - 9.0
+   * - KNN ``efSearchScaleFactor``
+     - 10.0

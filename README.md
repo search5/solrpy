@@ -102,6 +102,12 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.9.0
+
+- **KNN / Dense Vector Search**: `KNN(conn)` for `{!knn}` queries (Solr 9.0+)
+- `efSearchScaleFactor` support (Solr 10.0+)
+- `build_query()` for query string generation without execution
+
 ### 1.8.1
 
 - **HTTP transport abstraction**: `SolrTransport` decouples companion classes from internal `_get`/`_post`

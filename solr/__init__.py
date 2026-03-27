@@ -12,3 +12,4 @@ from .suggest import Suggest
 from .extract import Extract
 from .response import SpellcheckResult
 from .response import GroupedResult, GroupField, Group
+from .knn import KNN
