@@ -22,7 +22,7 @@ class TestHTTPConnection(SolrConnectionTestCase):
         """Make sure connections to Solr are being closed properly."""
         conn = self.new_connection()
         conn.close()
-        self.assertTrue(conn.conn.is_closed)
+        self.assertTrue(conn._client.is_closed)  # conn._client is httpx.Client
 
     def test_invalid_max_retries(self):
         """ Passing something that can't be cast as an integer for max_retries
@@ -43,33 +43,19 @@ class TestRetries(SolrConnectionTestCase):
 
     def test_connection_error_retries(self):
         """Verify that connection errors trigger retries."""
-        call_count = [0]
-
-        def always_fail(*args, **kwargs):
-            call_count[0] += 1
-            raise httpx.ConnectError("fake error")
-
-        self.conn.conn.post = always_fail
+        thrower = ThrowConnectionExceptions(self.conn)
         self.conn._reconnect = lambda: None  # prevent client recreation
         with self.assertRaises(httpx.ConnectError):
             self.query(self.conn, "user_id:12345")
-        self.assertEqual(call_count[0], 4)
+        # max_retries=3 → 4 total attempts (1 initial + 3 retries)
+        self.assertEqual(thrower.calls, 4)
 
     def test_success_after_failure(self):
         """After one failure, the next attempt should succeed."""
-        call_count = [0]
-        original_post = self.conn.conn.post
-
-        def fail_once(*args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] <= 1:
-                raise httpx.ConnectError("fake error")
-            return original_post(*args, **kwargs)
-
-        self.conn.conn.post = fail_once
+        thrower = ThrowConnectionExceptions(self.conn, max=1)
         self.conn._reconnect = lambda: None
         self.query(self.conn, "user_id:12345")
-        self.assertEqual(call_count[0], 2)
+        self.assertEqual(thrower.calls, 2)
 
 
 # Additional commit-control tests using RequestTracking.
@@ -91,7 +77,7 @@ class TestPing(unittest.TestCase):
         conn.auth_headers = {}
         conn._auth_callable = None
         conn.persistent = True
-        conn.conn = httpx.Client(base_url='http://localhost:8983')
+        conn._client = httpx.Client(base_url='http://localhost:8983')
         self.assertFalse(conn.ping())
         conn.close()
 
@@ -168,7 +154,7 @@ class TestRetryBackoff(unittest.TestCase):
     def test_retry_logs_warning(self):
         conn = solr.Solr(SOLR_HTTP, response_format='xml', max_retries=1, retry_delay=0.01)
         call_count = [0]
-        original_post = conn.conn.post
+        original_post = conn._client.post
 
         def failing_post(*args, **kwargs):
             call_count[0] += 1
@@ -176,7 +162,7 @@ class TestRetryBackoff(unittest.TestCase):
                 raise httpx.ConnectError("fake connection error")
             return original_post(*args, **kwargs)
 
-        conn.conn.post = failing_post  # type: ignore
+        conn._client.post = failing_post  # type: ignore
 
         with self.assertLogs('solr', level='WARNING') as cm:
             conn._post('/solr/core0/update', '<commit/>', conn.xmlheaders)
@@ -188,7 +174,7 @@ class TestRetryBackoff(unittest.TestCase):
         import time
         conn = solr.Solr(SOLR_HTTP, response_format='xml', max_retries=2, retry_delay=0.05)
         call_count = [0]
-        original_post = conn.conn.post
+        original_post = conn._client.post
 
         def failing_post(*args, **kwargs):
             call_count[0] += 1
@@ -196,7 +182,7 @@ class TestRetryBackoff(unittest.TestCase):
                 raise httpx.ConnectError("fake connection error")
             return original_post(*args, **kwargs)
 
-        conn.conn.post = failing_post  # type: ignore
+        conn._client.post = failing_post  # type: ignore
         conn._reconnect = lambda: None  # prevent client recreation
 
         start = time.monotonic()

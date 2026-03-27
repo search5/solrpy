@@ -521,15 +521,23 @@ Priority: ``auth`` callable > ``auth_token`` > ``http_user/http_pass``.
 SolrCloud
 ---------
 
-**With ZooKeeper** (real-time node discovery, requires ``kazoo``)::
+Install ZooKeeper support::
+
+    pip install solrpy[cloud]
+
+**With ZooKeeper** (real-time node discovery via ``kazoo``)::
 
     from solr import SolrZooKeeper, SolrCloud
 
-    zk = SolrZooKeeper('zk1:2181,zk2:2181')
-    cloud = SolrCloud(zk, collection='mycore')
+    zk = SolrZooKeeper('zk1:2181,zk2:2181,zk3:2181')
+    cloud = SolrCloud(zk, collection='products')
 
-    response = cloud.select('*:*')
-    cloud.add({'id': '1', 'title': 'test'}, commit=True)
+    # Reads go to any active replica (automatic failover)
+    response = cloud.select('category:books', rows=20)
+
+    # Writes are routed to shard leaders
+    cloud.add({'id': '1', 'title': 'Solr in Action'}, commit=True)
+    cloud.delete(id='1', commit=True)
 
     cloud.close()
     zk.close()
@@ -540,14 +548,58 @@ SolrCloud
 
     cloud = SolrCloud.from_urls(
         ['http://solr1:8983/solr', 'http://solr2:8983/solr'],
-        collection='mycore')
+        collection='products')
 
     response = cloud.select('*:*')
     cloud.close()
 
-Install ZooKeeper support::
+Pass connection options (timeout, auth, SSL) via ``**solr_kwargs``::
 
-    pip install solrpy[cloud]
+    cloud = SolrCloud(zk, collection='secure',
+                      timeout=10,
+                      auth_token='my-jwt-token')
+
+Failover retries default to 3 with exponential backoff::
+
+    # Customize retry behavior
+    cloud = SolrCloud(zk, collection='products',
+                      retry_count=5, retry_delay=1.0)
+
+
+Using SolrZooKeeper directly
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can also use ``SolrZooKeeper`` independently for cluster inspection::
+
+    from solr import SolrZooKeeper
+
+    zk = SolrZooKeeper('zk1:2181,zk2:2181')
+
+    # List active nodes
+    print(zk.live_nodes())
+    # ['solr1:8983_solr', 'solr2:8983_solr', 'solr3:8983_solr']
+
+    # Get all replica URLs for a collection
+    replicas = zk.replica_urls('products')
+    # ['http://solr1:8983/solr', 'http://solr2:8983/solr']
+
+    # Get shard leader URLs (one per shard)
+    leaders = zk.leader_urls('products')
+    # ['http://solr1:8983/solr']
+
+    # Check collection aliases
+    aliases = zk.aliases()
+    # {'prod': 'products_v2', 'staging': 'products_v1'}
+
+    # Aliases are resolved automatically in replica_urls/leader_urls
+    zk.replica_urls('prod')  # same as zk.replica_urls('products_v2')
+
+    # Inspect collection state (shards, replicas, router)
+    state = zk.collection_state('products')
+    for shard, data in state['shards'].items():
+        print(shard, len(data['replicas']), 'replicas')
+
+    zk.close()
 
 
 Pydantic response models
@@ -574,6 +626,41 @@ Convert search results to typed Pydantic models (``pip install solrpy[pydantic]`
     # Post-hoc conversion
     resp = conn.select('*:*')
     products = resp.as_models(Product)
+
+
+Async usage
+-----------
+
+Use ``AsyncSolr`` for async/await support (e.g. in FastAPI, aiohttp)::
+
+    from solr import AsyncSolr
+
+    async with AsyncSolr('http://localhost:8983/solr/mycore') as conn:
+        response = await conn.select('*:*')
+        for doc in response.results:
+            print(doc['id'])
+
+Unified sync/async companions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Since 2.0.4, all companion classes work with both ``Solr`` and ``AsyncSolr``.
+No need for separate ``AsyncSchemaAPI``, ``AsyncKNN``, etc.::
+
+    from solr import Solr, AsyncSolr, SchemaAPI, KNN
+
+    # Sync
+    conn = Solr('http://localhost:8983/solr/mycore')
+    schema = SchemaAPI(conn)
+    fields = schema.fields()
+
+    # Async — same class, returns coroutines
+    async with AsyncSolr('http://localhost:8983/solr/mycore') as conn:
+        schema = SchemaAPI(conn)
+        fields = await schema.fields()
+
+The ``AsyncSchemaAPI``, ``AsyncKNN``, ``AsyncMoreLikeThis``,
+``AsyncSuggest``, and ``AsyncExtract`` names are kept as backward-compatible
+aliases.
 
 
 Closing the connection

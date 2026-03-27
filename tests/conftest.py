@@ -124,8 +124,8 @@ class ThrowConnectionExceptions:
         import httpx
         self.calls = 0
         self.max = max
-        self.wrap = conn.conn.post
-        conn.conn.post = self
+        self.wrap = conn._client.post
+        conn._client.post = self
 
     def __call__(self, *args, **kwargs):
         import httpx

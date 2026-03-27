@@ -102,6 +102,14 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 2.0.4
+
+- **Unified sync/async API**: `SchemaAPI(conn)` works with both `Solr` and `AsyncSolr`
+- Single class, dual mode — no need for separate `AsyncSchemaAPI` etc.
+- `DualTransport` auto-detects sync vs async connection
+- `_chain()` helper for composing sync values and async coroutines
+- `AsyncSchemaAPI`, `AsyncKNN`, `AsyncMoreLikeThis`, `AsyncSuggest`, `AsyncExtract` kept as backward-compatible aliases
+
 ### 2.0.3
 
 - **Async companion classes**: `AsyncSchemaAPI`, `AsyncKNN`, `AsyncMoreLikeThis`, `AsyncSuggest`, `AsyncExtract`

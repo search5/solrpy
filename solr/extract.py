@@ -1,4 +1,8 @@
-"""Solr Cell (Tika) document extraction wrapper for Solr 1.4+."""
+"""Solr Cell (Tika) document extraction wrapper for Solr 1.4+.
+
+Since 2.0.4 this class accepts both :class:`~solr.core.Solr` and
+:class:`~solr.async_solr.AsyncSolr`.
+"""
 from __future__ import annotations
 
 import json
@@ -7,7 +11,7 @@ import urllib.parse as urllib
 from typing import Any, IO, TYPE_CHECKING
 
 from .exceptions import SolrVersionError
-from .transport import SolrTransport
+from .transport import DualTransport, _chain
 
 if TYPE_CHECKING:
     from .core import Solr
@@ -15,6 +19,8 @@ if TYPE_CHECKING:
 
 class Extract:
     """Index or extract rich documents via Solr's ExtractingRequestHandler (Solr 1.4+).
+
+    Works with both ``Solr`` (sync) and ``AsyncSolr`` (async) connections.
 
     Example::
 
@@ -32,8 +38,9 @@ class Extract:
 
     _MIN_VERSION = (1, 4)
 
-    def __init__(self, conn: Solr) -> None:
-        self._transport = SolrTransport(conn)
+    def __init__(self, conn: Any) -> None:
+        self._transport = DualTransport(conn)
+        self._is_async: bool = self._transport.is_async
 
     def _check_version(self) -> None:
         """Raise SolrVersionError if server is too old."""
@@ -44,7 +51,7 @@ class Extract:
     def __call__(self, file_obj: IO[bytes],
                  content_type: str = 'application/octet-stream',
                  commit: bool = False,
-                 **params: Any) -> dict[str, Any]:
+                 **params: Any) -> Any:
         """Index a rich document via ``/update/extract``.
 
         Args:
@@ -80,12 +87,11 @@ class Extract:
         body = file_obj.read()
         headers: dict[str, str] = {'Content-Type': content_type}
         raw = self._transport.post_raw('/update/extract?' + qs, body, headers)
-        result: dict[str, Any] = json.loads(raw)
-        return result
+        return _chain(raw, lambda text: json.loads(text))
 
     def extract_only(self, file_obj: IO[bytes],
                      content_type: str = 'application/octet-stream',
-                     **params: Any) -> tuple[str, dict[str, Any]]:
+                     **params: Any) -> Any:
         """Extract text and metadata without indexing the document.
 
         Calls ``/update/extract`` with ``extractOnly=true``. The document is
@@ -103,12 +109,16 @@ class Extract:
             (e.g. ``Content-Type``, ``Author``, ``title``).
         """
         params['extractOnly'] = 'true'
-        result = self(file_obj, content_type, **params)
-        text: str = result.get('', '') or ''
-        metadata: dict[str, Any] = result.get('_', {}) or {}
-        return text, metadata
+        raw = self(file_obj, content_type, **params)
 
-    def from_path(self, file_path: str, **params: Any) -> dict[str, Any]:
+        def _parse(result: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+            text: str = result.get('', '') or ''
+            metadata: dict[str, Any] = result.get('_', {}) or {}
+            return text, metadata
+
+        return _chain(raw, _parse)
+
+    def from_path(self, file_path: str, **params: Any) -> Any:
         """Index a document from a filesystem path.
 
         The MIME type is guessed from the file extension via
@@ -129,7 +139,7 @@ class Extract:
             return self(f, content_type, **params)
 
     def extract_from_path(self, file_path: str,
-                          **params: Any) -> tuple[str, dict[str, Any]]:
+                          **params: Any) -> Any:
         """Extract text and metadata from a file path without indexing.
 
         Convenience wrapper around :meth:`extract_only` that opens the file

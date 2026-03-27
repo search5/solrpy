@@ -1,6 +1,40 @@
 Changelog
 =========
 
+2.0.4 (2026-03-27)
+-------------------
+
+**New features:**
+
+- **Unified sync/async API**: all companion classes (``SchemaAPI``, ``KNN``,
+  ``MoreLikeThis``, ``Suggest``, ``Extract``) now accept both ``Solr`` (sync)
+  and ``AsyncSolr`` (async) connections.
+- With a sync connection, methods return values directly. With an async
+  connection, methods return coroutines (to be ``await``-ed).
+- **``DualTransport``** in ``solr/transport.py``: auto-detects sync vs async
+  and delegates to ``SolrTransport`` or ``AsyncTransport`` accordingly.
+- **``_chain()``** helper composes a transform onto either a sync value or
+  an async coroutine, eliminating code duplication in companion classes.
+- ``AsyncSchemaAPI``, ``AsyncKNN``, ``AsyncMoreLikeThis``, ``AsyncSuggest``,
+  and ``AsyncExtract`` are kept as backward-compatible aliases.
+
+**Example:**
+
+.. code-block:: python
+
+    from solr import Solr, AsyncSolr, SchemaAPI
+
+    # Sync — returns list directly
+    conn = Solr('http://localhost:8983/solr/mycore')
+    schema = SchemaAPI(conn)
+    fields = schema.fields()
+
+    # Async — returns coroutine
+    async with AsyncSolr('http://localhost:8983/solr/mycore') as conn:
+        schema = SchemaAPI(conn)
+        fields = await schema.fields()
+
+
 2.0.3 (2026-03-27)
 -------------------
 

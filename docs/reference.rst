@@ -464,7 +464,8 @@ Extract class (Solr 1.4+)
    ``/update/extract`` handler. The handler must be configured in
    ``solrconfig.xml``.
 
-   :param conn: A :class:`Solr` instance.
+   :param conn: A :class:`Solr` or :class:`AsyncSolr` instance.
+      With ``AsyncSolr``, methods return coroutines.
 
    .. method:: __call__(file_obj, content_type='application/octet-stream', commit=False, **params)
 
@@ -530,7 +531,8 @@ Suggest class (Solr 4.7+)
    The ``/suggest`` handler and at least one ``SuggestComponent`` must be
    configured in ``solrconfig.xml``.
 
-   :param conn: A :class:`Solr` instance.
+   :param conn: A :class:`Solr` or :class:`AsyncSolr` instance.
+      With ``AsyncSolr``, methods return coroutines.
 
    .. method:: __call__(q, dictionary=None, count=10, **params)
 
@@ -607,7 +609,8 @@ KNN / Dense Vector Search (Solr 9.0+)
    Dense Vector / KNN Search using Solr's ``{!knn}`` query parser.
    Created explicitly by the user.
 
-   :param conn: A :class:`Solr` instance.
+   :param conn: A :class:`Solr` or :class:`AsyncSolr` instance.
+      With ``AsyncSolr``, execution methods return coroutines.
 
    .. method:: __call__(vector, field, top_k, filters=None, ef_search_scale_factor=None, **params)
 
@@ -647,31 +650,242 @@ SolrCloud (Solr 4.0+)
 .. class:: SolrCloud(zk, collection, retry_count=3, retry_delay=0.5, **solr_kwargs)
 
    SolrCloud client with leader-aware routing and automatic failover.
+   Two modes of operation: **ZooKeeper mode** (real-time node discovery)
+   and **HTTP mode** (CLUSTERSTATUS polling, no ZooKeeper needed).
 
    :param zk: A :class:`SolrZooKeeper` instance.
    :param collection: Solr collection name.
-   :param retry_count: Number of failover retries.
-   :param retry_delay: Base delay between retries (exponential backoff).
+   :param retry_count: Number of failover retries (default ``3``). On each
+       failure, the client reconnects to a different node and retries.
+   :param retry_delay: Base delay in seconds between retries (default ``0.5``).
+       Uses exponential backoff: ``retry_delay * 2^attempt``.
+   :param solr_kwargs: Extra keyword arguments forwarded to the underlying
+       :class:`Solr` connection (e.g. ``timeout``, ``http_user``,
+       ``http_pass``, ``auth_token``, ``auth``, ``response_format``).
 
-   .. classmethod:: from_urls(urls, collection, **kwargs)
+   .. classmethod:: from_urls(urls, collection, retry_count=3, retry_delay=0.5, **solr_kwargs)
 
       Create without ZooKeeper, using HTTP-only CLUSTERSTATUS discovery.
+      The client probes provided URLs to find active nodes and discovers
+      shard leaders via the ``CLUSTERSTATUS`` admin API.
 
-   Mirrors all :class:`Solr` methods: ``select()``, ``add()``, ``delete()``,
-   ``commit()``, etc. Writes are routed to shard leaders.
+      :param urls: List of Solr base URLs, e.g.
+          ``['http://solr1:8983/solr', 'http://solr2:8983/solr']``.
+      :param collection: Solr collection name.
+      :param retry_count: Number of failover retries.
+      :param retry_delay: Base delay between retries.
+      :param solr_kwargs: Forwarded to :class:`Solr`.
+      :returns: A :class:`SolrCloud` instance in HTTP mode.
+
+   **Properties:**
+
+   .. attribute:: server_version
+
+      Detected Solr server version tuple, e.g. ``(9, 4, 1)``.
+
+   **Read operations** (routed to any active replica):
+
+   .. method:: select(*args, **kwargs)
+
+      Execute a search query with automatic failover. Same parameters as
+      :meth:`Solr.select`.
+
+   .. method:: ping()
+
+      Ping the current Solr node.
+
+   **Write operations** (routed to a shard leader):
+
+   .. method:: add(doc, **kwargs)
+
+      Add a document, routed to a shard leader.
+
+   .. method:: add_many(docs, **kwargs)
+
+      Add multiple documents, routed to a shard leader.
+
+   .. method:: delete(**kwargs)
+
+      Delete documents, routed to a shard leader.
+
+   .. method:: delete_query(query, **kwargs)
+
+      Delete by query, routed to a shard leader.
+
+   .. method:: delete_many(ids, **kwargs)
+
+      Delete multiple documents by ID, routed to a shard leader.
+
+   .. method:: commit(**kwargs)
+
+      Commit changes, routed to a shard leader.
+
+   .. method:: optimize(**kwargs)
+
+      Optimize the index, routed to a shard leader.
+
+   .. method:: close()
+
+      Close the underlying Solr connection.
+
+   **Failover behavior:**
+
+   When any operation fails, the client:
+
+   1. Logs a WARNING with the attempt number and error.
+   2. Waits ``retry_delay * 2^attempt`` seconds (exponential backoff).
+   3. Reconnects to a different node (leader for writes, any replica for reads).
+   4. Retries the operation.
+   5. After ``retry_count`` retries, raises the last exception.
+
+   **Example (ZooKeeper mode):**
+
+   .. code-block:: python
+
+       from solr import SolrZooKeeper, SolrCloud
+
+       zk = SolrZooKeeper('zk1:2181,zk2:2181,zk3:2181')
+       cloud = SolrCloud(zk, collection='products',
+                         timeout=10, auth_token='my-jwt-token')
+
+       # reads go to any active replica
+       response = cloud.select('category:books', rows=20)
+
+       # writes are routed to shard leaders
+       cloud.add({'id': '1', 'title': 'Solr in Action'}, commit=True)
+       cloud.delete(id='1', commit=True)
+
+       cloud.close()
+       zk.close()
+
+   **Example (HTTP-only mode):**
+
+   .. code-block:: python
+
+       from solr import SolrCloud
+
+       cloud = SolrCloud.from_urls(
+           ['http://solr1:8983/solr', 'http://solr2:8983/solr'],
+           collection='products')
+
+       response = cloud.select('*:*')
+       cloud.close()
+
+
+SolrZooKeeper
+~~~~~~~~~~~~~
 
 .. class:: SolrZooKeeper(hosts, timeout=10.0)
 
-   ZooKeeper client for SolrCloud node discovery. Requires ``kazoo``.
+   ZooKeeper client for SolrCloud node discovery. Reads ZooKeeper state
+   (``/live_nodes``, ``/collections/{name}/state.json``, ``/aliases.json``)
+   to discover active Solr nodes, shard leaders, and collection aliases.
+
+   Requires the ``kazoo`` library::
+
+       pip install solrpy[cloud]
+
+   :param hosts: ZooKeeper connection string, e.g.
+       ``'zk1:2181,zk2:2181,zk3:2181'``. Supports chroot paths:
+       ``'zk1:2181,zk2:2181/solr'``.
+   :param timeout: Connection timeout in seconds (default ``10.0``).
+   :raises ImportError: If ``kazoo`` is not installed.
 
    .. method:: live_nodes()
+
+      Return a list of currently active Solr node identifiers as reported
+      by ZooKeeper's ``/live_nodes`` znode.
+
+      :returns: ``list[str]`` — Node identifiers, e.g.
+          ``['solr1:8983_solr', 'solr2:8983_solr']``.
+
    .. method:: collection_state(collection)
-   .. method:: leader_urls(collection)
-   .. method:: replica_urls(collection)
-   .. method:: random_url(collection)
-   .. method:: random_leader_url(collection)
+
+      Return the full state dict for a collection. Contains shard info,
+      replica info, router config, and more.
+
+      Tries per-collection ``state.json`` first (Solr 5+), then falls
+      back to the legacy ``/clusterstate.json`` (Solr 4.x).
+
+      :param collection: Collection name (not an alias).
+      :returns: ``dict`` — State dict with keys like ``'shards'``,
+          ``'router'``, ``'maxShardsPerNode'``, etc.
+      :raises RuntimeError: If the collection is not found in ZooKeeper.
+
    .. method:: aliases()
+
+      Return collection aliases as a dict.
+
+      :returns: ``dict[str, str]`` — ``{alias_name: real_collection_name}``.
+          Empty dict if no aliases are defined.
+
+   .. method:: replica_urls(collection)
+
+      Return base URLs of all active replicas for a collection.
+      Aliases are resolved automatically.
+
+      :param collection: Collection name or alias.
+      :returns: ``list[str]`` — Solr base URLs, e.g.
+          ``['http://solr1:8983/solr', 'http://solr2:8983/solr']``.
+
+   .. method:: leader_urls(collection)
+
+      Return base URLs of shard leaders for a collection (one per shard).
+      Aliases are resolved automatically.
+
+      :param collection: Collection name or alias.
+      :returns: ``list[str]`` — Leader Solr base URLs.
+
+   .. method:: random_url(collection)
+
+      Return a random active replica URL for load balancing.
+
+      :param collection: Collection name or alias.
+      :returns: ``str`` — A Solr base URL.
+      :raises RuntimeError: If no active replicas are found.
+
+   .. method:: random_leader_url(collection)
+
+      Return a random shard leader URL for write operations.
+
+      :param collection: Collection name or alias.
+      :returns: ``str`` — A leader Solr base URL.
+      :raises RuntimeError: If no leaders are found.
+
    .. method:: close()
+
+      Close the ZooKeeper connection. Always call this when done.
+
+   **Example:**
+
+   .. code-block:: python
+
+       from solr import SolrZooKeeper
+
+       zk = SolrZooKeeper('zk1:2181,zk2:2181,zk3:2181')
+
+       # Discover nodes
+       nodes = zk.live_nodes()
+       print('Active nodes:', nodes)
+
+       # Get all replica URLs
+       replicas = zk.replica_urls('mycore')
+       print('Replicas:', replicas)
+
+       # Get shard leaders
+       leaders = zk.leader_urls('mycore')
+       print('Leaders:', leaders)
+
+       # Check aliases
+       aliases = zk.aliases()
+       print('Aliases:', aliases)  # e.g. {'prod': 'mycore_v2'}
+
+       # Get collection state
+       state = zk.collection_state('mycore')
+       for shard, data in state['shards'].items():
+           print(shard, ':', len(data['replicas']), 'replicas')
+
+       zk.close()
 
 
 Query builders
@@ -742,17 +956,26 @@ All builders coexist with raw string parameters::
 Schema API (Solr 4.2+)
 -----------------------
 
-.. class:: SchemaAPI
+.. class:: SchemaAPI(conn)
 
    Created explicitly by the user. All methods require Solr 4.2+.
 
+   :param conn: A :class:`Solr` or :class:`AsyncSolr` instance.
+      With ``AsyncSolr``, all methods return coroutines.
+
    Example::
 
-       from solr import Solr, SchemaAPI
+       from solr import Solr, AsyncSolr, SchemaAPI
 
+       # Sync
        conn = Solr('http://localhost:8983/solr/mycore')
        schema = SchemaAPI(conn)
        fields = schema.fields()
+
+       # Async
+       async with AsyncSolr('http://localhost:8983/solr/mycore') as conn:
+           schema = SchemaAPI(conn)
+           fields = await schema.fields()
 
    **Full schema:**
 

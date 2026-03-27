@@ -94,7 +94,7 @@ class AsyncSolr:
             self.auth_headers = {}
 
         base_url = '%s://%s' % (self.scheme, self.host)
-        self.conn: httpx.AsyncClient = httpx.AsyncClient(
+        self._client: httpx.AsyncClient = httpx.AsyncClient(
             base_url=base_url, timeout=self.timeout, follow_redirects=True)
 
         # Version detection is sync during __init__; use sync client briefly
@@ -131,7 +131,7 @@ class AsyncSolr:
 
     async def close(self) -> None:
         """Close the underlying httpx.AsyncClient."""
-        await self.conn.aclose()
+        await self._client.aclose()
 
     def _get_auth_headers(self) -> dict[str, str]:
         """Return auth headers."""
@@ -160,7 +160,7 @@ class AsyncSolr:
 
     async def _get(self, path: str) -> httpx.Response:
         """Async GET request."""
-        rsp = await self.conn.get(path, headers=self._get_auth_headers())
+        rsp = await self._client.get(path, headers=self._get_auth_headers())
         if rsp.status_code != 200:
             raise SolrException(rsp.status_code, rsp.reason_phrase, rsp.text)
         return rsp
@@ -181,7 +181,7 @@ class AsyncSolr:
                 kwargs: dict[str, Any] = {'headers': _headers, 'content': raw_body}
                 if timeout is not None:
                     kwargs['timeout'] = timeout
-                rsp = await self.conn.post(url, **kwargs)
+                rsp = await self._client.post(url, **kwargs)
                 if rsp.status_code != 200:
                     raise SolrException(rsp.status_code, rsp.reason_phrase, rsp.text)
                 return rsp

@@ -21,7 +21,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "2.0.3"
+__version__ = "2.0.4"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -113,7 +113,7 @@ class Solr:
         }
         if self.scheme == 'https' and (ssl_cert or ssl_key):
             client_kwargs['cert'] = (ssl_cert, ssl_key) if ssl_key else ssl_cert
-        self.conn: httpx.Client = httpx.Client(**client_kwargs)
+        self._client: httpx.Client = httpx.Client(**client_kwargs)
 
         self.response_version = 2.2
 
@@ -161,7 +161,7 @@ class Solr:
 
     def close(self) -> None:
         """Close the underlying HTTP(S) connection."""
-        self.conn.close()
+        self._client.close()
 
     def ping(self) -> bool:
         """Ping the Solr server. Returns True if reachable, False otherwise."""
@@ -188,7 +188,7 @@ class Solr:
     def _get(self, path: str) -> httpx.Response:
         """Issue a GET request and return the httpx response."""
         _headers = self._get_auth_headers()
-        rsp = self.conn.get(path, headers=_headers)
+        rsp = self._client.get(path, headers=_headers)
         if rsp.status_code != 200:
             from .exceptions import SolrException
             raise SolrException(rsp.status_code, rsp.reason_phrase, rsp.text)
@@ -506,10 +506,10 @@ class Solr:
     def _reconnect(self) -> None:
         """Close and re-create the httpx client."""
         self.reconnects += 1
-        self.conn.close()
+        self._client.close()
         base_url = '%s://%s' % (self.scheme, self.host)
-        self.conn = httpx.Client(base_url=base_url, timeout=self.timeout,
-                                 follow_redirects=True)
+        self._client = httpx.Client(base_url=base_url, timeout=self.timeout,
+                                    follow_redirects=True)
 
     def _post(self, url: str, body: str | bytes, headers: dict[str, str], timeout: float | None = None) -> httpx.Response:
         """POST data to Solr with retry and exponential backoff."""
@@ -525,7 +525,7 @@ class Solr:
                 kwargs: dict[str, Any] = {'headers': _headers, 'content': raw_body}
                 if timeout is not None:
                     kwargs['timeout'] = timeout
-                rsp = self.conn.post(url, **kwargs)
+                rsp = self._client.post(url, **kwargs)
                 if rsp.status_code != 200:
                     from .exceptions import SolrException
                     raise SolrException(rsp.status_code, rsp.reason_phrase, rsp.text)

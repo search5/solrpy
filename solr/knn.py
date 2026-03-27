@@ -10,6 +10,7 @@ from typing import Any, Sequence, TYPE_CHECKING
 
 from .exceptions import SolrVersionError
 from .response import Response
+from .transport import _is_async_conn
 
 if TYPE_CHECKING:
     from .core import Solr
@@ -20,6 +21,8 @@ class KNN:
 
     Supports ``{!knn}``, ``{!vectorSimilarity}``, hybrid search, and
     re-ranking patterns.  Created explicitly by the user.
+
+    Works with both ``Solr`` (sync) and ``AsyncSolr`` (async) connections.
 
     Example::
 
@@ -38,8 +41,9 @@ class KNN:
 
     _MIN_VERSION = (9, 0)
 
-    def __init__(self, conn: Solr) -> None:
+    def __init__(self, conn: Any) -> None:
         self._conn = conn
+        self._is_async: bool = _is_async_conn(conn)
 
     def _check_version(self) -> None:
         """Raise SolrVersionError if server is too old."""
@@ -193,7 +197,7 @@ class KNN:
         seed_query: str | None = None,
         pre_filter: str | list[str] | None = None,
         **params: Any,
-    ) -> Response | None:
+    ) -> Any:
         """Execute a ``{!knn}`` search query (Solr 9.0+).
 
         :param vector: Dense vector as a sequence of floats.
@@ -204,7 +208,7 @@ class KNN:
         :param seed_query: Lexical query to guide vector search.
         :param pre_filter: Explicit pre-filter query string(s).
         :param params: Additional Solr parameters.
-        :returns: A :class:`~solr.response.Response` instance.
+        :returns: A :class:`~solr.response.Response` instance (sync) or coroutine (async).
         """
         self._check_version()
         q = self.build_knn_query(
@@ -229,7 +233,7 @@ class KNN:
         pre_filter: str | list[str] | None = None,
         filters: str | None = None,
         **params: Any,
-    ) -> Response | None:
+    ) -> Any:
         """Execute a ``{!vectorSimilarity}`` search (Solr 9.0+).
 
         Returns all documents whose similarity to the vector exceeds
@@ -261,7 +265,7 @@ class KNN:
         field: str,
         min_return: float = 0.5,
         **params: Any,
-    ) -> Response | None:
+    ) -> Any:
         """Execute a hybrid (lexical OR vector) search (Solr 9.0+).
 
         :param text_query: The lexical search query.
@@ -284,7 +288,7 @@ class KNN:
         rerank_docs: int = 100,
         rerank_weight: float = 1.0,
         **params: Any,
-    ) -> Response | None:
+    ) -> Any:
         """Execute a lexical query re-ranked by vector similarity (Solr 9.0+).
 
         :param query: The base lexical query.
@@ -309,6 +313,6 @@ class KNN:
                                     ef_search_scale_factor=ef_search_scale_factor)
 
     def __call__(self, vector: Sequence[float], field: str, top_k: int = 10,
-                 **params: Any) -> Response | None:
+                 **params: Any) -> Any:
         """Shortcut for :meth:`search`."""
         return self.search(vector, field, top_k, **params)

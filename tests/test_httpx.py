@@ -11,7 +11,7 @@ class TestHttpxClient(unittest.TestCase):
         """Solr should use httpx.Client internally."""
         import httpx
         conn = solr.Solr(SOLR_HTTP, response_format='xml')
-        self.assertIsInstance(conn.conn, httpx.Client)
+        self.assertIsInstance(conn._client, httpx.Client)
         conn.close()
 
     def test_connection_pooling(self):

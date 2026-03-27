@@ -1,11 +1,15 @@
-"""Suggest handler wrapper for Solr 4.7+."""
+"""Suggest handler wrapper for Solr 4.7+.
+
+Since 2.0.4 this class accepts both :class:`~solr.core.Solr` and
+:class:`~solr.async_solr.AsyncSolr`.
+"""
 from __future__ import annotations
 
 import urllib.parse as urllib
 from typing import Any, TYPE_CHECKING
 
 from .exceptions import SolrVersionError
-from .transport import SolrTransport
+from .transport import DualTransport, _chain
 
 if TYPE_CHECKING:
     from .core import Solr
@@ -21,6 +25,8 @@ class Suggest:
     ``'weight'``, and ``'payload'`` keys) gathered from all configured
     suggesters that match the query.
 
+    Works with both ``Solr`` (sync) and ``AsyncSolr`` (async) connections.
+
     Example::
 
         from solr import Solr, Suggest
@@ -34,8 +40,9 @@ class Suggest:
 
     _MIN_VERSION = (4, 7)
 
-    def __init__(self, conn: Solr) -> None:
-        self._transport = SolrTransport(conn)
+    def __init__(self, conn: Any) -> None:
+        self._transport = DualTransport(conn)
+        self._is_async: bool = self._transport.is_async
 
     def _check_version(self) -> None:
         """Raise SolrVersionError if server is too old."""
@@ -44,7 +51,7 @@ class Suggest:
                                    self._transport.server_version)
 
     def __call__(self, q: str, dictionary: str | None = None,
-                 count: int = 10, **params: Any) -> list[dict[str, Any]]:
+                 count: int = 10, **params: Any) -> Any:
         """Return a flat list of suggestions for the query term.
 
         Args:
@@ -75,8 +82,8 @@ class Suggest:
         query_params.update({k: str(v) for k, v in params.items()})
 
         qs = urllib.urlencode(query_params)
-        data = self._transport.get_json('/suggest?' + qs)
-        return self._extract_suggestions(data)
+        raw = self._transport.get_json('/suggest?' + qs)
+        return _chain(raw, self._extract_suggestions)
 
     def _extract_suggestions(self, data: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract a flat suggestion list from the raw /suggest response dict."""
