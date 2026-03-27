@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "solrpy"
-version = "2.0.6"
+version = "2.0.6.post1"
 description = "Client for the Solr search service"
 license = "Apache-2.0"
 readme = "README.md"
