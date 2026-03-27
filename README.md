@@ -142,6 +142,14 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 2.0.8
+
+- **Decimal support**: `decimal.Decimal` values now serialize correctly in both JSON and XML update paths
+- **Security**: all `eval()` usage removed (resolved since 2.x rewrite)
+- **No stray `print()`**: debug print statements fully eliminated from all execution paths
+- **UTF-8 safe**: `setup.py` replaced with Poetry `pyproject.toml`, no encoding issues
+- **`q.op` support**: dotted Solr parameters work via underscore notation (`q_op='AND'` → `q.op=AND`)
+
 ### 2.0.7
 
 - **Lazy initialization**: `Solr()` constructor is now instant (~0ms). httpx client and version detection deferred to first use

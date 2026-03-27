@@ -49,18 +49,22 @@ def utc_to_string(value: datetime.datetime) -> str:
 def solr_json_default(obj: Any) -> Any:
     """Custom JSON encoder for Solr update payloads.
 
-    Handles ``datetime.datetime``, ``datetime.date``, ``set``, ``tuple``.
+    Handles ``datetime.datetime``, ``datetime.date``, ``set``, ``tuple``,
+    and ``decimal.Decimal``.
     ``bool``, ``int``, ``float``, ``str``, ``list``, ``dict`` are
     handled natively by :func:`json.dumps`.
 
-    :param obj: The object to serialize. Must be a datetime, date, set, or
-        tuple; otherwise :class:`TypeError` is raised.
+    :param obj: The object to serialize. Must be a datetime, date, set,
+        tuple, or Decimal; otherwise :class:`TypeError` is raised.
     """
+    import decimal
     if isinstance(obj, datetime.datetime):
         return utc_to_string(obj)
     if isinstance(obj, datetime.date):
         return utc_to_string(
             datetime.datetime.combine(obj, datetime.time(tzinfo=utc)))
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
     if isinstance(obj, (set, tuple)):
         return list(obj)
     raise TypeError("Object of type %s is not JSON serializable" % type(obj).__name__)

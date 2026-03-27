@@ -1,6 +1,30 @@
 Changelog
 =========
 
+2.0.8 (2026-03-27)
+-------------------
+
+**Bug fixes:**
+
+- **Decimal serialization**: ``decimal.Decimal`` values are now handled in
+  both update paths — JSON encoder converts to ``float``, XML serializer
+  converts via ``str()`` to produce clean numeric strings.
+
+**Resolved legacy issues:**
+
+- **Security — ``eval()`` removed**: all uses of ``eval()`` were eliminated
+  in the 2.x rewrite. Response parsing uses ``json.loads()`` and SAX XML
+  parser exclusively. No risk of arbitrary code execution from untrusted data.
+- **No stray ``print()``**: debug ``print(''.join(lst))`` in ``add_many()``
+  that leaked documents to logs is gone. No ``print()`` calls exist in any
+  execution path.
+- **UTF-8 encoding**: ``setup.py`` replaced with Poetry ``pyproject.toml``.
+  The ``open('README.md')`` encoding issue no longer applies.
+- **``q.op`` parameter**: dotted Solr parameters (e.g. ``q.op``) are
+  supported via underscore notation: ``conn.select('*:*', q_op='AND')``
+  sends ``q.op=AND``. Works for all dotted parameter names.
+
+
 2.0.7.post1 (2026-03-27)
 -------------------------
 

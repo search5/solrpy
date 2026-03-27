@@ -40,6 +40,40 @@ class TestSerializeValue(unittest.TestCase):
     def test_none_returns_none(self):
         self.assertIsNone(serialize_value(None))
 
+    def test_decimal(self):
+        from decimal import Decimal
+        self.assertEqual(serialize_value(Decimal('3.14')), '3.14')
+
+
+class TestSolrJsonDefault(unittest.TestCase):
+    """Unit tests for the solr_json_default() JSON encoder."""
+
+    def test_decimal_to_float(self):
+        import json
+        from decimal import Decimal
+        from solr.utils import solr_json_default
+        result = json.dumps({'price': Decimal('9.99')}, default=solr_json_default)
+        self.assertIn('9.99', result)
+        # Should be a number, not a string
+        data = json.loads(result)
+        self.assertIsInstance(data['price'], float)
+
+    def test_none_in_json(self):
+        """None should serialize to JSON null, not string 'None'."""
+        import json
+        result = json.dumps({'field': None})
+        self.assertIn('null', result)
+        self.assertNotIn('None', result)
+
+    def test_atomic_update_none_json(self):
+        """{'set': None} should produce {"set": null} in JSON."""
+        import json
+        from solr.utils import solr_json_default
+        doc = {'id': '1', 'old_field': {'set': None}}
+        result = json.dumps(doc, default=solr_json_default)
+        data = json.loads(result)
+        self.assertIsNone(data['old_field']['set'])
+
 
 class TestAtomicUpdateSerialization(unittest.TestCase):
     """atomic_update must serialize datetime/bool/date correctly."""
