@@ -355,7 +355,7 @@ class TestGroupVersionGuard(unittest.TestCase):
         # Mock the raw() call to return a valid JSON response
         conn.response_format = 'json'
         handler = SearchHandler(conn)
-        handler.raw = MagicMock(return_value=json.dumps({
+        handler._raw_json = MagicMock(return_value={
             'responseHeader': {'status': 0, 'QTime': 1},
             'grouped': {
                 'category': {
@@ -363,7 +363,7 @@ class TestGroupVersionGuard(unittest.TestCase):
                     'groups': [],
                 },
             },
-        }))
+        })
         resp = handler(q='*:*', group='true', group_field='category')
         self.assertIsNotNone(resp)
 
@@ -373,10 +373,10 @@ class TestGroupVersionGuard(unittest.TestCase):
         conn = self._make_conn((1, 2, 0))
         conn.response_format = 'json'
         handler = SearchHandler(conn)
-        handler.raw = MagicMock(return_value=json.dumps({
+        handler._raw_json = MagicMock(return_value={
             'responseHeader': {'status': 0, 'QTime': 1},
             'response': {'numFound': 0, 'start': 0, 'docs': []},
-        }))
+        })
         resp = handler(q='*:*')
         self.assertIsNotNone(resp)
 

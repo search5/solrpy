@@ -22,6 +22,7 @@ from .field import Field
 from .sort import Sort
 from .facet import Facet
 from .cloud import SolrCloud
+from .compat import PysolrCompat
 try:
     from .zookeeper import SolrZooKeeper
 except ImportError:

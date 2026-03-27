@@ -64,7 +64,7 @@ class MoreLikeThis:
         rsp = await self._conn._post(
             self._conn.path + '/mlt', request, self._conn.form_headers)
         from .parsers import parse_json_response
-        data = json.loads(rsp.text)
+        data = json.loads(rsp.content)
         return parse_json_response(data, params, self)
 
     def raw(self, **params: Any) -> Any:

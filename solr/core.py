@@ -21,7 +21,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "2.0.6"
+__version__ = "2.0.7"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -106,14 +106,14 @@ class Solr:
         assert self.max_retries >= 0
 
         base_url = '%s://%s' % (self.scheme, self.host)
-        client_kwargs: dict[str, Any] = {
+        self._client_kwargs: dict[str, Any] = {
             'base_url': base_url,
             'timeout': self.timeout,
             'follow_redirects': True,
         }
         if self.scheme == 'https' and (ssl_cert or ssl_key):
-            client_kwargs['cert'] = (ssl_cert, ssl_key) if ssl_key else ssl_cert
-        self._client: httpx.Client = httpx.Client(**client_kwargs)
+            self._client_kwargs['cert'] = (ssl_cert, ssl_key) if ssl_key else ssl_cert
+        self.__client: httpx.Client | None = None
 
         self.response_version = 2.2
 
@@ -157,11 +157,36 @@ class Solr:
         self.always_commit = always_commit
         self.debug = debug
         self.select = SearchHandler(self, "/select")
-        self.server_version = self._detect_version()
+        self._server_version: tuple[int, ...] | None = None
+
+    @property
+    def _client(self) -> httpx.Client:
+        """Lazily create the httpx.Client on first use."""
+        if self.__client is None:
+            self.__client = httpx.Client(**self._client_kwargs)
+        return self.__client
+
+    @_client.setter
+    def _client(self, value: httpx.Client) -> None:
+        self.__client = value
+
+    @property
+    def server_version(self) -> tuple[int, ...]:
+        """Lazily detect and cache the Solr server version."""
+        if self._server_version is None:
+            self._server_version = self._detect_version()
+        return self._server_version
+
+    @server_version.setter
+    def server_version(self, value: tuple[int, ...]) -> None:
+        self._server_version = value
 
     def close(self) -> None:
         """Close the underlying HTTP(S) connection."""
-        self._client.close()
+        if self.__client is None:
+            # Force creation so is_closed reflects True after close
+            self.__client = httpx.Client(**self._client_kwargs)
+        self.__client.close()
 
     def ping(self) -> bool:
         """Ping the Solr server. Returns True if reachable, False otherwise."""
@@ -348,7 +373,7 @@ class Solr:
         qs = urllib.parse.urlencode(params)
         selector = '%s/get?%s' % (self.path, qs)
         rsp = self._get(selector)
-        data = json.loads(rsp.text)
+        data = json.loads(rsp.content)
 
         if id is not None:
             result: dict[str, Any] | None = data.get('doc')
@@ -377,7 +402,7 @@ class Solr:
         qs = urllib.parse.urlencode({'expr': str(expr)})
         selector = '%s/stream?%s' % (self.path, qs)
         rsp = self._get(selector)
-        data = json.loads(rsp.text)
+        data = json.loads(rsp.content)
 
         docs = data.get('result-set', {}).get('docs', [])
         for doc in docs:
@@ -555,10 +580,9 @@ class Solr:
     def _reconnect(self) -> None:
         """Close and re-create the httpx client."""
         self.reconnects += 1
-        self._client.close()
-        base_url = '%s://%s' % (self.scheme, self.host)
-        self._client = httpx.Client(base_url=base_url, timeout=self.timeout,
-                                    follow_redirects=True)
+        if self.__client is not None:
+            self.__client.close()
+        self.__client = httpx.Client(**self._client_kwargs)
 
     def _post(self, url: str, body: str | bytes, headers: dict[str, str], timeout: float | None = None) -> httpx.Response:
         """POST data to Solr with retry and exponential backoff."""
@@ -712,8 +736,7 @@ class SearchHandler:
 
         if self.conn.response_format == 'json':
             params['wt'] = 'json'
-            raw = self.raw(timeout=timeout, **params)
-            data = json.loads(raw)
+            data = self._raw_json(timeout=timeout, **params)
             resp = parse_json_response(data, params, self)
         else:
             if self.conn.server_version >= (7, 0):
@@ -731,6 +754,23 @@ class SearchHandler:
     def raw(self, **params: Any) -> str:
         """Issue a raw query. No pre/post-processing on parameters or response."""
         timeout = params.pop('timeout', None)
+        rsp = self._raw_request(timeout=timeout, **params)
+        return rsp.text
+
+    def _raw_json(self, **params: Any) -> dict[str, Any]:
+        """Issue a query and return parsed JSON directly from bytes.
+
+        Avoids the intermediate bytes→str→json decode that ``raw()`` +
+        ``json.loads(str)`` would perform.
+        """
+        timeout = params.pop('timeout', None)
+        rsp = self._raw_request(timeout=timeout, **params)
+        result: dict[str, Any] = json.loads(rsp.content)
+        return result
+
+    def _raw_request(self, **params: Any) -> Any:
+        """Issue a POST to the handler and return the raw httpx.Response."""
+        timeout = params.pop('timeout', None)
         query = []
         for key, value in params.items():
             key = key.replace(self.arg_separator, '.')
@@ -745,11 +785,10 @@ class SearchHandler:
 
         try:
             rsp = conn._post(self.selector, request, conn.form_headers, timeout=timeout)
-            data = rsp.text
             if conn.debug:
-                logging.info("solrpy got response: %s" % data)
+                logging.info("solrpy got response: %s" % rsp.text)
         finally:
             if not conn.persistent:
                 conn.close()
 
-        return data
+        return rsp

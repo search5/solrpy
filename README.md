@@ -91,6 +91,46 @@ s = solr.Solr('http://localhost:8983/solr/mycore')
 print(s.server_version)  # (6, 6, 6)
 ```
 
+## Why solrpy over pysolr?
+
+| Feature | solrpy | pysolr |
+|---|:---:|:---:|
+| Basic CRUD | ✅ | ✅ |
+| Async/await | ✅ | — |
+| Streaming Expressions | ✅ | — |
+| KNN / Vector search | ✅ | — |
+| Schema API (full CRUD) | ✅ | — |
+| Pydantic models | ✅ | — |
+| SolrCloud + ZooKeeper | ✅ | ✅ |
+| JSON Facet API | ✅ | — |
+| Structured Field/Sort/Facet builders | ✅ | — |
+| Document extraction (Tika) | ✅ | ✅ |
+| Solr version auto-detection | ✅ | — |
+| Solr 1.2–10.x spanning | ✅ | — |
+| Type hints + py.typed | ✅ | — |
+| Connection pooling (httpx) | ✅ | ✅ |
+| Performance | on par | on par |
+
+### Migrating from pysolr
+
+```python
+# Option 1: Drop-in compatibility wrapper
+from solr import PysolrCompat as Solr
+
+conn = Solr('http://localhost:8983/solr/mycore')
+results = conn.search('title:hello')       # pysolr API
+conn.add([doc1, doc2], commit=True)        # accepts list like pysolr
+conn.delete(id='1', q='old:*')             # q= maps to delete_query
+
+# Option 2: Native solrpy API (recommended)
+from solr import Solr
+
+conn = Solr('http://localhost:8983/solr/mycore')
+results = conn.select('title:hello')       # select instead of search
+conn.add_many([doc1, doc2], commit=True)   # explicit add_many
+conn.delete_query('old:*', commit=True)    # explicit delete_query
+```
+
 ## Tests
 
 Tests require a running Solr instance. Using Docker:
@@ -101,6 +141,13 @@ poetry run pytest tests/
 ```
 
 ## Changelog
+
+### 2.0.7
+
+- **Lazy initialization**: `Solr()` constructor is now instant (~0ms). httpx client and version detection deferred to first use
+- **PysolrCompat**: drop-in compatibility wrapper for pysolr migration (`from solr import PysolrCompat`)
+- **Select performance**: `json.loads(bytes)` instead of `json.loads(string)` eliminates redundant decode
+- Comparison table and migration guide in README
 
 ### 2.0.6
 

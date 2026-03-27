@@ -111,8 +111,18 @@ class AsyncSolr:
         self._client: httpx.AsyncClient = httpx.AsyncClient(
             base_url=base_url, timeout=self.timeout, follow_redirects=True)
 
-        # Version detection is sync during __init__; use sync client briefly
-        self.server_version = self._detect_version_sync()
+        self._server_version: tuple[int, ...] | None = None
+
+    @property
+    def server_version(self) -> tuple[int, ...]:
+        """Lazily detect and cache the Solr server version."""
+        if self._server_version is None:
+            self._server_version = self._detect_version_sync()
+        return self._server_version
+
+    @server_version.setter
+    def server_version(self, value: tuple[int, ...]) -> None:
+        self._server_version = value
 
     def _detect_version_sync(self) -> tuple[int, ...]:
         """Detect Solr version synchronously (used during __init__)."""
@@ -127,7 +137,7 @@ class AsyncSolr:
                     rsp = client.get(base + '/admin/info/system?wt=json',
                                      headers=self.auth_headers)
                     if rsp.status_code == 200:
-                        data = json.loads(rsp.text)
+                        data = json.loads(rsp.content)
                         ver_str = data['lucene']['solr-spec-version']
                         return tuple(int(x) for x in ver_str.split('.')[:3])
                 except Exception:
@@ -254,7 +264,7 @@ class AsyncSolr:
         rsp = await self._post(
             self.path + '/select', request, self.form_headers,
             timeout=params.pop('timeout', None) if 'timeout' in params else None)
-        data = json.loads(rsp.text)
+        data = json.loads(rsp.content)
         resp = parse_json_response(data, params, self)
         if model is not None and resp is not None:
             resp.results = resp.as_models(model)
@@ -391,7 +401,7 @@ class AsyncSolr:
             params['fl'] = ','.join(fields)
         qs = urllib.parse.urlencode(params)
         rsp = await self._get('%s/get?%s' % (self.path, qs))
-        data = json.loads(rsp.text)
+        data = json.loads(rsp.content)
         if id is not None:
             result = data.get('doc')
             if result is not None and model is not None:
@@ -424,7 +434,7 @@ class AsyncSolr:
         qs = urllib.parse.urlencode({'expr': str(expr)})
         selector = '%s/stream?%s' % (self.path, qs)
         rsp = await self._get(selector)
-        data = json.loads(rsp.text)
+        data = json.loads(rsp.content)
 
         docs = data.get('result-set', {}).get('docs', [])
 
