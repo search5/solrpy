@@ -32,7 +32,11 @@ utc = UTC()
 
 
 def utc_to_string(value: datetime.datetime) -> str:
-    """Convert datetimes to the subset of ISO 8601 that Solr expects."""
+    """Convert datetimes to the subset of ISO 8601 that Solr expects.
+
+    :param value: A :class:`~datetime.datetime` instance. If timezone-naive,
+        it is assumed to be UTC.
+    """
     if value.tzinfo is None:
         value = value.replace(tzinfo=utc)
     result = value.astimezone(utc).isoformat()
@@ -48,6 +52,9 @@ def solr_json_default(obj: Any) -> Any:
     Handles ``datetime.datetime``, ``datetime.date``, ``set``, ``tuple``.
     ``bool``, ``int``, ``float``, ``str``, ``list``, ``dict`` are
     handled natively by :func:`json.dumps`.
+
+    :param obj: The object to serialize. Must be a datetime, date, set, or
+        tuple; otherwise :class:`TypeError` is raised.
     """
     if isinstance(obj, datetime.datetime):
         return utc_to_string(obj)
@@ -68,6 +75,7 @@ def serialize_value(value: Any) -> str | None:
     This is the single source of truth for type serialization, used by
     ``Solr.add()``, ``Solr.atomic_update()``, ``AsyncSolr.add()``, etc.
 
+    :param value: The Python value to serialize.
     :returns: Serialized string, or ``None`` if *value* is ``None``.
     """
     if value is None:
@@ -87,6 +95,10 @@ def utc_from_string(value: str) -> datetime.datetime:
 
     Note: this doesn't process the entire ISO 8601 standard,
     only the specific format Solr promises to generate.
+
+    :param value: An ISO 8601 date string ending with ``Z`` as returned
+        by Solr (e.g. ``"2024-01-15T10:30:00Z"``).
+    :raises ValueError: If *value* is not a valid Solr date string.
     """
     try:
         if not value.endswith('Z') and value[10] == 'T':
@@ -145,7 +157,11 @@ def read_response(response: httplib.HTTPResponse) -> str:
 
 
 def requires_version(*min_version: int) -> Callable[..., Any]:
-    """Decorator that raises SolrVersionError if server_version < min_version."""
+    """Decorator that raises SolrVersionError if server_version < min_version.
+
+    :param min_version: Minimum Solr version components (e.g. ``4, 7`` for
+        Solr 4.7+).
+    """
 
     def decorator(function: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(self: Solr, *args: Any, **kw: Any) -> Any:

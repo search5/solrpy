@@ -52,6 +52,10 @@ class SolrTransport:
     """
 
     def __init__(self, conn: Solr) -> None:
+        """Initialize a sync transport.
+
+        :param conn: A :class:`~solr.core.Solr` connection instance.
+        """
         self._conn = conn
 
     @property
@@ -92,7 +96,13 @@ class SolrTransport:
     def post_raw(self, endpoint: str, body: str | bytes,
                  headers: dict[str, str],
                  timeout: float | None = None) -> str:
-        """POST raw data and return decoded response text."""
+        """POST raw data and return decoded response text.
+
+        :param endpoint: URL path relative to the core (e.g. ``/update/extract``).
+        :param body: Raw request body as a string or bytes.
+        :param headers: HTTP headers to include in the request.
+        :param timeout: Optional request timeout in seconds.
+        """
         rsp = self._conn._post(self.path + endpoint, body, headers, timeout=timeout)
         return rsp.text
 
@@ -104,6 +114,10 @@ class AsyncTransport:
     """
 
     def __init__(self, conn: Any) -> None:
+        """Initialize an async transport.
+
+        :param conn: An :class:`~solr.async_solr.AsyncSolr` connection instance.
+        """
         self._conn = conn
 
     @property
@@ -143,7 +157,13 @@ class AsyncTransport:
     async def post_raw(self, endpoint: str, body: str | bytes,
                        headers: dict[str, str],
                        timeout: float | None = None) -> str:
-        """Async POST raw data and return decoded response text."""
+        """Async POST raw data and return decoded response text.
+
+        :param endpoint: URL path relative to the core (e.g. ``/update/extract``).
+        :param body: Raw request body as a string or bytes.
+        :param headers: HTTP headers to include in the request.
+        :param timeout: Optional request timeout in seconds.
+        """
         rsp = await self._conn._post(self.path + endpoint, body, headers, timeout=timeout)
         result: str = rsp.text
         return result
@@ -170,6 +190,11 @@ class DualTransport:
     """
 
     def __init__(self, conn: Any) -> None:
+        """Initialize a dual transport that auto-detects sync or async mode.
+
+        :param conn: A :class:`~solr.core.Solr` or
+            :class:`~solr.async_solr.AsyncSolr` connection instance.
+        """
         self.is_async: bool = _is_async_conn(conn)
         self._conn = conn
         if self.is_async:
@@ -202,5 +227,11 @@ class DualTransport:
     def post_raw(self, endpoint: str, body: str | bytes,
                  headers: dict[str, str],
                  timeout: float | None = None) -> Any:
-        """POST raw data and return text (sync) or coroutine (async)."""
+        """POST raw data and return text (sync) or coroutine (async).
+
+        :param endpoint: URL path relative to the core (e.g. ``/update/extract``).
+        :param body: Raw request body as a string or bytes.
+        :param headers: HTTP headers to include in the request.
+        :param timeout: Optional request timeout in seconds.
+        """
         return self._impl.post_raw(endpoint, body, headers, timeout=timeout)

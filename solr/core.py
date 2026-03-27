@@ -330,6 +330,9 @@ class Solr:
 
         Returns a single doc dict for ``id``, a list for ``ids``,
         or ``None`` if a single doc is not found.
+
+        :param model: Optional Pydantic model class. When provided, each
+            returned document is converted via ``model.model_validate(doc)``.
         """
         if id is None and ids is None:
             raise ValueError("Either id or ids must be specified.")
@@ -392,6 +395,9 @@ class Solr:
         Yields Response objects for each batch. Requires ``sort`` to
         include a uniqueKey field.
 
+        :param \*\*params: Additional Solr query parameters forwarded to the
+            ``select`` handler (e.g., ``fq``, ``fl``).
+
         Example::
 
             for batch in conn.iter_cursor('*:*', sort='id asc', rows=100):
@@ -416,7 +422,16 @@ class Solr:
 
     def commit(self, wait_flush: bool = True, wait_searcher: bool = True,
                _optimize: bool = False, soft_commit: bool = False) -> str:
-        """Issue a commit command to the Solr server."""
+        """Issue a commit command to the Solr server.
+
+        :param wait_flush: Block until index changes are flushed to disk.
+        :param wait_searcher: Block until a new searcher is opened and
+            registered as the main query searcher.
+        :param _optimize: When ``True``, issue an optimize instead of a
+            plain commit.
+        :param soft_commit: Perform a soft commit (Solr 4.0+). Changes are
+            visible in search but not yet persisted to disk.
+        """
         if soft_commit:
             if self.server_version < (4, 0):
                 raise SolrVersionError("soft_commit", (4, 0), self.server_version)
@@ -425,7 +440,12 @@ class Solr:
         return self._commit(verb, wait_flush, wait_searcher)
 
     def optimize(self, wait_flush: bool = True, wait_searcher: bool = True) -> str:
-        """Issue an optimize command to the Solr server."""
+        """Issue an optimize command to the Solr server.
+
+        :param wait_flush: Block until index changes are flushed to disk.
+        :param wait_searcher: Block until a new searcher is opened and
+            registered as the main query searcher.
+        """
         return self._commit("optimize", wait_flush, wait_searcher)
 
     def _commit(self, verb: str, wait_flush: bool, wait_searcher: bool) -> str:
@@ -601,6 +621,21 @@ class SearchHandler:
         for dotted Solr parameter names (e.g., ``hl_simple_post``).
 
         Returns a :class:`Response` instance.
+
+        :param highlight: Enable highlighting. Pass ``True`` to highlight
+            on *fields*, a field name string, or an iterable of field names.
+        :param score: Include the ``score`` pseudo-field in results
+            (default ``True``).
+        :param sort_order: Default sort direction (``"asc"`` or ``"desc"``)
+            applied to sort fields that do not already specify a direction.
+        :param json_facet: A JSON facet dict sent as the ``json.facet``
+            parameter (Solr 5.0+).
+        :param facets: A list of :class:`~solr.facet.Facet` objects whose
+            parameters are merged into the query.
+        :param model: Optional Pydantic model class. When provided, each
+            result document is converted via ``model.model_validate(doc)``.
+        :param \*\*params: Additional Solr query parameters (e.g., ``fq``,
+            ``rows``, ``start``). Underscores in names are converted to dots.
         """
         if json_facet is not None:
             if self.conn.server_version < (5, 0):

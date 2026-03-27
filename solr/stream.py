@@ -27,6 +27,12 @@ class StreamExpression:
     """
 
     def __init__(self, func_name: str, *args: Any, **kwargs: Any) -> None:
+        """Initialize a streaming expression node.
+
+        :param func_name: The Solr streaming function name (e.g. ``"search"``).
+        :param args: Positional arguments (collection names, sub-expressions).
+        :param kwargs: Named parameters rendered as ``key=value`` pairs.
+        """
         self._func = func_name
         self._args: list[Any] = list(args)
         self._kwargs: dict[str, Any] = kwargs
@@ -59,6 +65,11 @@ class AggregateExpression:
     """An aggregate function (count, sum, avg, min, max) for use in rollup/stats."""
 
     def __init__(self, func_name: str, field: str) -> None:
+        """Initialize an aggregate expression.
+
+        :param func_name: The aggregate function name (e.g. ``"sum"``).
+        :param field: The Solr field to aggregate over.
+        """
         self._func = func_name
         self._field = field
 
@@ -85,12 +96,20 @@ def search(collection: str, **kwargs: Any) -> StreamExpression:
 
 
 def facet(collection: str, **kwargs: Any) -> StreamExpression:
-    """Build a ``facet()`` streaming expression."""
+    """Build a ``facet()`` streaming expression.
+
+    :param collection: Solr collection name.
+    :param kwargs: Facet parameters (q, buckets, bucketSorts, etc.).
+    """
     return StreamExpression('facet', collection, **kwargs)
 
 
 def topic(collection: str, **kwargs: Any) -> StreamExpression:
-    """Build a ``topic()`` streaming expression."""
+    """Build a ``topic()`` streaming expression.
+
+    :param collection: Solr collection name.
+    :param kwargs: Topic parameters (q, fl, id, checkpointEvery, etc.).
+    """
     return StreamExpression('topic', collection, **kwargs)
 
 
@@ -99,32 +118,56 @@ def topic(collection: str, **kwargs: Any) -> StreamExpression:
 # ===================================================================
 
 def unique(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``unique()`` streaming expression."""
+    """Build a ``unique()`` streaming expression.
+
+    :param args: Positional arguments (sub-expressions, field names).
+    :param kwargs: Named parameters (over, etc.).
+    """
     return StreamExpression('unique', *args, **kwargs)
 
 
 def top(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``top()`` streaming expression."""
+    """Build a ``top()`` streaming expression.
+
+    :param args: Positional arguments (sub-expressions).
+    :param kwargs: Named parameters (n, sort, etc.).
+    """
     return StreamExpression('top', *args, **kwargs)
 
 
 def sort(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``sort()`` streaming expression."""
+    """Build a ``sort()`` streaming expression.
+
+    :param args: Positional arguments (sub-expressions).
+    :param kwargs: Named parameters (by, etc.).
+    """
     return StreamExpression('sort', *args, **kwargs)
 
 
 def select(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``select()`` streaming expression."""
+    """Build a ``select()`` streaming expression.
+
+    :param args: Positional arguments (sub-expressions, field names).
+    :param kwargs: Named parameters (field aliases, etc.).
+    """
     return StreamExpression('select', *args, **kwargs)
 
 
 def rollup(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``rollup()`` streaming expression."""
+    """Build a ``rollup()`` streaming expression.
+
+    :param args: Positional arguments (sub-expressions).
+    :param kwargs: Named parameters (over, aggregate functions, etc.).
+    """
     return StreamExpression('rollup', *args, **kwargs)
 
 
 def reduce(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``reduce()`` streaming expression."""
+    """Build a ``reduce()`` streaming expression.
+
+    :param args: Positional arguments (sub-expressions).
+    :param kwargs: Named parameters (by, etc.).
+    """
     return StreamExpression('reduce', *args, **kwargs)
 
 
@@ -133,32 +176,56 @@ def reduce(*args: Any, **kwargs: Any) -> StreamExpression:
 # ===================================================================
 
 def merge(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``merge()`` streaming expression."""
+    """Build a ``merge()`` streaming expression.
+
+    :param args: Positional arguments (two or more sub-expressions to merge).
+    :param kwargs: Named parameters (on, etc.).
+    """
     return StreamExpression('merge', *args, **kwargs)
 
 
 def innerJoin(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build an ``innerJoin()`` streaming expression."""
+    """Build an ``innerJoin()`` streaming expression.
+
+    :param args: Positional arguments (two sub-expressions to join).
+    :param kwargs: Named parameters (on, etc.).
+    """
     return StreamExpression('innerJoin', *args, **kwargs)
 
 
 def leftOuterJoin(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``leftOuterJoin()`` streaming expression."""
+    """Build a ``leftOuterJoin()`` streaming expression.
+
+    :param args: Positional arguments (two sub-expressions to join).
+    :param kwargs: Named parameters (on, etc.).
+    """
     return StreamExpression('leftOuterJoin', *args, **kwargs)
 
 
 def hashJoin(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``hashJoin()`` streaming expression."""
+    """Build a ``hashJoin()`` streaming expression.
+
+    :param args: Positional arguments (two sub-expressions to join).
+    :param kwargs: Named parameters (on, hashed, etc.).
+    """
     return StreamExpression('hashJoin', *args, **kwargs)
 
 
 def intersect(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build an ``intersect()`` streaming expression."""
+    """Build an ``intersect()`` streaming expression.
+
+    :param args: Positional arguments (two sub-expressions).
+    :param kwargs: Named parameters (on, etc.).
+    """
     return StreamExpression('intersect', *args, **kwargs)
 
 
 def complement(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``complement()`` streaming expression."""
+    """Build a ``complement()`` streaming expression.
+
+    :param args: Positional arguments (two sub-expressions).
+    :param kwargs: Named parameters (on, etc.).
+    """
     return StreamExpression('complement', *args, **kwargs)
 
 
@@ -167,27 +234,42 @@ def complement(*args: Any, **kwargs: Any) -> StreamExpression:
 # ===================================================================
 
 def count(field: str) -> AggregateExpression:
-    """Aggregate: ``count(field)``."""
+    """Aggregate: ``count(field)``.
+
+    :param field: The Solr field to count.
+    """
     return AggregateExpression('count', field)
 
 
 def sum(field: str) -> AggregateExpression:
-    """Aggregate: ``sum(field)``."""
+    """Aggregate: ``sum(field)``.
+
+    :param field: The Solr field to sum.
+    """
     return AggregateExpression('sum', field)
 
 
 def avg(field: str) -> AggregateExpression:
-    """Aggregate: ``avg(field)``."""
+    """Aggregate: ``avg(field)``.
+
+    :param field: The Solr field to average.
+    """
     return AggregateExpression('avg', field)
 
 
 def min(field: str) -> AggregateExpression:
-    """Aggregate: ``min(field)``."""
+    """Aggregate: ``min(field)``.
+
+    :param field: The Solr field to find the minimum of.
+    """
     return AggregateExpression('min', field)
 
 
 def max(field: str) -> AggregateExpression:
-    """Aggregate: ``max(field)``."""
+    """Aggregate: ``max(field)``.
+
+    :param field: The Solr field to find the maximum of.
+    """
     return AggregateExpression('max', field)
 
 
@@ -196,25 +278,45 @@ def max(field: str) -> AggregateExpression:
 # ===================================================================
 
 def fetch(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``fetch()`` streaming expression."""
+    """Build a ``fetch()`` streaming expression.
+
+    :param args: Positional arguments (collection, sub-expression).
+    :param kwargs: Named parameters (fl, on, etc.).
+    """
     return StreamExpression('fetch', *args, **kwargs)
 
 
 def parallel(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``parallel()`` streaming expression."""
+    """Build a ``parallel()`` streaming expression.
+
+    :param args: Positional arguments (collection, sub-expression).
+    :param kwargs: Named parameters (workers, sort, etc.).
+    """
     return StreamExpression('parallel', *args, **kwargs)
 
 
 def daemon(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``daemon()`` streaming expression."""
+    """Build a ``daemon()`` streaming expression.
+
+    :param args: Positional arguments (sub-expression).
+    :param kwargs: Named parameters (id, runInterval, queueSize, etc.).
+    """
     return StreamExpression('daemon', *args, **kwargs)
 
 
 def update(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build an ``update()`` streaming expression."""
+    """Build an ``update()`` streaming expression.
+
+    :param args: Positional arguments (collection, sub-expression).
+    :param kwargs: Named parameters (batchSize, etc.).
+    """
     return StreamExpression('update', *args, **kwargs)
 
 
 def commit(*args: Any, **kwargs: Any) -> StreamExpression:
-    """Build a ``commit()`` streaming expression."""
+    """Build a ``commit()`` streaming expression.
+
+    :param args: Positional arguments (collection, sub-expression).
+    :param kwargs: Named parameters passed to the Solr commit expression.
+    """
     return StreamExpression('commit', *args, **kwargs)

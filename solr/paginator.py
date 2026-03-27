@@ -32,6 +32,15 @@ class SolrPaginator:
     """
 
     def __init__(self, result: Response, default_page_size: int | str | None = None) -> None:
+        """Initialize a paginator from a Solr response.
+
+        :param result: A :class:`~solr.response.Response` object returned by a
+            Solr query.
+        :param default_page_size: Number of results per page. If ``None``, the
+            page size is inferred from the ``rows`` query parameter or the
+            number of results in *result*. Must be an integer (or integer
+            string) no smaller than the current result count.
+        """
         self.params: dict[str, Any] = result._params
         self.result = result
         self.query: Any = result._query
@@ -79,7 +88,12 @@ class SolrPaginator:
         return self.query(**new_params)
 
     def page(self, page_num: int = 1) -> SolrPage:
-        """Return the requested Page object."""
+        """Return the requested Page object.
+
+        :param page_num: 1-based page number.
+        :raises PageNotAnInteger: If *page_num* cannot be converted to an int.
+        :raises EmptyPage: If *page_num* is outside the valid page range.
+        """
         try:
             page_num = int(page_num)
         except (TypeError, ValueError):

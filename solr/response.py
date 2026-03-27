@@ -21,6 +21,10 @@ class Group:
     """
 
     def __init__(self, raw: dict[str, Any]) -> None:
+        """Initialize a Group from a raw Solr group dict.
+
+        :param raw: A single group entry from the Solr grouped response JSON.
+        """
         self._raw = raw
 
     @property
@@ -72,6 +76,11 @@ class GroupField:
     """
 
     def __init__(self, raw: dict[str, Any]) -> None:
+        """Initialize a GroupField from a raw Solr grouped-field dict.
+
+        :param raw: The grouped response dict for a single field, containing
+            ``matches``, ``ngroups``, and ``groups`` keys.
+        """
         self._raw = raw
 
     @property
@@ -113,9 +122,19 @@ class GroupedResult:
     """
 
     def __init__(self, raw: dict[str, Any]) -> None:
+        """Initialize a GroupedResult from the raw ``grouped`` response dict.
+
+        :param raw: The full ``grouped`` dict from a Solr response, mapping
+            field names to their grouped result dicts.
+        """
         self._raw = raw
 
     def __getitem__(self, field: str) -> GroupField:
+        """Return the :class:`GroupField` for the given field name.
+
+        :param field: The grouped field name to look up.
+        :raises KeyError: If *field* is not present in the grouped response.
+        """
         return GroupField(self._raw[field])
 
     def __iter__(self) -> Any:
@@ -153,6 +172,11 @@ class SpellcheckResult:
     """
 
     def __init__(self, raw: dict[str, Any]) -> None:
+        """Initialize a SpellcheckResult from the raw spellcheck response dict.
+
+        :param raw: The ``spellcheck`` dict from a Solr response, containing
+            ``correctlySpelled``, ``suggestions``, and optionally ``collation``.
+        """
         self._raw = raw
 
     @property
@@ -215,6 +239,12 @@ class Response:
               be a dict.
     """
     def __init__(self, query: Any) -> None:
+        """Initialize a Response container.
+
+        :param query: The callable (typically a :class:`~solr.core.SearchHandler`)
+            used to fetch subsequent batches via :meth:`next_batch` /
+            :meth:`previous_batch`.
+        """
         self.header: dict[str, Any] = {}
         self.results: Any = []
         self._query: Any = query

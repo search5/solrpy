@@ -178,34 +178,64 @@ class SolrCloud:
         self._conn.close()
 
     def select(self, *args: Any, **kwargs: Any) -> Response | None:
-        """Execute a search query with automatic failover."""
+        """Execute a search query with automatic failover.
+
+        :param args: Positional arguments forwarded to :meth:`Solr.select`.
+        :param kwargs: Keyword arguments forwarded to :meth:`Solr.select`.
+        """
         result: Response | None = self._with_failover('select', *args, **kwargs)
         return result
 
     def add(self, doc: dict[str, Any], **kwargs: Any) -> Any:
-        """Add a document, routed to a shard leader."""
+        """Add a document, routed to a shard leader.
+
+        :param doc: Document as a dict of field name to value mappings.
+        :param kwargs: Additional keyword arguments forwarded to :meth:`Solr.add`.
+        """
         return self._with_failover('add', doc, leader=True, **kwargs)
 
     def add_many(self, docs: Any, **kwargs: Any) -> Any:
-        """Add multiple documents, routed to a shard leader."""
+        """Add multiple documents, routed to a shard leader.
+
+        :param docs: Iterable of document dicts to add.
+        :param kwargs: Additional keyword arguments forwarded to :meth:`Solr.add_many`.
+        """
         return self._with_failover('add_many', docs, leader=True, **kwargs)
 
     def delete(self, **kwargs: Any) -> Any:
-        """Delete documents, routed to a shard leader."""
+        """Delete documents, routed to a shard leader.
+
+        :param kwargs: Keyword arguments forwarded to :meth:`Solr.delete`
+            (e.g. ``id='doc1'``).
+        """
         return self._with_failover('delete', leader=True, **kwargs)
 
     def delete_query(self, query: str, **kwargs: Any) -> Any:
-        """Delete by query, routed to a shard leader."""
+        """Delete by query, routed to a shard leader.
+
+        :param query: Solr query string matching documents to delete.
+        :param kwargs: Additional keyword arguments forwarded to :meth:`Solr.delete_query`.
+        """
         return self._with_failover('delete_query', query, leader=True, **kwargs)
 
     def delete_many(self, ids: list[Any], **kwargs: Any) -> Any:
-        """Delete multiple documents by ID."""
+        """Delete multiple documents by ID.
+
+        :param ids: List of document IDs to delete.
+        :param kwargs: Additional keyword arguments forwarded to :meth:`Solr.delete_many`.
+        """
         return self._with_failover('delete_many', ids, leader=True, **kwargs)
 
     def commit(self, **kwargs: Any) -> Any:
-        """Commit changes."""
+        """Commit changes.
+
+        :param kwargs: Keyword arguments forwarded to :meth:`Solr.commit`.
+        """
         return self._with_failover('commit', leader=True, **kwargs)
 
     def optimize(self, **kwargs: Any) -> Any:
-        """Optimize the index."""
+        """Optimize the index.
+
+        :param kwargs: Keyword arguments forwarded to :meth:`Solr.optimize`.
+        """
         return self._with_failover('optimize', leader=True, **kwargs)

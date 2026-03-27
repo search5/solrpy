@@ -41,6 +41,10 @@ class Suggest:
     _MIN_VERSION = (4, 7)
 
     def __init__(self, conn: Any) -> None:
+        """Initialize a Suggest handler client.
+
+        :param conn: A :class:`~solr.core.Solr` or :class:`~solr.async_solr.AsyncSolr` connection.
+        """
         self._transport = DualTransport(conn)
         self._is_async: bool = self._transport.is_async
 

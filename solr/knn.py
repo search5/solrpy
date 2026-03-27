@@ -42,6 +42,10 @@ class KNN:
     _MIN_VERSION = (9, 0)
 
     def __init__(self, conn: Any) -> None:
+        """Initialize a KNN search client.
+
+        :param conn: A :class:`~solr.core.Solr` or :class:`~solr.async_solr.AsyncSolr` connection.
+        """
         self._conn = conn
         self._is_async: bool = _is_async_conn(conn)
 
@@ -308,11 +312,23 @@ class KNN:
 
     def build_query(self, vector: Sequence[float], field: str, top_k: int = 10,
                     ef_search_scale_factor: float | None = None) -> str:
-        """Alias for :meth:`build_knn_query` (backward compatibility)."""
+        """Alias for :meth:`build_knn_query` (backward compatibility).
+
+        :param vector: Dense vector as a sequence of floats.
+        :param field: Name of the ``DenseVectorField`` to search.
+        :param top_k: Number of nearest neighbors to retrieve.
+        :param ef_search_scale_factor: Candidate examination multiplier (Solr 10.0+).
+        """
         return self.build_knn_query(vector, field, top_k,
                                     ef_search_scale_factor=ef_search_scale_factor)
 
     def __call__(self, vector: Sequence[float], field: str, top_k: int = 10,
                  **params: Any) -> Any:
-        """Shortcut for :meth:`search`."""
+        """Shortcut for :meth:`search`.
+
+        :param vector: Dense vector as a sequence of floats.
+        :param field: Name of the ``DenseVectorField`` to search.
+        :param top_k: Number of nearest neighbors to retrieve.
+        :param params: Additional Solr parameters forwarded to :meth:`search`.
+        """
         return self.search(vector, field, top_k, **params)

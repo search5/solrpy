@@ -57,6 +57,20 @@ class AsyncSolr:
         """Create an async Solr connection.
 
         Same parameters as :class:`~solr.core.Solr`.
+
+        :param url: URI pointing to the Solr instance, e.g.
+            ``'http://localhost:8983/solr/mycore'``.
+        :param timeout: Timeout in seconds for server responses.
+        :param http_user: Username for HTTP Basic authentication.
+        :param http_pass: Password for HTTP Basic authentication.
+        :param post_headers: Extra headers included in all requests.
+        :param max_retries: Max automatic retries on connection errors.
+        :param retry_delay: Base delay in seconds between retries (exponential backoff).
+        :param always_commit: Auto-commit on every update method call.
+        :param response_format: ``'json'`` (default) or ``'xml'``.
+        :param auth_token: Bearer token string for authentication.
+        :param auth: Callable returning a ``dict[str, str]`` of auth headers per request.
+        :param debug: Log all requests and responses.
         """
         self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]
         self.url = url
@@ -220,6 +234,10 @@ class AsyncSolr:
     async def select(self, q: str | None = None, **params: Any) -> Response | None:
         """Async search query.
 
+        :param q: Query string, e.g. ``'*:*'`` or ``'title:foo'``.
+        :param params: Additional Solr query parameters passed as keyword
+            arguments.  Underscores in keys are converted to dots, so
+            ``facet_field='category'`` becomes ``facet.field=category``.
         :param model: Optional Pydantic model class. When provided,
             ``response.results`` will contain model instances instead of dicts.
         """
@@ -243,7 +261,12 @@ class AsyncSolr:
         return resp
 
     async def add(self, doc: dict[str, Any], **kwargs: Any) -> Any:
-        """Async add a document."""
+        """Async add a document.
+
+        :param doc: Dictionary mapping field names to values.
+        :param kwargs: Optional keyword arguments.  ``commit`` (bool) forces an
+            immediate commit; ``timeout`` (float) overrides the request timeout.
+        """
         commit = kwargs.pop('commit', self.always_commit)
         timeout = kwargs.pop('timeout', None)
         query: dict[str, str] = {}
@@ -269,7 +292,12 @@ class AsyncSolr:
         return await self._update(''.join(lst), query, timeout=timeout)
 
     async def add_many(self, docs: Iterable[dict[str, Any]], **kwargs: Any) -> Any:
-        """Async add multiple documents."""
+        """Async add multiple documents.
+
+        :param docs: Iterable of dictionaries, each mapping field names to values.
+        :param kwargs: Optional keyword arguments.  ``commit`` (bool) forces an
+            immediate commit; ``timeout`` (float) overrides the request timeout.
+        """
         commit = kwargs.pop('commit', self.always_commit)
         timeout = kwargs.pop('timeout', None)
         query: dict[str, str] = {}
@@ -298,7 +326,12 @@ class AsyncSolr:
         return await self._update(''.join(lst), query, timeout=timeout)
 
     async def delete(self, id: Any = None, **kwargs: Any) -> Any:
-        """Async delete by id."""
+        """Async delete by id.
+
+        :param id: Unique identifier of the document to delete.
+        :param kwargs: Optional keyword arguments.  ``commit`` (bool) forces an
+            immediate commit; ``timeout`` (float) overrides the request timeout.
+        """
         from xml.sax.saxutils import escape
         commit = kwargs.pop('commit', self.always_commit)
         timeout = kwargs.pop('timeout', None)
@@ -309,7 +342,12 @@ class AsyncSolr:
         return await self._update(xml, query, timeout=timeout)
 
     async def delete_query(self, q: str, **kwargs: Any) -> Any:
-        """Async delete by query."""
+        """Async delete by query.
+
+        :param q: Solr query string identifying documents to delete.
+        :param kwargs: Optional keyword arguments.  ``commit`` (bool) forces an
+            immediate commit; ``timeout`` (float) overrides the request timeout.
+        """
         from xml.sax.saxutils import escape
         commit = kwargs.pop('commit', self.always_commit)
         timeout = kwargs.pop('timeout', None)
@@ -320,7 +358,11 @@ class AsyncSolr:
         return await self._update(xml, query, timeout=timeout)
 
     async def commit(self, **kwargs: Any) -> str:
-        """Async commit."""
+        """Async commit.
+
+        :param kwargs: Optional keyword arguments.  ``soft_commit`` (bool)
+            performs a soft commit instead of a hard commit when set to ``True``.
+        """
         soft_commit = kwargs.pop('soft_commit', False)
         if soft_commit:
             return await self._update('<commit softCommit="true"/>')
@@ -329,7 +371,14 @@ class AsyncSolr:
     async def get(self, id: str | None = None, ids: list[str] | None = None,
                   fields: list[str] | None = None,
                   model: type[Any] | None = None) -> Any:
-        """Async Real-time Get."""
+        """Async Real-time Get.
+
+        :param id: Unique identifier of a single document to retrieve.
+        :param ids: List of document identifiers to retrieve in bulk.
+        :param fields: List of field names to return (passed as ``fl``).
+        :param model: Optional Pydantic model class.  When provided, results
+            are returned as model instances instead of plain dicts.
+        """
         if id is None and ids is None:
             raise ValueError("Either id or ids must be specified.")
         import urllib.parse

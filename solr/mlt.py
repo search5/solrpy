@@ -31,6 +31,10 @@ class MoreLikeThis:
     """
 
     def __init__(self, conn: Any) -> None:
+        """Initialize a MoreLikeThis handler client.
+
+        :param conn: A :class:`~solr.core.Solr` or :class:`~solr.async_solr.AsyncSolr` connection.
+        """
         self._conn = conn
         self._is_async: bool = _is_async_conn(conn)
         if not self._is_async:
@@ -38,7 +42,13 @@ class MoreLikeThis:
             self._handler = SearchHandler(conn, '/mlt')
 
     def __call__(self, q: str | None = None, **params: Any) -> Any:
-        """Query the MLT handler."""
+        """Query the MLT handler.
+
+        :param q: Query string to find similar documents for. If ``None``,
+            the query must be supplied via ``params``.
+        :param params: Additional Solr MLT parameters (e.g. ``fl``, ``mlt_fl``,
+            ``mlt_mintf``).
+        """
         if self._is_async:
             return self._call_async(q, **params)
         return self._handler(q, **params)
@@ -58,7 +68,10 @@ class MoreLikeThis:
         return parse_json_response(data, params, self)
 
     def raw(self, **params: Any) -> Any:
-        """Issue a raw MLT query."""
+        """Issue a raw MLT query.
+
+        :param params: Raw Solr parameters passed directly to the ``/mlt`` handler.
+        """
         if self._is_async:
             raise NotImplementedError("raw() is not supported in async mode")
         return self._handler.raw(**params)
