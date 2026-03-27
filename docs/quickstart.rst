@@ -662,6 +662,22 @@ The ``AsyncSchemaAPI``, ``AsyncKNN``, ``AsyncMoreLikeThis``,
 ``AsyncSuggest``, and ``AsyncExtract`` names are kept as backward-compatible
 aliases.
 
+Async Streaming Expressions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Execute streaming expressions asynchronously with ``async for``::
+
+    from solr import AsyncSolr
+    from solr.stream import search, rollup, top, sum
+
+    async with AsyncSolr('http://localhost:8983/solr/mycore') as conn:
+        expr = (search('logs', q='*:*', fl='host,bytes', sort='host asc')
+                | rollup(over='host', total=sum('bytes'))
+                | top(n=5, sort='total desc'))
+
+        async for doc in await conn.stream(expr):
+            print(doc)
+
 
 Closing the connection
 ----------------------

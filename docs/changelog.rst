@@ -1,6 +1,26 @@
 Changelog
 =========
 
+2.0.5 (2026-03-27)
+-------------------
+
+**New features:**
+
+- **Async Streaming Expressions**: ``async for doc in await conn.stream(expr):``
+  executes streaming expressions asynchronously via ``AsyncSolr``.
+- **Internal JSON update path**: on Solr 4.0+, ``add()``, ``add_many()``, and
+  ``atomic_update()`` now use JSON internally instead of XML. No user-facing
+  parameter change; Solr < 4.0 falls back to XML automatically.
+- ``solr_json_default()`` encoder for ``json.dumps`` — handles ``datetime``,
+  ``date``, ``set``, ``tuple``.
+
+**Bug fixes:**
+
+- ``serialize_value()`` helper extracted to ``solr/utils.py``. Fixes missing
+  ``datetime``/``date``/``bool`` conversion in ``atomic_update()``,
+  ``AsyncSolr.add()``, and ``AsyncSolr.add_many()``.
+
+
 2.0.4 (2026-03-27)
 -------------------
 

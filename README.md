@@ -102,6 +102,13 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 2.0.5
+
+- **Async Streaming Expressions**: `async for doc in await conn.stream(expr):`
+- **serialize_value() bug fix**: `atomic_update()`, `AsyncSolr.add/add_many` now correctly serialize `datetime`, `date`, `bool`
+- **Internal JSON update path**: Solr 4.0+ uses JSON for add/add_many/atomic_update (no user-facing change)
+- `solr_json_default()` encoder handles `datetime`, `date`, `set`, `tuple`
+
 ### 2.0.4
 
 - **Unified sync/async API**: `SchemaAPI(conn)` works with both `Solr` and `AsyncSolr`

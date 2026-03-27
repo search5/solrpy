@@ -344,3 +344,40 @@ class AsyncSolr:
         if model is not None:
             return [model.model_validate(d) for d in docs]
         return docs
+
+    async def stream(self, expr: Any,
+                     model: type[Any] | None = None) -> Any:
+        """Execute a streaming expression via the ``/stream`` handler (Solr 5.0+).
+
+        Returns an async generator of tuple dicts. Skips the final EOF marker.
+
+        Usage::
+
+            async for doc in await conn.stream(expr):
+                print(doc)
+
+        :param expr: A :class:`~solr.stream.StreamExpression` or string.
+        :param model: Optional Pydantic model for automatic conversion.
+        :returns: Async generator of result dicts (or model instances).
+        """
+        if self.server_version < (5, 0):
+            raise SolrVersionError("stream", (5, 0), self.server_version)
+
+        import urllib.parse
+        qs = urllib.parse.urlencode({'expr': str(expr)})
+        selector = '%s/stream?%s' % (self.path, qs)
+        rsp = await self._get(selector)
+        data = json.loads(rsp.text)
+
+        docs = data.get('result-set', {}).get('docs', [])
+
+        async def _iter() -> Any:
+            for doc in docs:
+                if 'EOF' in doc:
+                    return
+                if model is not None:
+                    yield model.model_validate(doc)
+                else:
+                    yield doc
+
+        return _iter()
