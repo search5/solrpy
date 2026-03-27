@@ -126,15 +126,40 @@ Enable highlighting for specific fields::
         highlight=['title', 'body'],
     )
 
-    # highlighting data is available on the response
-    print(response.highlighting)
-
 Or highlight all returned fields by passing ``True``::
 
     response = conn.select(
         'title:lucene',
         fields=['title', 'body'],
         highlight=True,
+    )
+
+The response contains a ``highlighting`` dict keyed by document ID.
+Each value is a dict of field names to lists of highlighted snippets::
+
+    response = conn.select('title:lucene', highlight=['title'])
+
+    # response.highlighting structure:
+    # {
+    #     'doc1': {'title': ['<em>Lucene</em> in Action']},
+    #     'doc2': {'title': ['Apache <em>Lucene</em> Guide']},
+    # }
+
+    for doc in response.results:
+        hl = response.highlighting.get(doc['id'], {})
+        for field, snippets in hl.items():
+            print(doc['id'], field, snippets)
+
+You can customize highlighting with additional Solr parameters using
+underscore notation::
+
+    response = conn.select(
+        'title:lucene',
+        highlight=['title'],
+        hl_simple_pre='<b>',       # hl.simple.pre=<b>
+        hl_simple_post='</b>',     # hl.simple.post=</b>
+        hl_fragsize=200,           # hl.fragsize=200
+        hl_snippets=3,             # hl.snippets=3
     )
 
 
@@ -273,12 +298,15 @@ Group results by a field value::
 KNN / Dense Vector Search (Solr 9.0+)
 ---------------------------------------
 
-Search by vector similarity using Solr's ``DenseVectorField``::
+Search by vector similarity using Solr's ``DenseVectorField``.
+The ``KNN`` class provides four search modes.
+
+**Basic top-K search** (``search`` / ``__call__``)::
 
     from solr import KNN
 
     knn = KNN(conn)
-    response = knn(
+    response = knn.search(
         [0.1, 0.2, 0.3, 0.4, 0.5],
         field='embedding',
         top_k=10,
@@ -286,15 +314,79 @@ Search by vector similarity using Solr's ``DenseVectorField``::
     for doc in response.results:
         print(doc['id'], doc.get('score'))
 
+The shortcut ``knn(...)`` is equivalent to ``knn.search(...)``.
+
 With filter queries::
 
-    response = knn([0.1, 0.2, 0.3], field='embedding', top_k=10,
-                   filters='category:books')
+    response = knn.search([0.1, 0.2, 0.3], field='embedding', top_k=10,
+                          filters='category:books')
+
+With early termination and seed query for faster HNSW traversal::
+
+    response = knn.search(
+        [0.1, 0.2, 0.3], field='embedding', top_k=10,
+        early_termination=True,
+        saturation_threshold=0.95,
+        patience=5,
+        seed_query='title:lucene',
+    )
+
+With pre-filter to restrict the vector search space::
+
+    response = knn.search(
+        [0.1, 0.2, 0.3], field='embedding', top_k=10,
+        pre_filter='category:books',
+    )
 
 Solr 10.0+ accuracy tuning::
 
-    response = knn([0.1, 0.2], field='embedding', top_k=10,
-                   ef_search_scale_factor=2.0)
+    response = knn.search([0.1, 0.2], field='embedding', top_k=10,
+                          ef_search_scale_factor=2.0)
+
+**Similarity threshold search** (``similarity``) -- returns all documents
+above a minimum similarity score instead of a fixed top-K count::
+
+    response = knn.similarity(
+        [0.1, 0.2, 0.3],
+        field='embedding',
+        min_return=0.7,
+        min_traverse=0.5,
+    )
+    for doc in response.results:
+        print(doc['id'], doc.get('score'))
+
+**Hybrid search** (``hybrid``) -- combines a lexical text query with vector
+similarity using an OR clause::
+
+    response = knn.hybrid(
+        'machine learning algorithms',
+        vector=[0.1, 0.2, 0.3],
+        field='embedding',
+        min_return=0.5,
+    )
+    for doc in response.results:
+        print(doc['id'], doc.get('score'))
+
+**Re-rank search** (``rerank``) -- runs a lexical query first, then re-ranks
+the top results by vector similarity::
+
+    response = knn.rerank(
+        'machine learning',
+        vector=[0.1, 0.2, 0.3],
+        field='embedding',
+        top_k=10,
+        rerank_docs=100,
+        rerank_weight=1.0,
+    )
+    for doc in response.results:
+        print(doc['id'], doc.get('score'))
+
+**Query builders** -- build query strings without executing them::
+
+    q = knn.build_knn_query([0.1, 0.2], field='embedding', top_k=10)
+    q = knn.build_similarity_query([0.1, 0.2], field='embedding', min_return=0.7)
+    q = knn.build_hybrid_query('text query', [0.1, 0.2], field='embedding')
+    params = knn.build_rerank_params([0.1, 0.2], field='embedding')
 
 
 Query builders (Field, Sort, Facet)
@@ -317,6 +409,38 @@ Use builder objects for structured query parameters, or keep using raw strings::
             Facet.range('price', start=0, end=100, gap=10),
         ],
     )
+
+Document transformers (Solr 4.5+) add computed values to each document::
+
+    from solr import Field
+
+    response = conn.select('*:*',
+        fields=[
+            Field('id'),
+            Field('title'),
+            Field.transformer('explain'),                      # [explain]
+            Field.transformer('child', childFilter='type:comment'),  # [child childFilter=type:comment]
+        ],
+    )
+
+Range facets divide a numeric or date field into intervals::
+
+    from solr import Facet
+
+    facets = [
+        Facet.range('price', start=0, end=1000, gap=100),
+    ]
+    response = conn.select('*:*', facets=facets)
+
+Pivot facets (Solr 4.0+) produce hierarchical facet counts across
+two or more fields::
+
+    from solr import Facet
+
+    facets = [
+        Facet.pivot('category', 'author', mincount=1),
+    ]
+    response = conn.select('*:*', facets=facets)
 
 Raw strings still work — builders are an optional alternative::
 
@@ -628,6 +752,62 @@ Convert search results to typed Pydantic models (``pip install solrpy[pydantic]`
     products = resp.as_models(Product)
 
 
+Streaming Expressions (Solr 5.0+)
+-----------------------------------
+
+Build and execute `Streaming Expressions
+<https://solr.apache.org/guide/solr/latest/query-guide/streaming-expressions.html>`_
+using Python builder functions.  Results are returned as an iterator of dicts.
+
+**Basic usage** -- iterate over results with a ``for`` loop::
+
+    from solr.stream import search
+
+    expr = search('mycore', q='*:*', fl='id,title', sort='id asc', rows=100)
+
+    for doc in conn.stream(expr):
+        print(doc['id'], doc['title'])
+
+**Pipe operator** -- chain expressions together with ``|``.  The left-hand
+expression becomes the first positional argument of the right-hand expression::
+
+    from solr.stream import search, rollup, top, sum
+
+    expr = (search('logs', q='*:*', fl='host,bytes', sort='host asc')
+            | rollup(over='host', total=sum('bytes'))
+            | top(n=5, sort='total desc'))
+
+    for doc in conn.stream(expr):
+        print(doc)
+
+**Multiple function examples**::
+
+    from solr.stream import search, rollup, top, unique, merge, sum, count, avg
+
+    # De-duplicate results by a field
+    expr = search('products', q='*:*', fl='sku,name', sort='sku asc') | unique(over='sku')
+
+    # Merge two sorted streams
+    expr = merge(
+        search('logs_2024', q='*:*', fl='id,ts', sort='ts asc'),
+        search('logs_2025', q='*:*', fl='id,ts', sort='ts asc'),
+        on='ts asc',
+    )
+
+    # Rollup with multiple aggregates
+    expr = (search('sales', q='*:*', fl='region,amount,qty', sort='region asc')
+            | rollup(over='region', revenue=sum('amount'),
+                     orders=count('qty'), avg_order=avg('amount')))
+
+    for doc in conn.stream(expr):
+        print(doc)
+
+You can also pass a raw expression string if you prefer::
+
+    for doc in conn.stream('top(n=3,search(mycore,q="*:*",fl="id",sort="id asc"),sort="id desc")'):
+        print(doc)
+
+
 Async usage
 -----------
 
@@ -677,6 +857,69 @@ Execute streaming expressions asynchronously with ``async for``::
 
         async for doc in await conn.stream(expr):
             print(doc)
+
+
+Migrating from pysolr
+---------------------
+
+If you are migrating from the ``pysolr`` library, use :class:`~solr.PysolrCompat`
+as a drop-in replacement. It wraps :class:`~solr.Solr` with pysolr-compatible
+method names::
+
+    # Before (pysolr)
+    # import pysolr
+    # conn = pysolr.Solr('http://localhost:8983/solr/mycore')
+
+    # After (solrpy)
+    from solr import PysolrCompat
+    conn = PysolrCompat('http://localhost:8983/solr/mycore')
+
+The following table shows how pysolr methods map to solrpy:
+
+.. list-table::
+   :widths: 35 35 30
+   :header-rows: 1
+
+   * - pysolr method
+     - PysolrCompat method
+     - Native solrpy equivalent
+   * - ``conn.search('q', rows=10)``
+     - ``conn.search('q', rows=10)``
+     - ``conn.select('q', rows=10)``
+   * - ``conn.add([doc1, doc2])``
+     - ``conn.add([doc1, doc2])``
+     - ``conn.add_many([doc1, doc2])``
+   * - ``conn.delete(id='1')``
+     - ``conn.delete(id='1')``
+     - ``conn.delete(id='1')``
+   * - ``conn.delete(q='title:old')``
+     - ``conn.delete(q='title:old')``
+     - ``conn.delete_query('title:old')``
+   * - ``conn.extract(file_obj)``
+     - ``conn.extract(file_obj)``
+     - ``Extract(conn)(file_obj)``
+
+Example showing before and after::
+
+    # --- pysolr code ---
+    # import pysolr
+    # conn = pysolr.Solr('http://localhost:8983/solr/mycore')
+    # results = conn.search('category:books', rows=5)
+    # conn.add([{'id': '10', 'title': 'New Book'}])
+    # conn.delete(q='title:obsolete')
+    # conn.commit()
+
+    # --- solrpy PysolrCompat (minimal changes) ---
+    from solr import PysolrCompat
+    conn = PysolrCompat('http://localhost:8983/solr/mycore')
+    results = conn.search('category:books', rows=5)
+    conn.add([{'id': '10', 'title': 'New Book'}])
+    conn.delete(q='title:obsolete')
+    conn.commit()
+
+Since ``PysolrCompat`` subclasses ``Solr``, all native solrpy features
+(cursor pagination, streaming expressions, Pydantic models, etc.) are
+also available.
 
 
 Closing the connection

@@ -1,6 +1,37 @@
 Changelog
 =========
 
+2.0.7.post1 (2026-03-27)
+-------------------------
+
+**Documentation:**
+
+- KNN: all 4 search modes + builder methods in quickstart and reference
+- Streaming Expressions: sync examples, pipe operator, full function catalog
+- PysolrCompat: migration guide in quickstart + reference
+- AsyncSolr: full reference section with all methods
+- Response attributes: ``facet_counts``, ``stats``, ``debug``
+- Query builders: ``Field.transformer()``, ``Facet.range()``, ``Facet.pivot()``
+- Highlighting: response structure and customization examples
+- Remove ``pysolr`` from dev dependencies
+
+
+2.0.7 (2026-03-27)
+-------------------
+
+**New features:**
+
+- **Lazy initialization**: ``Solr()`` constructor is now instant (~0ms).
+  The ``httpx.Client`` and Solr version detection are deferred to first use.
+- **PysolrCompat**: drop-in compatibility wrapper for migrating from pysolr.
+  ``from solr import PysolrCompat`` provides ``search()``, ``add(list)``,
+  ``delete(q=...)`` that map to native solrpy methods.
+- **Select performance**: ``json.loads(bytes)`` instead of
+  ``json.loads(string)`` eliminates redundant decode in the select path.
+- Feature comparison table (solrpy vs pysolr) in README.
+- Comprehensive docstring audit: 104 methods updated with ``:param:`` docs.
+
+
 2.0.6 (2026-03-27)
 -------------------
 
@@ -131,6 +162,7 @@ Changelog
 **New features:**
 
 - **Pydantic response models** (opt-in, ``pip install solrpy[pydantic]``):
+
   - ``model=`` parameter on ``select()`` and ``get()`` — automatically
     converts result documents to Pydantic ``BaseModel`` instances.
   - ``Response.as_models(model)`` method for post-hoc conversion.

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "solrpy"
-version = "2.0.7"
+version = "2.0.7.post1"
 description = "Client for the Solr search service"
 license = "Apache-2.0"
 readme = "README.md"
@@ -37,7 +37,6 @@ pydantic = ["pydantic"]
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
 mypy = "^1.19.1"
-pysolr = "^3.11.0"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "^7.0"

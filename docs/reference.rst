@@ -291,6 +291,12 @@ SearchHandler class
    :param q: Query string.
    :param fields: Fields to return. String or iterable. Defaults to ``'*'``.
    :param highlight: ``False`` (default), ``True``, or a list of field names.
+       When enabled, the response gets a ``highlighting`` attribute — a dict
+       keyed by document ID, where each value is a dict of field names to
+       lists of highlighted snippets (e.g.
+       ``{'doc1': {'title': ['<em>Lucene</em> in Action']}}``).
+       Customize with ``hl_simple_pre``, ``hl_simple_post``, ``hl_fragsize``,
+       ``hl_snippets``, etc. via ``**params``.
    :param score: Include ``score`` in results. Defaults to ``True``.
    :param sort: Fields to sort by. String or iterable.
    :param sort_order: Default sort direction (``'asc'`` or ``'desc'``).
@@ -338,6 +344,38 @@ Response class
    .. attribute:: Response.maxScore
 
       Maximum relevance score across all matches.
+
+   .. attribute:: Response.facet_counts
+
+      Dictionary containing traditional facet results when ``facet=true`` is
+      used. Contains keys like ``facet_fields``, ``facet_queries``,
+      ``facet_ranges``, ``facet_pivots``, etc.
+
+   .. attribute:: Response.facets
+
+      Dictionary containing JSON Facet API results when ``json.facet`` is
+      used (Solr 5.0+). Contains the structured facet buckets returned by
+      Solr's JSON faceting.
+
+   .. attribute:: Response.stats
+
+      Dictionary containing field statistics when ``stats=true`` is used.
+      Contains per-field stats such as min, max, count, mean, etc.
+
+   .. attribute:: Response.debug
+
+      Dictionary containing debug information when ``debug=true`` (or
+      ``debugQuery=true``) is used. Contains parsed query, explain info,
+      timing data, etc.
+
+   .. note::
+
+      Any top-level key in the Solr JSON response that is not
+      ``responseHeader`` or ``response`` is automatically set as an
+      attribute on the ``Response`` object. This includes
+      ``highlighting``, ``facet_counts``, ``facets``, ``stats``,
+      ``debug``, ``nextCursorMark``, ``grouped``, and any other
+      component output. You can access them as ``response.key_name``.
 
    **Pydantic models (opt-in):**
 
@@ -606,42 +644,168 @@ KNN / Dense Vector Search (Solr 9.0+)
 
 .. class:: KNN(conn)
 
-   Dense Vector / KNN Search using Solr's ``{!knn}`` query parser.
-   Created explicitly by the user.
+   Dense Vector / KNN Search using Solr's ``{!knn}`` and
+   ``{!vectorSimilarity}`` query parsers.  Supports top-K search,
+   similarity threshold search, hybrid (lexical + vector) search,
+   and re-ranking.  Created explicitly by the user.
 
    :param conn: A :class:`Solr` or :class:`AsyncSolr` instance.
       With ``AsyncSolr``, execution methods return coroutines.
 
-   .. method:: __call__(vector, field, top_k, filters=None, ef_search_scale_factor=None, **params)
+   **Execution methods:**
 
-      Execute a KNN search query.
+   .. method:: search(vector, field, top_k=10, filters=None, early_termination=False, saturation_threshold=None, patience=None, ef_search_scale_factor=None, seed_query=None, pre_filter=None, **params)
+
+      Execute a ``{!knn}`` search query (top-K nearest neighbors).
+
+      :param vector: Dense vector as a sequence of floats.
+      :param field: Name of the ``DenseVectorField`` to search.
+      :param top_k: Number of nearest neighbors to retrieve. Defaults to ``10``.
+      :param filters: Filter query (``fq`` parameter).
+      :param early_termination: Enable HNSW early termination optimization.
+      :param saturation_threshold: Queue saturation cutoff for early termination
+          (float between 0 and 1).
+      :param patience: Iteration limit for early termination (integer).
+      :param ef_search_scale_factor: Candidate examination multiplier (Solr 10.0+).
+          Raises :class:`SolrVersionError` if Solr < 10.0.
+      :param seed_query: Lexical query string to guide the vector search entry point.
+      :param pre_filter: Explicit pre-filter query string(s). A single string or
+          a list of strings.
+      :param params: Additional Solr parameters.
+      :returns: A :class:`Response` instance (sync) or coroutine (async).
+      :raises SolrVersionError: If connected Solr is older than 9.0.
+
+   .. method:: similarity(vector, field, min_return, min_traverse=None, pre_filter=None, filters=None, **params)
+
+      Execute a ``{!vectorSimilarity}`` search.  Returns all documents whose
+      similarity to the vector exceeds *min_return*.
+
+      :param vector: Dense vector as a sequence of floats.
+      :param field: Name of the ``DenseVectorField``.
+      :param min_return: Minimum similarity threshold for results (float).
+      :param min_traverse: Minimum similarity to continue graph traversal
+          (float). Can improve performance by pruning low-similarity branches.
+      :param pre_filter: Explicit pre-filter query string(s).
+      :param filters: Filter query (``fq`` parameter).
+      :param params: Additional Solr parameters.
+      :returns: A :class:`Response` instance.
+      :raises SolrVersionError: If connected Solr is older than 9.0.
+
+   .. method:: hybrid(text_query, vector, field, min_return=0.5, **params)
+
+      Execute a hybrid (lexical OR vector) search.  Combines a standard text
+      query with a ``{!vectorSimilarity}`` query using an OR clause.
+
+      :param text_query: The lexical search query string.
+      :param vector: Dense vector for similarity matching.
+      :param field: Name of the ``DenseVectorField``.
+      :param min_return: Minimum similarity threshold for the vector part.
+          Defaults to ``0.5``.
+      :param params: Additional Solr parameters.
+      :returns: A :class:`Response` instance.
+      :raises SolrVersionError: If connected Solr is older than 9.0.
+
+   .. method:: rerank(query, vector, field, top_k=10, rerank_docs=100, rerank_weight=1.0, **params)
+
+      Execute a lexical query re-ranked by vector similarity.  Uses Solr's
+      ``{!rerank}`` query parser to re-score the top lexical results with a
+      ``{!knn}`` query.
+
+      :param query: The base lexical query string.
+      :param vector: Dense vector for re-ranking.
+      :param field: Name of the ``DenseVectorField``.
+      :param top_k: topK for the KNN re-rank query. Defaults to ``10``.
+      :param rerank_docs: Number of top lexical docs to re-rank. Defaults
+          to ``100``.
+      :param rerank_weight: Weight of the vector score in the final ranking.
+          Defaults to ``1.0``.
+      :param params: Additional Solr parameters.
+      :returns: A :class:`Response` instance.
+      :raises SolrVersionError: If connected Solr is older than 9.0.
+
+   .. method:: __call__(vector, field, top_k=10, **params)
+
+      Shortcut for :meth:`search`.
+
+   **Query builder methods:**
+
+   .. method:: build_knn_query(vector, field, top_k=10, early_termination=False, saturation_threshold=None, patience=None, ef_search_scale_factor=None, seed_query=None, pre_filter=None, include_tags=None, exclude_tags=None)
+
+      Build a ``{!knn}`` query string without executing it.
 
       :param vector: Dense vector as a sequence of floats.
       :param field: Name of the ``DenseVectorField`` to search.
       :param top_k: Number of nearest neighbors to retrieve.
-      :param filters: Optional filter query (``fq`` parameter).
-      :param ef_search_scale_factor: Solr 10.0+ parameter to tune search
-          accuracy independently from result count.
-      :returns: A :class:`Response` instance.
-      :raises SolrVersionError: If connected Solr is older than 9.0.
+      :param early_termination: Enable HNSW early termination.
+      :param saturation_threshold: Queue saturation cutoff (float).
+      :param patience: Iteration limit for early termination (int).
+      :param ef_search_scale_factor: Candidate examination multiplier (Solr 10.0+).
+      :param seed_query: Lexical query to guide vector search entry point.
+      :param pre_filter: Pre-filter query string(s) (string or list of strings).
+      :param include_tags: Only use ``fq`` filters with these tags.
+      :param exclude_tags: Exclude ``fq`` filters with these tags.
+      :returns: The KNN query string, e.g. ``{!knn f=embedding topK=10}[0.1,0.2,...]``.
 
-   .. method:: build_query(vector, field, top_k, ef_search_scale_factor=None)
+   .. method:: build_similarity_query(vector, field, min_return, min_traverse=None, pre_filter=None)
 
-      Build a ``{!knn}`` query string without executing it.
+      Build a ``{!vectorSimilarity}`` query string without executing it.
 
-   Example::
+      :param vector: Dense vector as a sequence of floats.
+      :param field: Name of the ``DenseVectorField``.
+      :param min_return: Minimum similarity threshold for results.
+      :param min_traverse: Minimum similarity to continue traversal.
+      :param pre_filter: Pre-filter query string(s).
+      :returns: The vectorSimilarity query string.
+
+   .. method:: build_hybrid_query(text_query, vector, field, min_return=0.5)
+
+      Build a hybrid (lexical OR vector) query string without executing it.
+
+      :param text_query: The lexical search query.
+      :param vector: Dense vector for similarity matching.
+      :param field: Name of the ``DenseVectorField``.
+      :param min_return: Minimum similarity threshold for the vector part.
+      :returns: A combined OR query string.
+
+   .. method:: build_rerank_params(vector, field, top_k=10, rerank_docs=100, rerank_weight=1.0)
+
+      Build re-ranking parameters for use with a lexical base query.
+
+      :param vector: Dense vector for re-ranking.
+      :param field: Name of the ``DenseVectorField``.
+      :param top_k: topK for the KNN re-rank query.
+      :param rerank_docs: Number of top lexical docs to re-rank.
+      :param rerank_weight: Weight of vector score in final ranking.
+      :returns: A dict with ``rq`` and ``rqq`` keys ready to pass as query
+          parameters.
+
+   .. method:: build_query(vector, field, top_k=10, ef_search_scale_factor=None)
+
+      Alias for :meth:`build_knn_query` (backward compatibility).
+
+   **Example:**
+
+   .. code-block:: python
 
        from solr import Solr, KNN
 
        conn = Solr('http://localhost:8983/solr/mycore')
        knn = KNN(conn)
-       response = knn([0.1, 0.2, 0.3, ...], field='embedding', top_k=10)
-       for doc in response.results:
-           print(doc['id'], doc.get('score'))
 
-       # Solr 10.0+: tune search accuracy
-       response = knn([0.1, 0.2], field='embedding', top_k=10,
-                      ef_search_scale_factor=2.0)
+       # Top-K nearest neighbors
+       response = knn.search([0.1, 0.2, 0.3], field='embedding', top_k=10)
+
+       # Similarity threshold
+       response = knn.similarity([0.1, 0.2, 0.3], field='embedding',
+                                 min_return=0.7)
+
+       # Hybrid (lexical + vector)
+       response = knn.hybrid('machine learning', [0.1, 0.2, 0.3],
+                             field='embedding')
+
+       # Re-rank lexical results by vector similarity
+       response = knn.rerank('machine learning', [0.1, 0.2, 0.3],
+                             field='embedding', rerank_docs=100)
 
 
 SolrCloud (Solr 4.0+)
@@ -1021,6 +1185,442 @@ Schema API (Solr 4.2+)
    .. method:: SchemaAPI.copy_fields()
    .. method:: SchemaAPI.add_copy_field(source, dest, max_chars=None)
    .. method:: SchemaAPI.delete_copy_field(source, dest)
+
+
+Streaming Expressions (Solr 5.0+)
+-----------------------------------
+
+.. module:: solr.stream
+   :synopsis: Streaming Expressions builder for Solr 5.0+.
+
+Build and execute Solr Streaming Expressions using Python builder functions.
+Each function returns a :class:`StreamExpression` node.  Nodes can be chained
+with the ``|`` (pipe) operator.
+
+**Core classes:**
+
+.. class:: StreamExpression(func_name, \*args, \*\*kwargs)
+
+   A Solr streaming expression node.  Renders to a Solr expression string
+   via ``str()``.  Supports the ``|`` (pipe) operator for chaining: the
+   left-hand expression becomes the first positional argument of the
+   right-hand expression.
+
+   :param func_name: The Solr streaming function name (e.g. ``"search"``).
+   :param args: Positional arguments (collection names, sub-expressions).
+   :param kwargs: Named parameters rendered as ``key=value`` pairs.
+       String values containing spaces are auto-quoted.
+
+   .. method:: __or__(other)
+
+      Pipe operator.  Inserts ``self`` as the first argument of *other*
+      and returns *other*.
+
+   .. method:: __str__()
+
+      Render as a Solr streaming expression string, e.g.
+      ``search(mycore,q="*:*",fl="id,title",sort="id asc")``.
+
+.. class:: AggregateExpression(func_name, field)
+
+   An aggregate function for use inside ``rollup()``, ``stats()``, etc.
+   Renders as ``func(field)``.
+
+   :param func_name: The aggregate function name (e.g. ``"sum"``).
+   :param field: The Solr field to aggregate over.
+
+**Source expressions:**
+
+.. function:: search(collection, \*\*kwargs)
+
+   Build a ``search()`` streaming expression.
+
+   :param collection: Solr collection name.
+   :param kwargs: Query parameters -- ``q``, ``fl``, ``sort``, ``rows``,
+       ``fq``, etc.
+
+.. function:: facet(collection, \*\*kwargs)
+
+   Build a ``facet()`` streaming expression.
+
+   :param collection: Solr collection name.
+   :param kwargs: Facet parameters -- ``q``, ``buckets``, ``bucketSorts``,
+       ``bucketSizeLimit``, etc.
+
+.. function:: topic(collection, \*\*kwargs)
+
+   Build a ``topic()`` streaming expression.
+
+   :param collection: Solr collection name.
+   :param kwargs: Topic parameters -- ``q``, ``fl``, ``id``,
+       ``checkpointEvery``, etc.
+
+**Transform expressions:**
+
+.. function:: unique(\*args, \*\*kwargs)
+
+   Build a ``unique()`` expression.  De-duplicates a sorted stream by field.
+
+   :param kwargs: ``over`` -- the field to de-duplicate on.
+
+.. function:: top(\*args, \*\*kwargs)
+
+   Build a ``top()`` expression.  Returns the top *n* tuples by sort order.
+
+   :param kwargs: ``n`` -- number of tuples to return; ``sort`` -- sort clause.
+
+.. function:: sort(\*args, \*\*kwargs)
+
+   Build a ``sort()`` expression.  Re-sorts a stream.
+
+   :param kwargs: ``by`` -- sort clause.
+
+.. function:: select(\*args, \*\*kwargs)
+
+   Build a ``select()`` expression.  Projects / renames fields.
+
+.. function:: rollup(\*args, \*\*kwargs)
+
+   Build a ``rollup()`` expression.  Groups a sorted stream and applies
+   aggregate functions.
+
+   :param kwargs: ``over`` -- field to group by; additional keyword arguments
+       are aggregate expressions (e.g. ``total=sum('bytes')``).
+
+.. function:: reduce(\*args, \*\*kwargs)
+
+   Build a ``reduce()`` expression.  Groups a stream by field values.
+
+   :param kwargs: ``by`` -- field to reduce on.
+
+**Join expressions:**
+
+.. function:: merge(\*args, \*\*kwargs)
+
+   Build a ``merge()`` expression.  Merges two or more sorted streams.
+
+   :param args: Two or more sub-expressions.
+   :param kwargs: ``on`` -- merge key and direction (e.g. ``"id asc"``).
+
+.. function:: innerJoin(\*args, \*\*kwargs)
+
+   Build an ``innerJoin()`` expression.
+
+   :param args: Two sub-expressions (left, right).
+   :param kwargs: ``on`` -- join key mapping (e.g. ``"left.id=right.id"``).
+
+.. function:: leftOuterJoin(\*args, \*\*kwargs)
+
+   Build a ``leftOuterJoin()`` expression.
+
+.. function:: hashJoin(\*args, \*\*kwargs)
+
+   Build a ``hashJoin()`` expression.
+
+   :param kwargs: ``on`` -- join key; ``hashed`` -- the hashed side.
+
+.. function:: intersect(\*args, \*\*kwargs)
+
+   Build an ``intersect()`` expression.  Returns tuples present in both
+   streams.
+
+.. function:: complement(\*args, \*\*kwargs)
+
+   Build a ``complement()`` expression.  Returns tuples in the first
+   stream that are not in the second.
+
+**Aggregate functions:**
+
+These return :class:`AggregateExpression` instances for use inside
+``rollup()``, ``stats()``, and similar expressions.
+
+.. function:: count(field)
+
+   Aggregate: ``count(field)``.
+
+.. function:: sum(field)
+
+   Aggregate: ``sum(field)``.
+
+.. function:: avg(field)
+
+   Aggregate: ``avg(field)``.
+
+.. function:: min(field)
+
+   Aggregate: ``min(field)``.
+
+.. function:: max(field)
+
+   Aggregate: ``max(field)``.
+
+**Control expressions:**
+
+.. function:: fetch(\*args, \*\*kwargs)
+
+   Build a ``fetch()`` expression.  Enriches tuples by fetching additional
+   fields from a collection.
+
+   :param kwargs: ``fl`` -- fields to fetch; ``on`` -- join key.
+
+.. function:: parallel(\*args, \*\*kwargs)
+
+   Build a ``parallel()`` expression.  Distributes a stream across workers.
+
+   :param kwargs: ``workers`` -- number of parallel workers; ``sort`` --
+       merge sort clause.
+
+.. function:: daemon(\*args, \*\*kwargs)
+
+   Build a ``daemon()`` expression.  Wraps a stream to run continuously.
+
+   :param kwargs: ``id`` -- daemon identifier; ``runInterval`` -- interval
+       in milliseconds; ``queueSize`` -- internal queue size.
+
+.. function:: update(\*args, \*\*kwargs)
+
+   Build an ``update()`` expression.  Sends tuples to a collection as
+   documents.
+
+   :param kwargs: ``batchSize`` -- number of documents per batch.
+
+.. function:: commit(\*args, \*\*kwargs)
+
+   Build a ``commit()`` expression.  Commits after an update stream.
+
+**Execution via Solr / AsyncSolr:**
+
+.. module:: solr
+   :noindex:
+
+.. method:: Solr.stream(expr, model=None)
+
+   Execute a streaming expression via the ``/stream`` handler (Solr 5.0+).
+   Returns a synchronous iterator of result dicts.  The final EOF marker
+   tuple is automatically skipped.
+
+   :param expr: A :class:`~solr.stream.StreamExpression` or a raw expression
+       string.
+   :param model: Optional Pydantic ``BaseModel`` subclass. When provided,
+       each result dict is converted via ``model.model_validate()``.
+   :returns: ``Iterator[dict[str, Any]]`` (or ``Iterator[Model]``).
+   :raises SolrVersionError: If connected Solr is older than 5.0.
+
+   Example::
+
+       from solr.stream import search, rollup, sum
+
+       expr = (search('logs', q='*:*', fl='host,bytes', sort='host asc')
+               | rollup(over='host', total=sum('bytes')))
+
+       for doc in conn.stream(expr):
+           print(doc)
+
+.. method:: AsyncSolr.stream(expr, model=None)
+   :async:
+
+   Async version of :meth:`Solr.stream`.  Returns an async generator.
+
+   :param expr: A :class:`~solr.stream.StreamExpression` or a raw string.
+   :param model: Optional Pydantic model for automatic conversion.
+   :returns: Async generator of result dicts (or model instances).
+
+   Example::
+
+       async for doc in await conn.stream(expr):
+           print(doc)
+
+
+PysolrCompat class
+-------------------
+
+.. class:: PysolrCompat(url, **kwargs)
+
+   A pysolr-compatible wrapper around :class:`Solr`. Subclasses ``Solr``
+   so all native solrpy features remain available, while adding method
+   aliases that match the ``pysolr`` library's public API. This allows
+   drop-in migration from pysolr with minimal code changes.
+
+   Constructor parameters are identical to :class:`Solr`.
+
+   .. method:: search(q, **kwargs)
+
+      Search for documents. Alias for :meth:`Solr.select`.
+
+      :param q: The query string.
+      :param kwargs: Additional Solr parameters (e.g. ``rows``, ``fq``).
+      :returns: A :class:`Response` instance.
+
+   .. method:: add(docs, commit=True, **kwargs)
+
+      Add one or more documents. Unlike native :meth:`Solr.add` (which
+      takes a single dict), this method accepts either a ``list`` of dicts
+      or a single dict, matching pysolr behavior.
+
+      :param docs: A list of document dicts, or a single document dict.
+      :param commit: Whether to auto-commit after adding. Defaults to
+          ``True`` to match pysolr convention.
+
+   .. method:: delete(id=None, q=None, commit=True, **kwargs)
+
+      Delete documents by id and/or query. Supports both ``id=`` and
+      ``q=`` keyword arguments in a single call, matching pysolr's API.
+
+      :param id: Document id to delete.
+      :param q: Query string; all matching documents will be deleted.
+      :param commit: Whether to auto-commit after deleting. Defaults to
+          ``True`` to match pysolr convention.
+
+   .. method:: extract(file_obj, **kwargs)
+
+      Extract/index a rich document via Solr Cell. Creates an
+      :class:`Extract` companion internally and delegates.
+
+      :param file_obj: A file-like object containing the document bytes.
+      :param kwargs: Additional parameters forwarded to :class:`Extract`.
+      :returns: The extraction result.
+
+   Example::
+
+       from solr import PysolrCompat
+
+       conn = PysolrCompat('http://localhost:8983/solr/mycore')
+       results = conn.search('title:lucene', rows=10)
+       conn.add([{'id': '1', 'title': 'Hello'}])
+       conn.delete(id='1')
+       conn.delete(q='title:Hello')
+       conn.commit()
+
+
+AsyncSolr class
+----------------
+
+.. class:: AsyncSolr(url, timeout=None, http_user=None, http_pass=None, post_headers=None, max_retries=3, retry_delay=0.1, always_commit=False, response_format='json', auth_token=None, auth=None, debug=False)
+
+   Async Solr client built on ``httpx.AsyncClient``. Provides the same
+   API as :class:`Solr` but with ``async``/``await`` methods.
+
+   Constructor parameters are the same as :class:`Solr` (except
+   ``persistent``, ``ssl_key``, and ``ssl_cert`` are not applicable).
+
+   **Context manager usage:**
+
+   ``AsyncSolr`` should be used as an async context manager to ensure the
+   underlying HTTP client is properly closed::
+
+       from solr import AsyncSolr
+
+       async with AsyncSolr('http://localhost:8983/solr/mycore') as conn:
+           response = await conn.select('*:*')
+           for doc in response.results:
+               print(doc['id'])
+
+   **Attributes:**
+
+   .. attribute:: AsyncSolr.server_version
+
+      Tuple representing the detected Solr version, e.g. ``(9, 4, 1)``.
+
+   **Search methods:**
+
+   .. method:: AsyncSolr.select(q=None, **params)
+      :async:
+
+      Async search query. Same parameters as :class:`SearchHandler`.
+
+      :param q: Query string.
+      :param params: Additional Solr parameters (underscores become dots).
+      :param model: Optional Pydantic model class for automatic conversion.
+      :returns: A :class:`Response` instance.
+
+   **Update methods:**
+
+   .. method:: AsyncSolr.add(doc, **kwargs)
+      :async:
+
+      Add a single document.
+
+      :param doc: Dictionary mapping field names to values.
+      :param commit: Force an immediate commit (bool).
+      :param timeout: Override the request timeout (float).
+
+   .. method:: AsyncSolr.add_many(docs, **kwargs)
+      :async:
+
+      Add multiple documents.
+
+      :param docs: Iterable of document dicts.
+      :param commit: Force an immediate commit (bool).
+      :param timeout: Override the request timeout (float).
+
+   **Delete methods:**
+
+   .. method:: AsyncSolr.delete(id=None, **kwargs)
+      :async:
+
+      Delete a document by id.
+
+      :param id: Unique identifier of the document to delete.
+      :param commit: Force an immediate commit (bool).
+      :param timeout: Override the request timeout (float).
+
+   .. method:: AsyncSolr.delete_query(q, **kwargs)
+      :async:
+
+      Delete documents by query.
+
+      :param q: Solr query string identifying documents to delete.
+      :param commit: Force an immediate commit (bool).
+      :param timeout: Override the request timeout (float).
+
+   **Commit:**
+
+   .. method:: AsyncSolr.commit(**kwargs)
+      :async:
+
+      Commit pending changes.
+
+      :param soft_commit: If ``True``, perform a soft commit (bool).
+
+   **Real-time Get (Solr 4.0+):**
+
+   .. method:: AsyncSolr.get(id=None, ids=None, fields=None, model=None)
+      :async:
+
+      Retrieve documents from the transaction log.
+
+      :param id: Single document ID.
+      :param ids: List of document IDs.
+      :param fields: List of field names to return.
+      :param model: Optional Pydantic model class.
+      :returns: A dict for single ``id`` (or ``None``), a list for ``ids``.
+
+   **Streaming Expressions (Solr 5.0+):**
+
+   .. method:: AsyncSolr.stream(expr, model=None)
+      :async:
+
+      Execute a streaming expression. Returns an async generator of
+      result dicts (or model instances). Skips the final EOF marker.
+
+      :param expr: A :class:`~solr.stream.StreamExpression` or string.
+      :param model: Optional Pydantic model for automatic conversion.
+
+      Usage::
+
+          async for doc in await conn.stream(expr):
+              print(doc)
+
+   **Connection management:**
+
+   .. method:: AsyncSolr.close()
+      :async:
+
+      Close the underlying ``httpx.AsyncClient``.
+
+   .. method:: AsyncSolr.ping()
+
+      Ping the Solr server (synchronous). Returns ``True`` if reachable.
 
 
 Paginator
