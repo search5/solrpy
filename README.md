@@ -102,6 +102,14 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.10.0
+
+- **SolrCloud**: `SolrCloud(zk, collection)` with ZooKeeper or `SolrCloud.from_urls(urls, collection)` HTTP-only
+- Leader-aware writes, automatic failover, collection aliases
+- `SolrZooKeeper` class for ZooKeeper node discovery
+- `kazoo` optional dependency (`pip install solrpy[cloud]`)
+- Docker Compose for local SolrCloud testing
+
 ### 1.9.2
 
 - **Solr 6~10 full compatibility**: `wt=xml` on Solr 7+ (`wt=standard` changed in 7.0)

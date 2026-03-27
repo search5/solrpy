@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  zoo:
+    image: zookeeper:3.9
+    ports:
+      - "2181:2181"
+    environment:
+      ZOO_MY_ID: 1
+
+  solr1:
+    image: solr:9.7
+    ports:
+      - "8985:8983"
+    depends_on:
+      - zoo
+    command: solr start -f -cloud -z zoo:2181
+
+  solr2:
+    image: solr:9.7
+    ports:
+      - "8986:8983"
+    depends_on:
+      - zoo
+    command: solr start -f -cloud -z zoo:2181
+
+  solr3:
+    image: solr:9.7
+    ports:
+      - "8987:8983"
+    depends_on:
+      - zoo
+    command: solr start -f -cloud -z zoo:2181

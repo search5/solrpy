@@ -280,6 +280,29 @@ MarkupSafe = ">=2.0"
 i18n = ["Babel (>=2.7)"]
 
 [[package]]
+name = "kazoo"
+version = "2.11.0"
+description = "\"Higher Level Zookeeper Client\""
+optional = true
+python-versions = "*"
+groups = ["main"]
+markers = "extra == \"cloud\""
+files = [
+    {file = "kazoo-2.11.0-py2.py3-none-any.whl", hash = "sha256:aa6be17159540dae4087661b8d4e24c7b58d4dc26170a2d5b8468b06712d84a9"},
+    {file = "kazoo-2.11.0.tar.gz", hash = "sha256:57e7e6f69295c8f922511488eeb79680729e14bb8eb382d5cad83aa11345c36c"},
+]
+
+[package.extras]
+alldeps = ["Sphinx (>=1.2.2)", "eventlet (>=0.17.1)", "flake8", "gevent (>=1.2)", "mypy (>=0.991)", "pure_sasl (>=0.5.1)", "sphinx-autodoc-typehints (>=1)"]
+dev = ["flake8"]
+docs = ["Sphinx (>=1.2.2)", "sphinx-autodoc-typehints (>=1)"]
+eventlet = ["eventlet (>=0.17.1)"]
+gevent = ["gevent (>=1.2)"]
+sasl = ["pure_sasl (>=0.5.1)"]
+test = ["eventlet (>=0.17.1) ; implementation_name != \"pypy\"", "gevent (>=1.2) ; implementation_name != \"pypy\"", "objgraph", "pyjks", "pyopenssl", "pytest", "pytest-cov", "pytest-timeout"]
+typing = ["mypy (>=0.991)"]
+
+[[package]]
 name = "librt"
 version = "0.8.1"
 description = "Mypyc runtime library"
@@ -932,7 +955,10 @@ h2 = ["h2 (>=4,<5)"]
 socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 
+[extras]
+cloud = ["kazoo"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "1a0109b83d11e0bb9c35c170e7eca55cd7df21226b3136ef79772b7d5153aeb4"
+content-hash = "404f1f5270acf4c9a2ee2284a076254737531382ac8485b1386612db9183a911"

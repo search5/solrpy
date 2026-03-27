@@ -13,3 +13,8 @@ from .extract import Extract
 from .response import SpellcheckResult
 from .response import GroupedResult, GroupField, Group
 from .knn import KNN
+from .cloud import SolrCloud
+try:
+    from .zookeeper import SolrZooKeeper
+except ImportError:
+    pass  # kazoo not installed

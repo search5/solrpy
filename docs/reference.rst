@@ -625,6 +625,39 @@ KNN / Dense Vector Search (Solr 9.0+)
                       ef_search_scale_factor=2.0)
 
 
+SolrCloud (Solr 4.0+)
+---------------------
+
+.. class:: SolrCloud(zk, collection, retry_count=3, retry_delay=0.5, **solr_kwargs)
+
+   SolrCloud client with leader-aware routing and automatic failover.
+
+   :param zk: A :class:`SolrZooKeeper` instance.
+   :param collection: Solr collection name.
+   :param retry_count: Number of failover retries.
+   :param retry_delay: Base delay between retries (exponential backoff).
+
+   .. classmethod:: from_urls(urls, collection, **kwargs)
+
+      Create without ZooKeeper, using HTTP-only CLUSTERSTATUS discovery.
+
+   Mirrors all :class:`Solr` methods: ``select()``, ``add()``, ``delete()``,
+   ``commit()``, etc. Writes are routed to shard leaders.
+
+.. class:: SolrZooKeeper(hosts, timeout=10.0)
+
+   ZooKeeper client for SolrCloud node discovery. Requires ``kazoo``.
+
+   .. method:: live_nodes()
+   .. method:: collection_state(collection)
+   .. method:: leader_urls(collection)
+   .. method:: replica_urls(collection)
+   .. method:: random_url(collection)
+   .. method:: random_leader_url(collection)
+   .. method:: aliases()
+   .. method:: close()
+
+
 Schema API (Solr 4.2+)
 -----------------------
 

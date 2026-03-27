@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "solrpy"
-version = "1.9.2"
+version = "1.10.0"
 description = "Client for the Solr search service"
 license = "Apache-2.0"
 readme = "README.md"
@@ -26,6 +26,10 @@ exclude = ["tests/", "docs/"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+kazoo = {version = "^2.9", optional = true}
+
+[tool.poetry.extras]
+cloud = ["kazoo"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"

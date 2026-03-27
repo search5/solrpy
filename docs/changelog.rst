@@ -1,6 +1,38 @@
 Changelog
 =========
 
+1.10.0 (2026-03-27)
+--------------------
+
+**New features (Solr 4.0+):**
+
+- **SolrCloud support** with two modes:
+
+  - **ZooKeeper mode**: ``SolrZooKeeper`` class in ``solr/zookeeper.py``
+    connects to ZooKeeper for real-time node discovery, leader identification,
+    and collection alias resolution. Requires ``kazoo`` (``pip install solrpy[cloud]``).
+  - **HTTP mode**: ``SolrCloud.from_urls()`` uses the CLUSTERSTATUS API for
+    node discovery without ZooKeeper. No extra dependencies.
+
+- **``SolrCloud`` class** in ``solr/cloud.py``:
+
+  - Leader-aware writes: update requests routed to shard leaders.
+  - Automatic failover: on error, retries with a different node (exponential backoff).
+  - Same API as ``Solr``: ``select()``, ``add()``, ``delete()``, ``commit()``, etc.
+
+- **``SolrZooKeeper`` class** in ``solr/zookeeper.py``:
+
+  - ``live_nodes()`` — active node list
+  - ``collection_state(name)`` — shard/replica state
+  - ``leader_urls(collection)`` / ``replica_urls(collection)``
+  - ``random_url(collection)`` / ``random_leader_url(collection)``
+  - ``aliases()`` — collection alias resolution
+
+- Docker Compose configuration for local SolrCloud testing
+  (``docker/docker-compose-cloud.yml``).
+- ``kazoo`` added as optional dependency (``extras = ["cloud"]``).
+
+
 1.9.2 (2026-03-27)
 -------------------
 

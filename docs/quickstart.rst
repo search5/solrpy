@@ -489,6 +489,38 @@ Authentication
 Priority: ``auth`` callable > ``auth_token`` > ``http_user/http_pass``.
 
 
+SolrCloud
+---------
+
+**With ZooKeeper** (real-time node discovery, requires ``kazoo``)::
+
+    from solr import SolrZooKeeper, SolrCloud
+
+    zk = SolrZooKeeper('zk1:2181,zk2:2181')
+    cloud = SolrCloud(zk, collection='mycore')
+
+    response = cloud.select('*:*')
+    cloud.add({'id': '1', 'title': 'test'}, commit=True)
+
+    cloud.close()
+    zk.close()
+
+**Without ZooKeeper** (HTTP-only, no extra dependencies)::
+
+    from solr import SolrCloud
+
+    cloud = SolrCloud.from_urls(
+        ['http://solr1:8983/solr', 'http://solr2:8983/solr'],
+        collection='mycore')
+
+    response = cloud.select('*:*')
+    cloud.close()
+
+Install ZooKeeper support::
+
+    pip install solrpy[cloud]
+
+
 Closing the connection
 ----------------------
 
