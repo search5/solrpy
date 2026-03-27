@@ -1,6 +1,20 @@
 Changelog
 =========
 
+1.11.0 (2026-03-27)
+--------------------
+
+**New features:**
+
+- **Pydantic response models** (opt-in, ``pip install solrpy[pydantic]``):
+  - ``model=`` parameter on ``select()`` and ``get()`` — automatically
+    converts result documents to Pydantic ``BaseModel`` instances.
+  - ``Response.as_models(model)`` method for post-hoc conversion.
+  - Pydantic v2 support (``model_validate()``).
+  - Works in both JSON and XML response modes.
+  - ``pydantic`` added as optional dependency.
+
+
 1.10.1 (2026-03-27)
 --------------------
 

@@ -339,6 +339,22 @@ Response class
 
       Maximum relevance score across all matches.
 
+   **Pydantic models (opt-in):**
+
+   .. method:: Response.as_models(model)
+
+      Convert result documents to Pydantic ``BaseModel`` instances.
+      Requires ``pydantic`` (``pip install solrpy[pydantic]``).
+
+      :param model: A Pydantic ``BaseModel`` subclass.
+      :returns: List of model instances.
+
+   The ``model=`` parameter on ``select()`` and ``get()`` does this
+   automatically::
+
+       resp = conn.select('*:*', model=MyDoc)  # results are list[MyDoc]
+       doc = conn.get(id='1', model=MyDoc)      # MyDoc | None
+
    **Cursor pagination (Solr 4.7+):**
 
    .. method:: Response.cursor_next()

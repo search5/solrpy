@@ -550,6 +550,32 @@ Install ZooKeeper support::
     pip install solrpy[cloud]
 
 
+Pydantic response models
+-------------------------
+
+Convert search results to typed Pydantic models (``pip install solrpy[pydantic]``)::
+
+    from pydantic import BaseModel
+
+    class Product(BaseModel):
+        id: str
+        title: str
+        price: float
+        category: str | None = None
+
+    # Automatic conversion via model= parameter
+    resp = conn.select('category:books', model=Product)
+    for p in resp.results:
+        print(p.title, p.price)  # IDE autocomplete, type safe
+
+    # Real-time Get
+    doc = conn.get(id='prod1', model=Product)  # Product | None
+
+    # Post-hoc conversion
+    resp = conn.select('*:*')
+    products = resp.as_models(Product)
+
+
 Closing the connection
 ----------------------
 

@@ -265,6 +265,23 @@ class Response:
     spellcheck = property(_get_spellcheck, _set_spellcheck,
                           doc="SpellcheckResult for this response, or None.")
 
+    def as_models(self, model: type[Any]) -> list[Any]:
+        """Convert result documents to Pydantic model instances.
+
+        Requires ``pydantic`` to be installed (``pip install solrpy[pydantic]``).
+
+        :param model: A Pydantic ``BaseModel`` subclass.
+        :returns: List of model instances.
+        :raises ImportError: If pydantic is not installed.
+        """
+        try:
+            from pydantic import BaseModel as _BM
+        except ImportError:
+            raise ImportError(
+                "pydantic is required for model support. "
+                "Install with: pip install solrpy[pydantic]")
+        return [model.model_validate(doc) for doc in self.results]
+
     def __len__(self) -> int:
         """Return the number of matching documents contained in this set."""
         return len(self.results)

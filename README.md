@@ -102,6 +102,13 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.11.0
+
+- **Pydantic response models**: `conn.select('*:*', model=MyDoc)` converts results to Pydantic models
+- `Response.as_models(MyDoc)` for post-hoc conversion
+- `conn.get(id='1', model=MyDoc)` returns `MyDoc | None`
+- `pip install solrpy[pydantic]`
+
 ### 1.10.1
 
 - **Field builder**: `Field('price', alias='p')`, `Field.func('sum', 'price', 'tax')`, `Field.transformer('explain')`

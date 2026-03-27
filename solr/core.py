@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.10.1"
+__version__ = "1.11.0"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -310,7 +310,8 @@ class Solr:
 
     @requires_version(4, 0)
     def get(self, id: str | None = None, ids: list[str] | None = None,
-            fields: list[str] | None = None) -> dict[str, Any] | list[dict[str, Any]] | None:
+            fields: list[str] | None = None,
+            model: type[Any] | None = None) -> Any:
         """Real-time Get via the /get handler (Solr 4.0+).
 
         Returns a single doc dict for ``id``, a list for ``ids``,
@@ -334,8 +335,12 @@ class Solr:
 
         if id is not None:
             result: dict[str, Any] | None = data.get('doc')
+            if result is not None and model is not None:
+                return model.model_validate(result)
             return result
         docs: list[dict[str, Any]] = data.get('response', {}).get('docs', [])
+        if model is not None:
+            return [model.model_validate(d) for d in docs]
         return docs
 
     def iter_cursor(self, q: str, sort: str | None = None,
@@ -526,6 +531,7 @@ class SearchHandler:
                  sort_order: str = "asc",
                  json_facet: dict[str, Any] | None = None,
                  facets: list[Any] | None = None,
+                 model: type[Any] | None = None,
                  **params: Any) -> Response | None:
         """Execute a search query against Solr.
 
@@ -611,7 +617,7 @@ class SearchHandler:
             params['wt'] = 'json'
             raw = self.raw(timeout=timeout, **params)
             data = json.loads(raw)
-            return parse_json_response(data, params, self)
+            resp = parse_json_response(data, params, self)
         else:
             if self.conn.server_version >= (7, 0):
                 params['wt'] = 'xml'
@@ -619,7 +625,11 @@ class SearchHandler:
                 params['version'] = self.conn.response_version
                 params['wt'] = 'standard'
             xml = self.raw(timeout=timeout, **params)
-            return parse_query_response(StringIO(xml), params, self)  # type: ignore[no-any-return]
+            resp = parse_query_response(StringIO(xml), params, self)
+
+        if model is not None and resp is not None:
+            resp.results = resp.as_models(model)
+        return resp
 
     def raw(self, **params: Any) -> str:
         """Issue a raw query. No pre/post-processing on parameters or response."""
