@@ -14,6 +14,10 @@ from .response import SpellcheckResult
 from .response import GroupedResult, GroupField, Group
 from .knn import KNN
 from .async_solr import AsyncSolr
+from .async_companions import (
+    AsyncSchemaAPI, AsyncKNN, AsyncMoreLikeThis,
+    AsyncSuggest, AsyncExtract,
+)
 from .field import Field
 from .sort import Sort
 from .facet import Facet

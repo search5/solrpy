@@ -1,6 +1,20 @@
 Changelog
 =========
 
+2.0.3 (2026-03-27)
+-------------------
+
+**New features:**
+
+- **Async companion classes** in ``solr/async_companions.py``:
+  - ``AsyncSchemaAPI(conn)`` — async schema operations
+  - ``AsyncKNN(conn)`` — async KNN/vector search
+  - ``AsyncMoreLikeThis(conn)`` — async MLT queries
+  - ``AsyncSuggest(conn)`` — async suggestions
+  - ``AsyncExtract(conn)`` — async document extraction
+- All exported from top-level ``solr`` package.
+
+
 2.0.2 (2026-03-27)
 -------------------
 

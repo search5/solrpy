@@ -102,6 +102,11 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 2.0.3
+
+- **Async companion classes**: `AsyncSchemaAPI`, `AsyncKNN`, `AsyncMoreLikeThis`, `AsyncSuggest`, `AsyncExtract`
+- Full async support for all companion features
+
 ### 2.0.2
 
 - **AsyncSolr**: `async with AsyncSolr(url) as conn: await conn.select('*:*')`
