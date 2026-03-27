@@ -1,13 +1,12 @@
 """Auto-split from test_all.py"""
 
 import socket
-import http.client
 import unittest
+import httpx
 import solr
 import solr.core
-import http.client as httplib
 from tests.conftest import (
-    SolrConnectionTestCase, ThrowBadStatusLineExceptions,
+    SolrConnectionTestCase, ThrowConnectionExceptions,
     SOLR_HTTP, SOLR_PATH, get_rand_userdoc,
 )
 
@@ -15,29 +14,15 @@ from tests.conftest import (
 class TestHTTPConnection(SolrConnectionTestCase):
 
     def test_connect(self):
-        """ Check if we're really get connected to Solr through HTTP.
-        """
+        """Check if we're really connected to Solr through HTTP."""
         conn = self.new_connection()
-
-        try:
-            conn.conn.request("GET", "/solr/")
-        except socket.error:
-            self.fail("Connection to %s failed" % (SOLR_HTTP))
-
-        status = conn.conn.getresponse().status
-        self.assertEqual(status, 200,
-                          "Expected FOUND (200), got: %d" % status)
+        self.assertTrue(conn.ping())
 
     def test_close_connection(self):
-        """ Make sure connections to Solr are being closed properly.
-        """
+        """Make sure connections to Solr are being closed properly."""
         conn = self.new_connection()
-        conn.conn.request("GET", SOLR_PATH)
         conn.close()
-
-        # Closing the Solr connection should close the underlying
-        # HTTPConnection's socket.
-        self.assertEqual(conn.conn.sock, None, "Connection not closed")
+        self.assertTrue(conn.conn.is_closed)
 
     def test_invalid_max_retries(self):
         """ Passing something that can't be cast as an integer for max_retries
@@ -56,26 +41,35 @@ class TestRetries(SolrConnectionTestCase):
         super(TestRetries, self).setUp()
         self.conn = self.new_connection()
 
-    def test_badstatusline(self):
-        """ Replace the low level connection request with a dummy function that
-        raises an exception. Verify that the request method is called 4 times
-        and still raises the exception """
-        t = ThrowBadStatusLineExceptions(self.conn)
+    def test_connection_error_retries(self):
+        """Verify that connection errors trigger retries."""
+        call_count = [0]
 
-        self.assertRaises(httplib.BadStatusLine, self.query,
-                          self.conn, "user_id:12345")
+        def always_fail(*args, **kwargs):
+            call_count[0] += 1
+            raise httpx.ConnectError("fake error")
 
-        self.assertEqual(t.calls, 4)
+        self.conn.conn.post = always_fail
+        self.conn._reconnect = lambda: None  # prevent client recreation
+        with self.assertRaises(httpx.ConnectError):
+            self.query(self.conn, "user_id:12345")
+        self.assertEqual(call_count[0], 4)
 
     def test_success_after_failure(self):
-        """ Wrap the calls the the lower level request and throw only 1
-        exception and then proceed normally. It should result in two calls to
-        self.conn.conn.request. """
-        t = ThrowBadStatusLineExceptions(self.conn, max=1)
+        """After one failure, the next attempt should succeed."""
+        call_count = [0]
+        original_post = self.conn.conn.post
 
+        def fail_once(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                raise httpx.ConnectError("fake error")
+            return original_post(*args, **kwargs)
+
+        self.conn.conn.post = fail_once
+        self.conn._reconnect = lambda: None
         self.query(self.conn, "user_id:12345")
-
-        self.assertEqual(t.calls, 2)
+        self.assertEqual(call_count[0], 2)
 
 
 # Additional commit-control tests using RequestTracking.
@@ -95,8 +89,9 @@ class TestPing(unittest.TestCase):
         conn.host = 'localhost:8983'
         conn.scheme = 'http'
         conn.auth_headers = {}
+        conn._auth_callable = None
         conn.persistent = True
-        conn.conn = http.client.HTTPConnection(conn.host)
+        conn.conn = httpx.Client(base_url='http://localhost:8983')
         self.assertFalse(conn.ping())
         conn.close()
 
@@ -173,15 +168,15 @@ class TestRetryBackoff(unittest.TestCase):
     def test_retry_logs_warning(self):
         conn = solr.Solr(SOLR_HTTP, response_format='xml', max_retries=1, retry_delay=0.01)
         call_count = [0]
-        original_request = conn.conn.request
+        original_post = conn.conn.post
 
-        def failing_request(*args, **kwargs):
+        def failing_post(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] <= 1:
-                raise socket.error("fake connection error")
-            return original_request(*args, **kwargs)
+                raise httpx.ConnectError("fake connection error")
+            return original_post(*args, **kwargs)
 
-        conn.conn.request = failing_request  # type: ignore
+        conn.conn.post = failing_post  # type: ignore
 
         with self.assertLogs('solr', level='WARNING') as cm:
             conn._post('/solr/core0/update', '<commit/>', conn.xmlheaders)
@@ -193,15 +188,16 @@ class TestRetryBackoff(unittest.TestCase):
         import time
         conn = solr.Solr(SOLR_HTTP, response_format='xml', max_retries=2, retry_delay=0.05)
         call_count = [0]
-        original_request = conn.conn.request
+        original_post = conn.conn.post
 
-        def failing_request(*args, **kwargs):
+        def failing_post(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] <= 2:
-                raise socket.error("fake connection error")
-            return original_request(*args, **kwargs)
+                raise httpx.ConnectError("fake connection error")
+            return original_post(*args, **kwargs)
 
-        conn.conn.request = failing_request  # type: ignore
+        conn.conn.post = failing_post  # type: ignore
+        conn._reconnect = lambda: None  # prevent client recreation
 
         start = time.monotonic()
         conn._post('/solr/core0/update', '<commit/>', conn.xmlheaders)

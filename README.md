@@ -102,6 +102,13 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 2.0.1
+
+- **Breaking**: `http.client` replaced with `httpx.Client`
+- Automatic **connection pooling** and keep-alive
+- `httpx` is now a required dependency
+- All public API unchanged — drop-in replacement for 1.x
+
 ### 1.12.0
 
 - **Streaming Expressions**: Python builder with pipe (`|`) operator — no other non-Java client has this

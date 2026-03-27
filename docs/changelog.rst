@@ -1,6 +1,20 @@
 Changelog
 =========
 
+2.0.1 (2026-03-27)
+-------------------
+
+**Breaking: httpx migration**
+
+- Replaced ``http.client`` with ``httpx.Client`` as the HTTP transport.
+- ``httpx`` is now a **required dependency**.
+- Automatic **connection pooling** and keep-alive via httpx.
+- Gzip decompression handled automatically by httpx.
+- Retry exceptions changed: ``socket.error``/``BadStatusLine`` → ``httpx.ConnectError``/``httpx.ReadError``.
+- ``Solr.conn`` is now an ``httpx.Client`` instance (was ``http.client.HTTPConnection``).
+- All public API unchanged — **drop-in replacement** for 1.x users.
+
+
 1.12.0 (2026-03-27)
 --------------------
 

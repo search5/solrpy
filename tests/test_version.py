@@ -102,15 +102,17 @@ class TestVersionDetection(unittest.TestCase):
                 if fail_json:
                     raise Exception("json fail")
                 class R:
-                    def read(self):
-                        return json_response.encode('utf-8')
+                    @property
+                    def text(self):
+                        return json_response
                 return R()
             else:
                 if fail_xml:
                     raise Exception("xml fail")
                 class R:
-                    def read(self):
-                        return xml_response.encode('utf-8')
+                    @property
+                    def text(self):
+                        return xml_response
                 return R()
 
         conn._get = mock_get

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import re
 import json
-import socket
 import datetime
 import logging
 import warnings
 import base64
-import http.client as httplib
 import urllib.parse as urlparse
 import urllib.parse as urllib
+import httpx
 from io import StringIO
 from typing import Any, Iterable, Iterator
 from xml.sax.saxutils import escape, quoteattr
@@ -17,12 +16,12 @@ from xml.sax.saxutils import escape, quoteattr
 from .exceptions import SolrException, SolrVersionError
 from .utils import (
     UTC, utc_to_string, utc_from_string, qs_from_items, strify,
-    check_response_status, read_response, committing, requires_version,
+    committing, requires_version,
 )
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.12.0"
+__version__ = "2.0.1"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -106,14 +105,15 @@ class Solr:
 
         assert self.max_retries >= 0
 
-        self.conn: httplib.HTTPConnection | httplib.HTTPSConnection
-        if self.scheme == 'https':
-            self.conn = httplib.HTTPSConnection(
-                self.host, key_file=ssl_key, cert_file=ssl_cert,
-                timeout=self.timeout)
-        else:
-            self.conn = httplib.HTTPConnection(
-                self.host, timeout=self.timeout)
+        base_url = '%s://%s' % (self.scheme, self.host)
+        client_kwargs: dict[str, Any] = {
+            'base_url': base_url,
+            'timeout': self.timeout,
+            'follow_redirects': True,
+        }
+        if self.scheme == 'https' and (ssl_cert or ssl_key):
+            client_kwargs['cert'] = (ssl_cert, ssl_key) if ssl_key else ssl_cert
+        self.conn: httpx.Client = httpx.Client(**client_kwargs)
 
         self.response_version = 2.2
 
@@ -172,7 +172,7 @@ class Solr:
         for base in base_paths:
             try:
                 rsp = self._get(base + '/admin/ping?wt=json')
-                data = rsp.read().decode('utf-8')
+                data = rsp.text
                 return '"OK"' in data or '"status":"OK"' in data
             except Exception:
                 pass
@@ -185,11 +185,14 @@ class Solr:
             return result
         return self.auth_headers.copy()
 
-    def _get(self, path: str) -> httplib.HTTPResponse:
-        """Issue a GET request and return the response object."""
+    def _get(self, path: str) -> httpx.Response:
+        """Issue a GET request and return the httpx response."""
         _headers = self._get_auth_headers()
-        self.conn.request('GET', path, None, _headers)
-        return check_response_status(self.conn.getresponse())
+        rsp = self.conn.get(path, headers=_headers)
+        if rsp.status_code != 200:
+            from .exceptions import SolrException
+            raise SolrException(rsp.status_code, rsp.reason_phrase, rsp.text)
+        return rsp
 
     def _detect_version(self) -> tuple[int, ...]:
         """Detect the Solr server version. Returns a tuple, e.g. (9, 4, 1)."""
@@ -201,7 +204,7 @@ class Solr:
         for base in base_paths:
             try:
                 rsp = self._get(base + '/admin/info/system?wt=json')
-                data = json.loads(rsp.read().decode('utf-8'))
+                data = json.loads(rsp.text)
                 ver_str = data['lucene']['solr-spec-version']
                 return tuple(int(x) for x in ver_str.split('.')[:3])
             except Exception:
@@ -210,7 +213,7 @@ class Solr:
         for base in base_paths:
             try:
                 rsp = self._get(base + '/admin/info/system?wt=xml')
-                raw = rsp.read().decode('utf-8')
+                raw = rsp.text
                 m = re.search(r'solr-spec-version[^>]*>([0-9.]+)', raw)
                 if m:
                     return tuple(int(x) for x in m.group(1).split('.')[:3])
@@ -331,7 +334,7 @@ class Solr:
         qs = urllib.parse.urlencode(params)
         selector = '%s/get?%s' % (self.path, qs)
         rsp = self._get(selector)
-        data = json.loads(rsp.read().decode('utf-8'))
+        data = json.loads(rsp.text)
 
         if id is not None:
             result: dict[str, Any] | None = data.get('doc')
@@ -360,7 +363,7 @@ class Solr:
         qs = urllib.parse.urlencode({'expr': str(expr)})
         selector = '%s/stream?%s' % (self.path, qs)
         rsp = self._get(selector)
-        data = json.loads(rsp.read().decode('utf-8'))
+        data = json.loads(rsp.text)
 
         docs = data.get('result-set', {}).get('docs', [])
         for doc in docs:
@@ -433,7 +436,7 @@ class Solr:
         selector = '%s/update%s' % (self.path, qs_from_items(query))  # type: ignore[arg-type]
         try:
             rsp = self._post(selector, request, self.xmlheaders, timeout=timeout)
-            data = read_response(rsp)
+            data = rsp.text
         finally:
             if not self.persistent:
                 self.close()
@@ -447,7 +450,7 @@ class Solr:
             if status != "0":
                 first_child = doc_elem.firstChild  # type: ignore[union-attr]
                 reason = first_child.nodeValue if first_child else None
-                raise SolrException(rsp.status, reason)
+                raise SolrException(rsp.status_code, reason)
         return data
 
     def __add(self, lst: list[str], fields: dict[str, Any]) -> None:
@@ -501,12 +504,14 @@ class Solr:
                self.xmlheaders, self.reconnects))
 
     def _reconnect(self) -> None:
-        """Close and re-establish the HTTP connection."""
+        """Close and re-create the httpx client."""
         self.reconnects += 1
-        self.close()
-        self.conn.connect()
+        self.conn.close()
+        base_url = '%s://%s' % (self.scheme, self.host)
+        self.conn = httpx.Client(base_url=base_url, timeout=self.timeout,
+                                 follow_redirects=True)
 
-    def _post(self, url: str, body: str | bytes, headers: dict[str, str], timeout: float | None = None) -> httplib.HTTPResponse:  # type: ignore[return]
+    def _post(self, url: str, body: str | bytes, headers: dict[str, str], timeout: float | None = None) -> httpx.Response:
         """POST data to Solr with retry and exponential backoff."""
         import time
         _logger = logging.getLogger('solr')
@@ -517,16 +522,15 @@ class Solr:
         retry_num = 0
         while attempts > 0:
             try:
-                if timeout is not None and self.conn.sock is not None:
-                    self.conn.sock.settimeout(timeout)
-                self.conn.request('POST', url, raw_body, _headers)
-                resp = check_response_status(self.conn.getresponse())
-                if timeout is not None and self.conn.sock is not None:
-                    self.conn.sock.settimeout(self.timeout)
-                return resp
-            except (socket.error,
-                    httplib.ImproperConnectionState,
-                    httplib.BadStatusLine):
+                kwargs: dict[str, Any] = {'headers': _headers, 'content': raw_body}
+                if timeout is not None:
+                    kwargs['timeout'] = timeout
+                rsp = self.conn.post(url, **kwargs)
+                if rsp.status_code != 200:
+                    from .exceptions import SolrException
+                    raise SolrException(rsp.status_code, rsp.reason_phrase, rsp.text)
+                return rsp
+            except (httpx.ConnectError, httpx.ReadError, httpx.WriteError):
                 self._reconnect()
                 attempts -= 1
                 if attempts <= 0:
@@ -538,6 +542,7 @@ class Solr:
                     retry_num, self.max_retries, url, delay,
                 )
                 time.sleep(delay)
+        raise RuntimeError("Unreachable")
 
 
 class SearchHandler:
@@ -676,7 +681,7 @@ class SearchHandler:
 
         try:
             rsp = conn._post(self.selector, request, conn.form_headers, timeout=timeout)
-            data = read_response(rsp)
+            data = rsp.text
             if conn.debug:
                 logging.info("solrpy got response: %s" % data)
         finally:

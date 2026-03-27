@@ -24,8 +24,10 @@ def _make_conn(version: tuple[int, ...] = (9, 0, 0)) -> solr.Solr:
 def _mock_post(conn: solr.Solr, payload: dict) -> MagicMock:
     """Attach a _post mock that returns the given JSON payload."""
     rsp = MagicMock()
-    rsp.getheader.return_value = ''
-    rsp.read.return_value = json.dumps(payload).encode('utf-8')
+    rsp.text = json.dumps(payload)
+    rsp.content = json.dumps(payload).encode('utf-8')
+    rsp.json.return_value = payload
+    rsp.status_code = 200
     conn._post = MagicMock(return_value=rsp)  # type: ignore[attr-defined]
     return conn._post  # type: ignore[attr-defined]
 

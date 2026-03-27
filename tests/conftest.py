@@ -92,41 +92,46 @@ class RequestTracking(SolrConnectionTestCase):
 
     def new_connection(self, **kw):
         conn = super().new_connection(**kw)
-        request = conn.conn.request
+        original_post = conn._post
 
-        def wrap(*args, **kw):
-            self._update = args, kw
-            return request(*args, **kw)
+        def wrap(url, body, headers, **kwargs):
+            raw_body = body if isinstance(body, bytes) else body.encode('utf-8')
+            self._last_url = url
+            self._last_body = raw_body
+            self._last_headers = headers
+            return original_post(url, body, headers, **kwargs)
 
-        conn.conn.request = wrap
+        conn._post = wrap
         return conn
 
     def method(self):
-        return self._update[0][0]
+        return 'POST'
 
     def selector(self):
-        s = self._update[0][1]
+        s = self._last_url
         if s.startswith(SOLR_PATH):
             return s[len(SOLR_PATH):]
-        self.fail("URL path doesn't start with expected prefix")
+        self.fail("URL path doesn't start with expected prefix: " + s)
 
     def postbody(self):
-        return self._update[0][2]
+        return self._last_body
 
 
-class ThrowBadStatusLineExceptions:
-    """Helper that forces BadStatusLine exceptions for retry testing."""
+class ThrowConnectionExceptions:
+    """Helper that forces connection exceptions for retry testing."""
 
     def __init__(self, conn, max=None):
+        import httpx
         self.calls = 0
         self.max = max
-        self.wrap = conn.conn.request
-        conn.conn.request = self
+        self.wrap = conn.conn.post
+        conn.conn.post = self
 
     def __call__(self, *args, **kwargs):
+        import httpx
         self.calls += 1
         if self.max is None or self.calls <= self.max:
-            raise httplib.BadStatusLine('Dummy status line exception')
+            raise httpx.ConnectError('Dummy connection error')
         return self.wrap(*args, **kwargs)
 
 
@@ -154,9 +159,23 @@ class EmptyResponse:
     }
 
     getheaders = _headers.items
+    status_code = 200
+    reason_phrase = "Ok"
     status = 200
     reason = "Ok"
     version = 11
+
+    @property
+    def text(self):
+        return self._empty_results
+
+    @property
+    def content(self):
+        return self._empty_results.encode('utf-8')
+
+    def json(self):
+        import json
+        return json.loads(self._empty_results)
 
     def getheader(self, name, default=None):
         return self._headers.get(name.lower, default)

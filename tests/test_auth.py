@@ -72,12 +72,12 @@ class TestCustomAuthCallable(unittest.TestCase):
                          auth=lambda: {'Authorization': 'Custom xyz'})
         # auth callable should override basic auth
         sent_headers = {}
-        original_request = conn.conn.request
+        original_get = conn.conn.get
         def capture(*args, **kwargs):
-            if len(args) >= 4:
-                sent_headers.update(args[3])
-            return original_request(*args, **kwargs)
-        conn.conn.request = capture  # type: ignore
+            if 'headers' in kwargs:
+                sent_headers.update(kwargs['headers'])
+            return original_get(*args, **kwargs)
+        conn.conn.get = capture  # type: ignore
         conn.ping()
         self.assertEqual(sent_headers.get('Authorization'), 'Custom xyz')
         conn.close()
