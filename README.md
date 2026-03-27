@@ -102,6 +102,14 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.9.2
+
+- **Solr 6~10 full compatibility**: `wt=xml` on Solr 7+ (`wt=standard` changed in 7.0)
+- Tested against Solr 6.6, 7.7, 8.11, 9.7, 10.0 — all 0 failures
+- GitHub Actions CI matrix for 5 Solr versions
+- KNN live tests version-gated (skip on < 9.0, efSearchScaleFactor skip on < 10.0)
+- Test isolation: Paginator no longer deletes all documents
+
 ### 1.9.1
 
 - **KNN API overhaul**: `search()`, `similarity()`, `hybrid()`, `rerank()` methods

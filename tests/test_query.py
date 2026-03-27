@@ -284,19 +284,29 @@ class TestQuerying(SolrConnectionTestCase):
 
         # Issue a prefix query, return data only (which should be equal
         # to user_id).
-        response = self.raw_query(
-            self.conn, q="user_id:%s*" % prefix, fl="data")
+        if self.conn.server_version >= (7, 0):
+            # Solr 7+ changed wt=standard behavior; use wt=xml explicitly
+            response = self.raw_query(
+                self.conn, q="user_id:%s*" % prefix, fl="data", wt="xml")
+        else:
+            response = self.raw_query(
+                self.conn, q="user_id:%s*" % prefix, fl="data")
 
-        # raw_query returns a string
+        # raw_query returns a string — verify via XML parsing
         xml = parseString(response)
-
         doc_elem = xml.getElementsByTagName("doc")
 
         self.assertEqual(len(doc_elem), 1,
             "raw_query didn't return the document, id:%s, the response is:%s" %
                 (id, repr(response)))
 
-        query_data = doc_elem[0].firstChild.firstChild.nodeValue
+        # Extract field value from XML (handles both <str> and <arr><str> tags)
+        data_nodes = doc_elem[0].getElementsByTagName("str")
+        query_data = None
+        for node in data_nodes:
+            if node.firstChild:
+                query_data = node.firstChild.nodeValue
+                break
 
         self.assertEqual(query_data, data,
             ("raw_query returned wrong value for data field, "
@@ -553,8 +563,12 @@ class TestSearchHandler(SolrConnectionTestCase):
         conn = self.new_connection()
         conn.select("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/select")
-        self.assertEqual(self.request_body,
-                         "q=id%3Afoobar&fl=%2A&version=2.2&wt=standard")
+        if conn.server_version >= (7, 0):
+            self.assertEqual(self.request_body,
+                             "q=id%3Afoobar&fl=%2A&wt=xml")
+        else:
+            self.assertEqual(self.request_body,
+                             "q=id%3Afoobar&fl=%2A&version=2.2&wt=standard")
 
     def test_select_raw_request(self):
         conn = self.new_connection()
@@ -567,8 +581,12 @@ class TestSearchHandler(SolrConnectionTestCase):
         alternate = solr.SearchHandler(conn, "/alternate/path")
         alternate("id:foobar", score=False)
         self.assertEqual(self.request_selector, SOLR_PATH + "/alternate/path")
-        self.assertEqual(self.request_body,
-                         "q=id%3Afoobar&fl=%2A&version=2.2&wt=standard")
+        if conn.server_version >= (7, 0):
+            self.assertEqual(self.request_body,
+                             "q=id%3Afoobar&fl=%2A&wt=xml")
+        else:
+            self.assertEqual(self.request_body,
+                             "q=id%3Afoobar&fl=%2A&version=2.2&wt=standard")
 
     def test_alternate_raw_request(self):
         conn = self.new_connection()
@@ -619,15 +637,26 @@ class TestPaginator(SolrConnectionTestCase):
     # paginator relies only on the results, not the connection that
     # produced them.
 
+    _PREFIX = 'pag_'
+
     def setUp(self):
         super(TestPaginator, self).setUp()
         self.conn = self.new_connection()
-        self.conn.delete_query('*:*')
+        # Clean up only paginator test data, not all documents
+        self.conn.delete_query('id:%s*' % self._PREFIX, commit=True)
         for i in range(0, 15):
-            self.conn.add({'id': i, 'data': 'data_%02i' % i})
+            self.conn.add({'id': '%s%02i' % (self._PREFIX, i),
+                           'data': 'data_%02i' % i})
         self.conn.commit()
         self.result = self.query(
-            self.conn, '*:*', sort='data', sort_order='desc')
+            self.conn, 'id:%s*' % self._PREFIX, sort='data', sort_order='desc')
+
+    def tearDown(self):
+        try:
+            self.conn.delete_query('id:%s*' % self._PREFIX, commit=True)
+        except Exception:
+            pass
+        super().tearDown()
 
     def test_num_pages(self):
         """ Check the number of pages reported by the paginator """
@@ -678,14 +707,17 @@ class TestPaginator(SolrConnectionTestCase):
     def test_unicode_query(self):
         """ Test for unicode support in subsequent paginator queries """
         chinese_data = b'\xe6\xb3\xb0\xe5\x9b\xbd'.decode('utf-8')
-        self.conn.add({'id': 100, 'data': chinese_data})
+        uid = 'pag_unicode_test'
+        self.conn.add({'id': uid, 'data': chinese_data})
         self.conn.commit()
-        result = self.query(self.conn, chinese_data)
+        result = self.query(self.conn, 'data:' + chinese_data)
         paginator = solr.SolrPaginator(result, default_page_size=10)
         try:
             paginator.page(1)
         except (solr.SolrException, ValueError, TypeError):
             self.fail('Unicode not encoded correctly in paginator')
+        finally:
+            self.conn.delete(id=uid, commit=True)
 
 
 

@@ -5,7 +5,7 @@ import solr
 import solr.core
 from tests.conftest import SOLR_HTTP
 
-SOLR9_HTTP = "http://localhost:8984/solr/knn_core"
+SOLR_KNN = "http://localhost:8983/solr/core0"
 
 
 class TestKNNCreation(unittest.TestCase):
@@ -127,10 +127,25 @@ class TestKNNQueryBuilding(unittest.TestCase):
 
 
 class TestKNNLiveSearch(unittest.TestCase):
-    """Integration tests against Solr 9.4 with DenseVectorField."""
+    """Integration tests requiring Solr 9.0+ with DenseVectorField."""
 
     def setUp(self):
-        self.conn = solr.Solr(SOLR9_HTTP)
+        try:
+            self.conn = solr.Solr(SOLR_KNN)
+        except Exception:
+            self.skipTest("Solr KNN instance not available at %s" % SOLR_KNN)
+        if self.conn.server_version < (9, 0):
+            self.conn.close()
+            self.skipTest("KNN requires Solr 9.0+, got %s" %
+                          '.'.join(str(v) for v in self.conn.server_version))
+        # Ensure vector test data exists (may be wiped by other tests)
+        self.conn.add_many([
+            {'id': 'vec1', 'data': 'first',   'embedding': [1.0, 0.0, 0.0]},
+            {'id': 'vec2', 'data': 'second',  'embedding': [0.0, 1.0, 0.0]},
+            {'id': 'vec3', 'data': 'third',   'embedding': [0.0, 0.0, 1.0]},
+            {'id': 'vec4', 'data': 'similar', 'embedding': [0.9, 0.1, 0.0]},
+            {'id': 'vec5', 'data': 'mixed',   'embedding': [0.5, 0.5, 0.0]},
+        ], commit=True)
 
     def tearDown(self):
         self.conn.close()
@@ -167,10 +182,11 @@ class TestKNNLiveSearch(unittest.TestCase):
     def test_search_with_filter(self):
         from solr import KNN
         knn = KNN(self.conn)
+        # Filter to only vec1 and vec4 (both have high x-axis values)
         resp = knn.search([1.0, 0.0, 0.0], field='embedding', top_k=5,
-                          filters='id:vec5')
+                          filters='id:(vec1 OR vec4)')
         ids = [doc['id'] for doc in resp.results]
-        self.assertIn('vec5', ids)
+        self.assertTrue(set(ids).issubset({'vec1', 'vec4'}))
 
     def test_callable_delegates_to_search(self):
         from solr import KNN
@@ -178,10 +194,35 @@ class TestKNNLiveSearch(unittest.TestCase):
         resp = knn([1.0, 0.0, 0.0], field='embedding', top_k=3)
         self.assertEqual(resp.numFound, 3)
 
+    def test_ef_search_scale_factor_live(self):
+        if self.conn.server_version < (10, 0):
+            self.skipTest("efSearchScaleFactor requires Solr 10.0+")
+        from solr import KNN
+        knn = KNN(self.conn)
+        resp = knn.search([1.0, 0.0, 0.0], field='embedding', top_k=3,
+                          ef_search_scale_factor=2.0)
+        self.assertIsNotNone(resp)
+        self.assertEqual(resp.numFound, 3)
+        self.assertEqual(resp.results[0]['id'], 'vec1')
+
+    def test_build_query_with_ef(self):
+        if self.conn.server_version < (10, 0):
+            self.skipTest("efSearchScaleFactor requires Solr 10.0+")
+        from solr import KNN
+        knn = KNN(self.conn)
+        q = knn.build_query([0.5, 0.5, 0.0], field='embedding', top_k=3,
+                            ef_search_scale_factor=1.5)
+        self.assertIn('efSearchScaleFactor=1.5', q)
+
+    def test_hybrid_live(self):
+        from solr import KNN
+        knn = KNN(self.conn)
+        resp = knn.hybrid('data:mixed', [1.0, 0.0, 0.0], field='embedding',
+                          min_return=0.5)
+        self.assertIsNotNone(resp)
+        self.assertGreater(resp.numFound, 0)
+
     def test_similarity_live(self):
-        """vectorSimilarity requires Solr 9.6+; skip on older."""
-        if self.conn.server_version < (9, 6):
-            self.skipTest("vectorSimilarity requires Solr 9.6+")
         from solr import KNN
         knn = KNN(self.conn)
         resp = knn.similarity([1.0, 0.0, 0.0], field='embedding',

@@ -1,0 +1,128 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        solr-version: ['6.6', '7.7', '8.11', '9.7', '10.0']
+        include:
+          - solr-version: '6.6'
+            date-type: tdate
+            num-type: tlong
+            knn: false
+          - solr-version: '7.7'
+            date-type: pdate
+            num-type: plong
+            knn: false
+          - solr-version: '8.11'
+            date-type: pdate
+            num-type: plong
+            knn: false
+          - solr-version: '9.7'
+            date-type: pdate
+            num-type: plong
+            knn: true
+          - solr-version: '10.0'
+            date-type: pdate
+            num-type: plong
+            knn: true
+
+    name: "Solr ${{ matrix.solr-version }}"
+
+    services:
+      solr:
+        image: "solr:${{ matrix.solr-version }}"
+        ports:
+          - 8983:8983
+        options: >-
+          --health-cmd "curl -f http://localhost:8983/solr/ || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Create Solr core
+        run: |
+          docker exec $(docker ps -q --filter ancestor=solr:${{ matrix.solr-version }}) \
+            solr create -c core0 || true
+          sleep 3
+
+      - name: Setup schema
+        run: |
+          # Common fields
+          curl -s -X POST "http://localhost:8983/solr/core0/schema" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "add-field": [
+                {"name": "user_id", "type": "string", "stored": true, "indexed": true, "multiValued": false},
+                {"name": "data", "type": "string", "stored": true, "indexed": true, "multiValued": false},
+                {"name": "data_sort", "type": "string", "stored": false, "indexed": true, "multiValued": false},
+                {"name": "letters", "type": "string", "stored": true, "indexed": true, "multiValued": true},
+                {"name": "creation_time", "type": "${{ matrix.date-type }}", "stored": true, "indexed": true, "multiValued": false},
+                {"name": "num", "type": "${{ matrix.num-type }}", "stored": true, "indexed": true, "multiValued": false}
+              ],
+              "add-copy-field": {"source": "data", "dest": "data_sort"}
+            }'
+
+      - name: Setup KNN schema
+        if: matrix.knn
+        run: |
+          curl -s -X POST "http://localhost:8983/solr/core0/schema" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "add-field-type": {
+                "name": "knn_vector",
+                "class": "solr.DenseVectorField",
+                "vectorDimension": 3,
+                "similarityFunction": "cosine"
+              }
+            }'
+          curl -s -X POST "http://localhost:8983/solr/core0/schema" \
+            -H "Content-Type: application/json" \
+            -d '{"add-field": {"name": "embedding", "type": "knn_vector", "stored": true, "indexed": true}}'
+          curl -s -X POST "http://localhost:8983/solr/core0/update?commit=true" \
+            -H "Content-Type: application/json" \
+            -d '[
+              {"id": "vec1", "data": "first",  "embedding": [1.0, 0.0, 0.0]},
+              {"id": "vec2", "data": "second", "embedding": [0.0, 1.0, 0.0]},
+              {"id": "vec3", "data": "third",  "embedding": [0.0, 0.0, 1.0]},
+              {"id": "vec4", "data": "similar","embedding": [0.9, 0.1, 0.0]},
+              {"id": "vec5", "data": "mixed",  "embedding": [0.5, 0.5, 0.0]}
+            ]'
+
+      - name: Run tests
+        run: poetry run pytest tests/ -v --tb=short
+
+      - name: Run mypy
+        run: poetry run mypy solr/ --strict --ignore-missing-imports
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install poetry && poetry install --no-interaction
+      - run: poetry run mypy solr/ --strict --ignore-missing-imports

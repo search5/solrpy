@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.9.1"
+__version__ = "1.9.2"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -599,8 +599,11 @@ class SearchHandler:
             data = json.loads(raw)
             return parse_json_response(data, params, self)
         else:
-            params['version'] = self.conn.response_version
-            params['wt'] = 'standard'
+            if self.conn.server_version >= (7, 0):
+                params['wt'] = 'xml'
+            else:
+                params['version'] = self.conn.response_version
+                params['wt'] = 'standard'
             xml = self.raw(timeout=timeout, **params)
             return parse_query_response(StringIO(xml), params, self)  # type: ignore[no-any-return]
 

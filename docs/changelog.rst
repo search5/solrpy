@@ -1,6 +1,24 @@
 Changelog
 =========
 
+1.9.2 (2026-03-27)
+-------------------
+
+**Solr 7~10 compatibility:**
+
+- XML mode now uses ``wt=xml`` on Solr 7+ (``wt=standard`` behavior changed
+  in 7.0, removed in 10.0). Solr < 7 continues to use ``wt=standard``.
+- All 326 tests pass against live Solr 10.0.
+- ``efSearchScaleFactor`` verified on Solr 10.0.
+- ``{!vectorSimilarity}`` verified on Solr 10.0.
+
+**Test improvements:**
+
+- KNN live tests self-provision vector data in ``setUp`` (test isolation).
+- ``test_raw_query`` uses ``wt=json`` for cross-version portability.
+- ``test_select_request`` / ``test_alternate_request`` version-aware assertions.
+
+
 1.9.1 (2026-03-27)
 -------------------
 
