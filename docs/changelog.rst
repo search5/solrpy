@@ -1,6 +1,22 @@
 Changelog
 =========
 
+1.12.0 (2026-03-27)
+--------------------
+
+**New features (Solr 5.0+):**
+
+- **Streaming Expressions**: Pythonic builder for Solr streaming expressions.
+  No other non-Java client supports this.
+- Python functions map 1:1 to Solr expression functions: ``search``, ``merge``,
+  ``rollup``, ``top``, ``unique``, ``innerJoin``, ``leftOuterJoin``, etc.
+- Aggregate functions: ``count``, ``sum``, ``avg``, ``min``, ``max``.
+- **Pipe (``|``) operator** for chaining expressions.
+- ``Solr.stream(expr)`` executes via ``/stream`` handler, returns iterator.
+- ``model=`` parameter for Pydantic conversion on stream results.
+- Tested against live SolrCloud 9.7.
+
+
 1.11.0 (2026-03-27)
 --------------------
 

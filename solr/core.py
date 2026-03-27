@@ -22,7 +22,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "1.11.0"
+__version__ = "1.12.0"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -342,6 +342,34 @@ class Solr:
         if model is not None:
             return [model.model_validate(d) for d in docs]
         return docs
+
+    def stream(self, expr: Any, model: type[Any] | None = None) -> Iterator[dict[str, Any]]:
+        """Execute a streaming expression via the ``/stream`` handler (Solr 5.0+).
+
+        Returns an iterator of tuple dicts. Skips the final EOF marker.
+
+        :param expr: A :class:`~solr.stream.StreamExpression` or string.
+        :param model: Optional Pydantic model for automatic conversion.
+        :returns: Iterator of result dicts (or model instances if model given).
+        """
+        if self.server_version < (5, 0):
+            from .exceptions import SolrVersionError
+            raise SolrVersionError("stream", (5, 0), self.server_version)
+
+        import urllib.parse
+        qs = urllib.parse.urlencode({'expr': str(expr)})
+        selector = '%s/stream?%s' % (self.path, qs)
+        rsp = self._get(selector)
+        data = json.loads(rsp.read().decode('utf-8'))
+
+        docs = data.get('result-set', {}).get('docs', [])
+        for doc in docs:
+            if 'EOF' in doc:
+                break
+            if model is not None:
+                yield model.model_validate(doc)
+            else:
+                yield doc
 
     def iter_cursor(self, q: str, sort: str | None = None,
                     rows: int = 100, **params: Any) -> Iterator[Response]:

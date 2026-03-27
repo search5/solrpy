@@ -102,6 +102,14 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 1.12.0
+
+- **Streaming Expressions**: Python builder with pipe (`|`) operator — no other non-Java client has this
+- `search`, `merge`, `rollup`, `top`, `unique`, `innerJoin`, etc.
+- Aggregate: `count`, `sum`, `avg`, `min`, `max`
+- `conn.stream(expr)` → iterator of result dicts
+- Pydantic model support via `model=` parameter
+
 ### 1.11.0
 
 - **Pydantic response models**: `conn.select('*:*', model=MyDoc)` converts results to Pydantic models
