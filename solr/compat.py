@@ -57,11 +57,17 @@ class PysolrCompat(Solr):
         :param commit: Whether to auto-commit after adding. Defaults to
             ``True`` to match pysolr convention.
         """
-        if isinstance(docs, list):
-            self.add_many(docs)
-        else:
-            # Single dict — delegate to parent Solr.add()
-            super().add(docs)
+        # Temporarily disable always_commit to avoid double-commit;
+        # commit is handled explicitly below.
+        saved = self.always_commit
+        self.always_commit = False
+        try:
+            if isinstance(docs, list):
+                self.add_many(docs)
+            else:
+                super().add(docs)
+        finally:
+            self.always_commit = saved
         if commit:
             self.commit()
 
@@ -74,10 +80,17 @@ class PysolrCompat(Solr):
         :param commit: Whether to auto-commit after deleting. Defaults to
             ``True`` to match pysolr convention.
         """
-        if id is not None:
-            super().delete(id=id)
-        if q is not None:
-            self.delete_query(q)
+        # Temporarily disable always_commit to avoid double-commit;
+        # commit is handled explicitly below.
+        saved = self.always_commit
+        self.always_commit = False
+        try:
+            if id is not None:
+                super().delete(id=id)
+            if q is not None:
+                self.delete_query(q)
+        finally:
+            self.always_commit = saved
         if commit:
             self.commit()
 

@@ -79,7 +79,6 @@ class Suggest:
             'suggest': 'true',
             'suggest.q': q,
             'suggest.count': str(count),
-            'wt': 'json',
         }
         if dictionary is not None:
             query_params['suggest.dictionary'] = dictionary

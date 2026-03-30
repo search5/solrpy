@@ -142,6 +142,11 @@ poetry run pytest tests/
 
 ## Changelog
 
+### 2.0.8a
+
+- **18 bug fixes**: async event-loop blocking (`time.sleep` → `asyncio.sleep`), date validation logic inverted, highlight `hl_fl` list bug, async timeout leak, PysolrCompat double commit, SolrCloud resource leak, stream pipe mutation, sort false positive, paginator `q` loss, and more
+- Full details in [changelog](https://search5.github.io/solrpy/latest/changelog.html)
+
 ### 2.0.8
 
 - **Decimal support**: `decimal.Decimal` values now serialize correctly in both JSON and XML update paths

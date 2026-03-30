@@ -75,13 +75,22 @@ class Facet:
         return cls(params)
 
     @classmethod
-    def query(cls, name: str, q: str) -> Facet:
+    def query(cls, *args: Any, **kwargs: Any) -> Facet:
         """Create a query facet.
 
-        :param name: Label for this facet query.
         :param q: Solr query string for this facet.
         :returns: A Facet object.
+
+        Accepts ``Facet.query('price:[0 TO 50]')`` or the legacy
+        two-argument form ``Facet.query('cheap', 'price:[0 TO 50]')``.
         """
+        if len(args) == 2:
+            # Legacy form: Facet.query(name, q) — name is unused
+            q = args[1]
+        elif len(args) == 1:
+            q = args[0]
+        else:
+            q = kwargs.get('q', '')
         return cls({
             'facet': 'true',
             'facet.query': q,

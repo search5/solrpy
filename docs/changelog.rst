@@ -1,6 +1,85 @@
 Changelog
 =========
 
+2.0.8a (2026-03-30)
+--------------------
+
+**Bug fixes (18 issues resolved):**
+
+- **[Critical] Async event-loop blocking**: ``AsyncSolr._post()`` retry loop
+  used synchronous ``time.sleep()`` which blocked the entire event loop.
+  Replaced with ``await asyncio.sleep()``.
+
+- **[High] Date validation logic inverted**: ``utc_from_string()`` had an
+  inverted condition that accepted invalid date strings and rejected some valid
+  ones. Also added a length guard to prevent ``IndexError`` on short inputs.
+
+- **[High] Highlight ``hl_fl`` assigned as list**: When ``highlight=True``
+  with a string ``fields`` argument, ``hl_fl`` was incorrectly set to
+  ``[fields]`` (a list) instead of the string itself.
+
+- **[High] Async ``select()`` timeout leak**: ``timeout`` parameter was
+  included in the URL-encoded query string sent to Solr before being popped,
+  sending an unwanted ``timeout`` parameter. Now popped before encoding.
+
+- **[High] ``PysolrCompat`` double commit**: When ``always_commit=True``,
+  ``add()`` and ``delete()`` committed twice — once via the ``@committing``
+  decorator and once explicitly. Fixed by temporarily disabling
+  ``always_commit`` during the delegated call.
+
+- **[Medium] SolrCloud probe resource leak**: In ``_pick_url()``, if
+  ``probe.ping()`` raised an exception, ``probe.close()`` was never called.
+  Wrapped in ``try/finally``.
+
+- **[Medium] ``Response.next_batch()``/``previous_batch()`` TypeError**:
+  ``int(self.results.start)`` raised ``TypeError`` (not ``AttributeError``)
+  when ``start`` was ``None``. Now catches both exception types.
+
+- **[Medium] Stream pipe operator mutation**: ``expr | func`` permanently
+  modified ``func._args`` in place. Subsequent pipes to the same ``func``
+  accumulated prior expressions. Now creates a copy.
+
+- **[Medium] ``Suggest`` duplicate ``wt=json``**: ``query_params`` included
+  ``'wt': 'json'`` and ``DualTransport.get_json()`` appended it again.
+  Removed the redundant entry.
+
+- **[Medium] Sort ``endswith("asc")`` false positive**: Field names ending
+  with ``"asc"`` (e.g. ``"classic"``) were incorrectly treated as already
+  having a sort direction. Now checks for ``" asc"``/``" desc"`` with a
+  leading space.
+
+- **[Medium] Duplicate ``urllib.parse`` import**: ``core.py`` imported
+  ``urllib.parse`` twice under two aliases. Unified to a single alias.
+
+- **[Medium] ``SolrPaginator._fetch_page()`` lost ``q``**: The query string
+  was passed inside ``**params`` instead of as the first positional argument
+  to ``SearchHandler.__call__()``. Now properly popped and passed.
+
+- **[Medium] ``Response.previous_batch()`` wrong ``rows`` path**: Looked for
+  ``rows`` at the top level of ``responseHeader`` instead of inside
+  ``responseHeader.params``.
+
+- **[Low] SSL cert validation**: Providing only ``ssl_key`` without
+  ``ssl_cert`` created a malformed ``(None, key)`` tuple. Now raises
+  ``ValueError`` early.
+
+- **[Low] ``Facet.query()`` unused ``name`` parameter**: Accepted a ``name``
+  argument that was silently ignored. Now accepts both the legacy two-argument
+  form ``Facet.query(name, q)`` and the corrected single-argument form
+  ``Facet.query(q)``.
+
+- **[Low] Loop variable shadowing in ``_delete()``**: ``for id in ids``
+  shadowed the function parameter and the builtin ``id()``. Renamed to
+  ``doc_id``.
+
+- **[Low] KNN hybrid query ``v=`` inconsistency**: ``build_hybrid_query()``
+  used ``v="[...]"`` inside local params while ``build_similarity_query()``
+  placed the vector in the query body. Unified to the body-style format.
+
+- **[Low/Won't fix] ``close()`` creates client if unused**: Kept for
+  ``is_closed`` API contract consistency.
+
+
 2.0.8 (2026-03-27)
 -------------------
 

@@ -193,7 +193,7 @@ class AsyncSolr:
                     headers: dict[str, str],
                     timeout: float | None = None) -> httpx.Response:
         """Async POST with retry and exponential backoff."""
-        import time
+        import asyncio
         _logger = logging.getLogger('solr')
         _headers = self._get_auth_headers()
         _headers.update(headers)
@@ -217,7 +217,7 @@ class AsyncSolr:
                 delay = self.retry_delay * (2 ** (retry_num - 1))
                 _logger.warning("Retry %d/%d for %s (delay=%.2fs)",
                                 retry_num, self.max_retries, url, delay)
-                time.sleep(delay)
+                await asyncio.sleep(delay)
         raise RuntimeError("Unreachable")
 
     @property
@@ -252,6 +252,7 @@ class AsyncSolr:
             ``response.results`` will contain model instances instead of dicts.
         """
         model = params.pop('model', None)
+        timeout = params.pop('timeout', None)
         if q is not None:
             params['q'] = q
         if 'fl' not in params:
@@ -263,7 +264,7 @@ class AsyncSolr:
             doseq=True)
         rsp = await self._post(
             self.path + '/select', request, self.form_headers,
-            timeout=params.pop('timeout', None) if 'timeout' in params else None)
+            timeout=timeout)
         data = json.loads(rsp.content)
         resp = parse_json_response(data, params, self)
         if model is not None and resp is not None:

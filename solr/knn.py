@@ -160,7 +160,7 @@ class KNN:
         :returns: A combined OR query string.
         """
         vec_str = '[%s]' % ','.join(str(v) for v in vector)
-        sim_q = '{!vectorSimilarity f=%s minReturn=%s v="%s"}' % (
+        sim_q = '{!vectorSimilarity f=%s minReturn=%s}%s' % (
             field, min_return, vec_str)
         return '(%s OR %s)' % (text_query, sim_q)
 

@@ -324,7 +324,7 @@ class Response:
         """Load the next set of matches."""
         try:
             start = int(self.results.start)
-        except AttributeError:
+        except (AttributeError, TypeError):
             start = 0
 
         start += len(self.results)
@@ -367,13 +367,14 @@ class Response:
         """Return the previous set of matches."""
         try:
             start = int(self.results.start)
-        except AttributeError:
+        except (AttributeError, TypeError):
             start = 0
 
         if not start:
             return None
 
-        rows = int(self.header.get('rows', len(self.results)))
+        header_params = self.header.get('params', self.header)
+        rows = int(header_params.get('rows', len(self.results)))
         start = max(0, start - rows)
         params = dict(self._params)
         params['start'] = start

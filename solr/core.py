@@ -6,7 +6,6 @@ import datetime
 import logging
 import warnings
 import base64
-import urllib.parse as urlparse
 import urllib.parse as urllib
 import httpx
 from io import StringIO
@@ -21,7 +20,7 @@ from .utils import (
 from .response import Response, Results
 from .parsers import parse_json_response, parse_query_response
 
-__version__ = "2.0.8"
+__version__ = "2.0.8a"
 
 __all__ = ['SolrException', 'SolrVersionError', 'Solr',
            'Response', 'SearchHandler']
@@ -77,7 +76,7 @@ class Solr:
         :param debug: Log all requests and responses.
         """
 
-        self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]
+        self.scheme, self.host, self.path = urllib.urlparse(url, 'http')[:3]
         self.url = url
 
         assert self.scheme in ('http', 'https')
@@ -112,6 +111,8 @@ class Solr:
             'follow_redirects': True,
         }
         if self.scheme == 'https' and (ssl_cert or ssl_key):
+            if ssl_key and not ssl_cert:
+                raise ValueError("ssl_cert is required when ssl_key is provided")
             self._client_kwargs['cert'] = (ssl_cert, ssl_key) if ssl_key else ssl_cert
         self.__client: httpx.Client | None = None
 
@@ -184,7 +185,7 @@ class Solr:
     def close(self) -> None:
         """Close the underlying HTTP(S) connection."""
         if self.__client is None:
-            # Force creation so is_closed reflects True after close
+            # Create a pre-closed client so _client.is_closed is True
             self.__client = httpx.Client(**self._client_kwargs)
         self.__client.close()
 
@@ -420,7 +421,7 @@ class Solr:
         Yields Response objects for each batch. Requires ``sort`` to
         include a uniqueKey field.
 
-        :param \*\*params: Additional Solr query parameters forwarded to the
+        :param \\**params: Additional Solr query parameters forwarded to the
             ``select`` handler (e.g., ``fq``, ``fl``).
 
         Example::
@@ -560,8 +561,8 @@ class Solr:
         if id is not None:
             ids.insert(0, id)
         lst: list[str] = []
-        for id in ids:
-            lst.append('<id>%s</id>\n' % escape(str(id)))
+        for doc_id in ids:
+            lst.append('<id>%s</id>\n' % escape(str(doc_id)))
         for query in (queries or ()):
             lst.append('<query>%s</query>\n' % escape(str(query)))
         if lst:
@@ -658,7 +659,7 @@ class SearchHandler:
             parameters are merged into the query.
         :param model: Optional Pydantic model class. When provided, each
             result document is converted via ``model.model_validate(doc)``.
-        :param \*\*params: Additional Solr query parameters (e.g., ``fq``,
+        :param \\**params: Additional Solr query parameters (e.g., ``fq``,
             ``rows``, ``start``). Underscores in names are converted to dots.
         """
         if json_facet is not None:
@@ -696,7 +697,7 @@ class SearchHandler:
                 if not fields:
                     raise ValueError("highlight is True and no fields were given")
                 elif isinstance(fields, str):
-                    params['hl_fl'] = [fields]
+                    params['hl_fl'] = fields
                 else:
                     params['hl_fl'] = ",".join(fields)
 
@@ -721,7 +722,7 @@ class SearchHandler:
                 sort_list = [str(s) for s in sort]
             sorting = []
             for e in sort_list:
-                if not (e.endswith("asc") or e.endswith("desc")):
+                if not (e.endswith(" asc") or e.endswith(" desc")):
                     sorting.append("%s %s" % (e, sort_order))
                 else:
                     sorting.append(e)

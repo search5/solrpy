@@ -57,8 +57,9 @@ class StreamExpression:
 
     def __or__(self, other: StreamExpression) -> StreamExpression:
         """Pipe operator: pass this expression as the first arg of *other*."""
-        other._args.insert(0, self)
-        return other
+        result = StreamExpression(other._func, *other._args, **other._kwargs)
+        result._args.insert(0, self)
+        return result
 
 
 class AggregateExpression:

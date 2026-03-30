@@ -104,10 +104,11 @@ class SolrCloud:
             try:
                 probe = Solr(base_url + '/' + self._collection,
                              **self._solr_kwargs)
-                if probe.ping():
+                try:
+                    if probe.ping():
+                        return base_url
+                finally:
                     probe.close()
-                    return base_url
-                probe.close()
             except Exception:
                 continue
         # All probes failed, return random from list

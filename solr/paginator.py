@@ -85,7 +85,8 @@ class SolrPaginator:
         for k, v in self.params.items():
             new_params[str(k)] = v
         new_params['start'] = start
-        return self.query(**new_params)
+        q = new_params.pop('q', '')
+        return self.query(q, **new_params)
 
     def page(self, page_num: int = 1) -> SolrPage:
         """Return the requested Page object.

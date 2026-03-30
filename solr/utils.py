@@ -105,7 +105,7 @@ def utc_from_string(value: str) -> datetime.datetime:
     :raises ValueError: If *value* is not a valid Solr date string.
     """
     try:
-        if not value.endswith('Z') and value[10] == 'T':
+        if len(value) < 20 or not value.endswith('Z') or value[10] != 'T':
             raise ValueError(value)
         year = int(value[0:4])
         month = int(value[5:7])
