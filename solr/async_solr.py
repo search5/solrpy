@@ -53,7 +53,8 @@ class AsyncSolr:
                  response_format: str = 'json',
                  auth_token: str | None = None,
                  auth: Any = None,
-                 debug: bool = False) -> None:
+                 debug: bool = False,
+                 solr_version: tuple[int, ...] | None = None) -> None:
         """Create an async Solr connection.
 
         Same parameters as :class:`~solr.core.Solr`.
@@ -71,6 +72,8 @@ class AsyncSolr:
         :param auth_token: Bearer token string for authentication.
         :param auth: Callable returning a ``dict[str, str]`` of auth headers per request.
         :param debug: Log all requests and responses.
+        :param solr_version: Override the detected Solr version, e.g. ``(9, 4, 1)``.
+            Skips autodetection entirely.
         """
         self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]
         self.url = url
@@ -111,7 +114,7 @@ class AsyncSolr:
         self._client: httpx.AsyncClient = httpx.AsyncClient(
             base_url=base_url, timeout=self.timeout, follow_redirects=True)
 
-        self._server_version: tuple[int, ...] | None = None
+        self._server_version: tuple[int, ...] | None = solr_version
 
     @property
     def server_version(self) -> tuple[int, ...]:

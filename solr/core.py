@@ -53,7 +53,8 @@ class Solr:
                  response_format: str = 'json',
                  auth_token: str | None = None,
                  auth: Any = None,
-                 debug: bool = False) -> None:
+                 debug: bool = False,
+                 solr_version: tuple[int, ...] | None = None) -> None:
         """
         Connect to the Solr instance at *url*.
 
@@ -74,6 +75,8 @@ class Solr:
         :param auth_token: Bearer token string for authentication.
         :param auth: Callable returning a ``dict[str, str]`` of auth headers per request.
         :param debug: Log all requests and responses.
+        :param solr_version: Override the detected Solr version, e.g. ``(9, 4, 1)``.
+            Skips autodetection entirely.
         """
 
         self.scheme, self.host, self.path = urllib.urlparse(url, 'http')[:3]
@@ -158,7 +161,7 @@ class Solr:
         self.always_commit = always_commit
         self.debug = debug
         self.select = SearchHandler(self, "/select")
-        self._server_version: tuple[int, ...] | None = None
+        self._server_version: tuple[int, ...] | None = solr_version
 
     @property
     def _client(self) -> httpx.Client:
