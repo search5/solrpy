@@ -53,7 +53,8 @@ class Solr:
                  response_format: str = 'json',
                  auth_token: str | None = None,
                  auth: Any = None,
-                 debug: bool = False) -> None:
+                 debug: bool = False,
+                 verify: bool | str | None = None) -> None:
         """
         Connect to the Solr instance at *url*.
 
@@ -74,6 +75,9 @@ class Solr:
         :param auth_token: Bearer token string for authentication.
         :param auth: Callable returning a ``dict[str, str]`` of auth headers per request.
         :param debug: Log all requests and responses.
+        :param verify: SSL certificate verification. Pass ``False`` to disable,
+            or a path string to a CA bundle or certificate file. Passed directly
+            to ``httpx.Client(verify=...)``. Defaults to httpx's default (``True``).
         """
 
         self.scheme, self.host, self.path = urllib.urlparse(url, 'http')[:3]
@@ -114,6 +118,8 @@ class Solr:
             if ssl_key and not ssl_cert:
                 raise ValueError("ssl_cert is required when ssl_key is provided")
             self._client_kwargs['cert'] = (ssl_cert, ssl_key) if ssl_key else ssl_cert
+        if verify is not None:
+            self._client_kwargs['verify'] = verify
         self.__client: httpx.Client | None = None
 
         self.response_version = 2.2
