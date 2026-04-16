@@ -76,7 +76,6 @@ class TestVerifyParam(unittest.TestCase):
     def test_verify_path_in_client_kwargs(self):
         conn = solr.Solr(SOLR_HTTP, verify='/path/to/ca-bundle.crt')
         self.assertEqual(conn._client_kwargs['verify'], '/path/to/ca-bundle.crt')
-        conn.close()
 
     def test_verify_false_passed_to_httpx_client(self):
         import httpx
@@ -93,7 +92,9 @@ class TestVerifyParam(unittest.TestCase):
         self.assertFalse(conn._verify)
 
     def test_async_verify_path(self):
-        conn = AsyncSolr(SOLR_HTTP, verify='/path/to/ca.pem')
+        from unittest.mock import patch
+        with patch('httpx.AsyncClient'):
+            conn = AsyncSolr(SOLR_HTTP, verify='/path/to/ca.pem')
         self.assertEqual(conn._verify, '/path/to/ca.pem')
 
 
