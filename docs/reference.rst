@@ -435,6 +435,26 @@ Response class
           for group in resp.grouped['category'].groups:
               print(group.groupValue, len(group.doclist))
 
+   **Highlighting:**
+
+   .. attribute:: Response.highlighting
+
+      A :class:`HighlightingResult` object when the response contains
+      highlighting data, otherwise not present. Enable highlighting by passing
+      ``highlight=True`` (or a list of field names) to ``select()``, or by
+      including ``hl='true'`` in query parameters.
+
+      Example::
+
+          resp = conn.select('apple', highlight=True, hl_fl='name,description')
+          for doc_id, fields in resp.highlighting:
+              for field_name, snippets in fields.items():
+                  print(doc_id, field_name, snippets)
+
+          # Access snippets for a specific document and field
+          snippets = resp.highlighting.snippets('MA147LL/A', 'name')
+          # → ['<em>Apple</em> 60 GB iPod with Video Playback Black']
+
    **Spellcheck (Solr 1.4+):**
 
    .. attribute:: Response.spellcheck
@@ -458,6 +478,64 @@ Response class
        print(len(response))
        for doc in response:
            print(doc['id'])
+
+
+HighlightingResult class
+------------------------
+
+.. class:: HighlightingResult(raw)
+
+   Wrapper around the raw ``highlighting`` dict from a Solr response. Returned
+   by :attr:`Response.highlighting` when the query includes ``hl=true``.
+
+   The structure mirrors the Solr JSON response:
+   ``{ doc_id: { field_name: ["...snippet with <em>term</em>..."] } }``
+
+   :param raw: The raw ``highlighting`` dict from the Solr response.
+
+   .. method:: HighlightingResult.__getitem__(doc_id)
+
+      Return the dict of highlighted fields for the given document ID.
+
+      :param doc_id: The document ID as it appears in ``response.docs``.
+      :raises KeyError: If *doc_id* is not in the highlighting result.
+
+   .. method:: HighlightingResult.get(doc_id, default=None)
+
+      Return highlighted fields for *doc_id*, or *default* if not found.
+
+   .. method:: HighlightingResult.snippets(doc_id, field)
+
+      Return the list of highlighted snippet strings for a specific document
+      and field. Returns an empty list if either *doc_id* or *field* is not
+      found.
+
+      :param doc_id: The document ID.
+      :param field: The field name.
+      :returns: List of snippet strings with matched terms wrapped in markup
+                (default: ``<em>…</em>``).
+
+   Supports ``len()``, ``in`` tests, and iteration over ``(doc_id, fields)``
+   pairs::
+
+       resp = conn.select('apple', highlight=True, hl_fl='name')
+
+       # Iterate
+       for doc_id, fields in resp.highlighting:
+           print(doc_id, fields)
+
+       # Subscript access
+       fields = resp.highlighting['MA147LL/A']
+       # → {'name': ['<em>Apple</em> 60 GB iPod ...']}
+
+       # Convenience snippet accessor
+       snippets = resp.highlighting.snippets('MA147LL/A', 'name')
+       # → ['<em>Apple</em> 60 GB iPod ...']
+
+       # Safe access
+       fields = resp.highlighting.get('unknown-id')  # → None
+
+       print(repr(resp.highlighting))  # HighlightingResult(1 docs)
 
 
 SpellcheckResult class (Solr 1.4+)
@@ -1662,6 +1740,23 @@ Paginator
    .. attribute:: object_list
 
       List of documents on this page.
+
+   .. attribute:: highlighting
+
+      A :class:`HighlightingResult` object for this page's results, or
+      ``None`` if highlighting was not requested. Each page fetches its own
+      highlighting data from Solr, so snippets correspond exactly to the
+      documents in :attr:`object_list`.
+
+      Example::
+
+          paginator = SolrPaginator(conn.select('apple', highlight=True,
+                                               hl_fl='name'))
+          page = paginator.page(2)
+          if page.highlighting:
+              for doc in page.object_list:
+                  snippets = page.highlighting.snippets(doc['id'], 'name')
+                  print(doc['id'], snippets)
 
    .. method:: has_next()
    .. method:: has_previous()
