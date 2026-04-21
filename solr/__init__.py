@@ -12,6 +12,7 @@ from .suggest import Suggest
 from .extract import Extract
 from .response import SpellcheckResult
 from .response import GroupedResult, GroupField, Group
+from .response import HighlightingResult
 from .knn import KNN
 from .async_solr import AsyncSolr
 from .async_companions import (

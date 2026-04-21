@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .response import Response, Results
+from .response import Response, Results, HighlightingResult
 
 
 class EmptyPage(ValueError):
@@ -105,16 +105,19 @@ class SolrPaginator:
 
         start = (page_num - 1) * self.page_size
         new_result = self._fetch_page(start=start)
-        return SolrPage(new_result.results, page_num, self)
+        highlighting = getattr(new_result, 'highlighting', None)
+        return SolrPage(new_result.results, page_num, self, highlighting=highlighting)
 
 
 class SolrPage:
     """A single Paginator-style page."""
 
-    def __init__(self, result: Results | list[dict[str, Any]], page_num: int, paginator: SolrPaginator) -> None:
+    def __init__(self, result: Results | list[dict[str, Any]], page_num: int, paginator: SolrPaginator,
+                 highlighting: HighlightingResult | None = None) -> None:
         self.result = result
         self.number = page_num
         self.paginator = paginator
+        self.highlighting: HighlightingResult | None = highlighting
 
     @property
     def object_list(self) -> Results | list[dict[str, Any]]:

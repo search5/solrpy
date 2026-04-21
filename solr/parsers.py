@@ -6,7 +6,7 @@ from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 
 from .exceptions import SolrException
-from .response import Response, Results, GroupedResult
+from .response import Response, Results, GroupedResult, HighlightingResult
 from .utils import utc_from_string
 
 
@@ -33,6 +33,9 @@ def parse_json_response(data: dict[str, Any], params: dict[str, Any], query: Any
 
     if hasattr(response, 'grouped') and isinstance(response.grouped, dict):
         response.grouped = GroupedResult(response.grouped)
+
+    if hasattr(response, 'highlighting') and isinstance(response.highlighting, dict):
+        response.highlighting = HighlightingResult(response.highlighting)
 
     return response
 

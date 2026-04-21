@@ -150,6 +150,66 @@ class GroupedResult:
         return 'GroupedResult(%r)' % list(self._raw.keys())
 
 
+class HighlightingResult:
+    """Wrapper around a Solr highlighting response component.
+
+    Provides access to highlighted snippets returned by the HighlightComponent.
+    Available whenever ``hl=true`` is passed as a query parameter.
+
+    The result is accessible via ``response.highlighting``.
+
+    Example::
+
+        resp = conn.select('apple', highlight=True, hl_fl='name,description')
+        for doc_id, fields in resp.highlighting:
+            for field_name, snippets in fields.items():
+                print(doc_id, field_name, snippets)
+
+    """
+
+    def __init__(self, raw: dict[str, Any]) -> None:
+        """Initialize a HighlightingResult from the raw ``highlighting`` response dict.
+
+        :param raw: The ``highlighting`` dict from a Solr response, mapping
+            document IDs to dicts of field names → list of snippet strings.
+        """
+        self._raw = raw
+
+    def __getitem__(self, doc_id: str) -> dict[str, list[str]]:
+        """Return highlighted fields for the given document ID.
+
+        :param doc_id: The document ID as it appears in the Solr response.
+        :raises KeyError: If *doc_id* is not present in the highlighting result.
+        """
+        return self._raw[doc_id]
+
+    def __iter__(self) -> Any:
+        """Iterate over ``(doc_id, fields)`` pairs."""
+        return iter(self._raw.items())
+
+    def __contains__(self, doc_id: object) -> bool:
+        return doc_id in self._raw
+
+    def __len__(self) -> int:
+        return len(self._raw)
+
+    def get(self, doc_id: str, default: dict[str, list[str]] | None = None) -> dict[str, list[str]] | None:
+        """Return highlighted fields for *doc_id*, or *default* if not found."""
+        return self._raw.get(doc_id, default)
+
+    def snippets(self, doc_id: str, field: str) -> list[str]:
+        """Return the list of highlighted snippets for a specific document and field.
+
+        :param doc_id: The document ID.
+        :param field: The field name.
+        :returns: List of snippet strings, or an empty list if not found.
+        """
+        return self._raw.get(doc_id, {}).get(field, [])
+
+    def __repr__(self) -> str:
+        return 'HighlightingResult(%d docs)' % len(self._raw)
+
+
 class SpellcheckResult:
     """Wrapper around a Solr spellcheck response component.
 
