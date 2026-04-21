@@ -35,7 +35,7 @@ cloud = ["kazoo"]
 pydantic = ["pydantic"]
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.0"
+pytest = ">=8,<10"
 mypy = "^1.19.1"
 
 [tool.poetry.group.docs.dependencies]
