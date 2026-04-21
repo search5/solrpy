@@ -54,7 +54,8 @@ class AsyncSolr:
                  auth_token: str | None = None,
                  auth: Any = None,
                  debug: bool = False,
-                 verify: bool | str | None = None) -> None:
+                 verify: bool | str | None = None,
+                 solr_version: tuple[int, ...] | None = None) -> None:
         """Create an async Solr connection.
 
         Same parameters as :class:`~solr.core.Solr`.
@@ -75,6 +76,9 @@ class AsyncSolr:
         :param verify: SSL certificate verification. Pass ``False`` to disable,
             or a path string to a CA bundle or certificate file. Passed directly
             to ``httpx.AsyncClient(verify=...)``. Defaults to httpx's default (``True``).
+        :param solr_version: Override the detected Solr version, e.g. ``(9, 4, 1)``.
+            Skips autodetection entirely. Useful when the server returns ``null``
+            for ``solr-spec-version`` (e.g. DSE distributions).
         """
         self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]
         self.url = url
@@ -120,7 +124,7 @@ class AsyncSolr:
             client_kwargs['verify'] = verify
         self._client: httpx.AsyncClient = httpx.AsyncClient(**client_kwargs)
 
-        self._server_version: tuple[int, ...] | None = None
+        self._server_version: tuple[int, ...] | None = solr_version
 
     @property
     def server_version(self) -> tuple[int, ...]:

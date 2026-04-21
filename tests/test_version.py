@@ -165,3 +165,16 @@ class TestSolrConnectionRemoved(unittest.TestCase):
 # 1.0.3 tests — response_format
 # ===================================================================
 
+
+
+class TestSolrVersionOverride(unittest.TestCase):
+
+    def test_version_override_skips_autodetect(self):
+        conn = solr.Solr(SOLR_HTTP, solr_version=(9, 4, 1))
+        self.assertEqual(conn.server_version, (9, 4, 1))
+        conn.close()
+
+    def test_async_version_override(self):
+        from solr.async_solr import AsyncSolr
+        conn = AsyncSolr(SOLR_HTTP, solr_version=(9, 4, 1))
+        self.assertEqual(conn.server_version, (9, 4, 1))

@@ -54,7 +54,8 @@ class Solr:
                  auth_token: str | None = None,
                  auth: Any = None,
                  debug: bool = False,
-                 verify: bool | str | None = None) -> None:
+                 verify: bool | str | None = None,
+                 solr_version: tuple[int, ...] | None = None) -> None:
         """
         Connect to the Solr instance at *url*.
 
@@ -78,6 +79,9 @@ class Solr:
         :param verify: SSL certificate verification. Pass ``False`` to disable,
             or a path string to a CA bundle or certificate file. Passed directly
             to ``httpx.Client(verify=...)``. Defaults to httpx's default (``True``).
+        :param solr_version: Override the detected Solr version, e.g. ``(9, 4, 1)``.
+            Skips autodetection entirely. Useful when the server returns ``null``
+            for ``solr-spec-version`` (e.g. DSE distributions).
         """
 
         self.scheme, self.host, self.path = urllib.urlparse(url, 'http')[:3]
@@ -164,7 +168,7 @@ class Solr:
         self.always_commit = always_commit
         self.debug = debug
         self.select = SearchHandler(self, "/select")
-        self._server_version: tuple[int, ...] | None = None
+        self._server_version: tuple[int, ...] | None = solr_version
 
     @property
     def _client(self) -> httpx.Client:
