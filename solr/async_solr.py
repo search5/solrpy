@@ -53,7 +53,8 @@ class AsyncSolr:
                  response_format: str = 'json',
                  auth_token: str | None = None,
                  auth: Any = None,
-                 debug: bool = False) -> None:
+                 debug: bool = False,
+                 verify: bool | str | None = None) -> None:
         """Create an async Solr connection.
 
         Same parameters as :class:`~solr.core.Solr`.
@@ -71,6 +72,9 @@ class AsyncSolr:
         :param auth_token: Bearer token string for authentication.
         :param auth: Callable returning a ``dict[str, str]`` of auth headers per request.
         :param debug: Log all requests and responses.
+        :param verify: SSL certificate verification. Pass ``False`` to disable,
+            or a path string to a CA bundle or certificate file. Passed directly
+            to ``httpx.AsyncClient(verify=...)``. Defaults to httpx's default (``True``).
         """
         self.scheme, self.host, self.path = urlparse.urlparse(url, 'http')[:3]
         self.url = url
@@ -107,9 +111,14 @@ class AsyncSolr:
         else:
             self.auth_headers = {}
 
+        self._verify = verify
         base_url = '%s://%s' % (self.scheme, self.host)
-        self._client: httpx.AsyncClient = httpx.AsyncClient(
-            base_url=base_url, timeout=self.timeout, follow_redirects=True)
+        client_kwargs: dict[str, Any] = {
+            'base_url': base_url, 'timeout': self.timeout, 'follow_redirects': True,
+        }
+        if verify is not None:
+            client_kwargs['verify'] = verify
+        self._client: httpx.AsyncClient = httpx.AsyncClient(**client_kwargs)
 
         self._server_version: tuple[int, ...] | None = None
 
@@ -127,7 +136,10 @@ class AsyncSolr:
     def _detect_version_sync(self) -> tuple[int, ...]:
         """Detect Solr version synchronously (used during __init__)."""
         base_url = '%s://%s' % (self.scheme, self.host)
-        with httpx.Client(base_url=base_url, timeout=self.timeout) as client:
+        client_kwargs: dict[str, Any] = {'base_url': base_url, 'timeout': self.timeout}
+        if self._verify is not None:
+            client_kwargs['verify'] = self._verify
+        with httpx.Client(**client_kwargs) as client:
             base_paths = [self.path]
             parent = self.path.rsplit('/', 1)[0]
             if parent and parent != self.path:

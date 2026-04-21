@@ -2,6 +2,7 @@
 
 import unittest
 import solr
+from solr.async_solr import AsyncSolr
 from tests.conftest import SOLR_HTTP, SolrConnectionTestCase
 
 
@@ -58,6 +59,43 @@ class TestHttpxClient(unittest.TestCase):
         self.assertIsInstance(conn.server_version, tuple)
         self.assertGreaterEqual(len(conn.server_version), 2)
         conn.close()
+
+
+class TestVerifyParam(unittest.TestCase):
+
+    def test_verify_default_absent_from_client_kwargs(self):
+        conn = solr.Solr(SOLR_HTTP)
+        self.assertNotIn('verify', conn._client_kwargs)
+        conn.close()
+
+    def test_verify_false_in_client_kwargs(self):
+        conn = solr.Solr(SOLR_HTTP, verify=False)
+        self.assertIs(conn._client_kwargs['verify'], False)
+        conn.close()
+
+    def test_verify_path_in_client_kwargs(self):
+        conn = solr.Solr(SOLR_HTTP, verify='/path/to/ca-bundle.crt')
+        self.assertEqual(conn._client_kwargs['verify'], '/path/to/ca-bundle.crt')
+
+    def test_verify_false_passed_to_httpx_client(self):
+        import httpx
+        conn = solr.Solr(SOLR_HTTP, verify=False)
+        self.assertIsInstance(conn._client, httpx.Client)
+        conn.close()
+
+    def test_async_verify_default_is_none(self):
+        conn = AsyncSolr(SOLR_HTTP)
+        self.assertIsNone(conn._verify)
+
+    def test_async_verify_false(self):
+        conn = AsyncSolr(SOLR_HTTP, verify=False)
+        self.assertFalse(conn._verify)
+
+    def test_async_verify_path(self):
+        from unittest.mock import patch
+        with patch('httpx.AsyncClient'):
+            conn = AsyncSolr(SOLR_HTTP, verify='/path/to/ca.pem')
+        self.assertEqual(conn._verify, '/path/to/ca.pem')
 
 
 if __name__ == "__main__":
