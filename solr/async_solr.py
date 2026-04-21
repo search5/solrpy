@@ -179,7 +179,10 @@ class AsyncSolr:
     def ping(self) -> bool:
         """Ping Solr (sync, uses a temporary client)."""
         base_url = '%s://%s' % (self.scheme, self.host)
-        with httpx.Client(base_url=base_url, timeout=self.timeout) as client:
+        client_kwargs: dict[str, Any] = {'base_url': base_url, 'timeout': self.timeout}
+        if self._verify is not None:
+            client_kwargs['verify'] = self._verify
+        with httpx.Client(**client_kwargs) as client:
             base_paths = [self.path]
             parent = self.path.rsplit('/', 1)[0]
             if parent and parent != self.path:
